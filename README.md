@@ -95,7 +95,7 @@ A **mobile-first , web platform** that automates volunteer coordination with GPS
 | **Organization Profile** | Manage details, locations, requirements | 📋 Planned |
 | **Predictive Demand Forecasting**| A heatmap or trend line showing "Predicted Need" vs. "Current Registered Volunteers."| 📋 Planned |
 
-> 📌 **Note**: See [ROADMAP.md](./docs/ROADMAP.md) for Tier 2 & 3 features (notifications, analytics, AI forecasting)
+📌 **Note**: See [ROADMAP.md](https://github.com/users/czhang1818/projects/4/views/1) for Tier 2 & 3 features (notifications, analytics, AI forecasting)
 
 ---
 
