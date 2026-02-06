@@ -1,0 +1,127 @@
+``` mermaid
+classDiagram
+    %% Relationships
+    User <|-- Volunteer
+    User <|-- Coordinator
+    
+    Coordinator "1" -- "1" Organization : Manages
+    Organization "1" -- "*" Opportunity : Publishes
+    
+    Volunteer "1" -- "*" Credential : Uploads
+    Organization "1" -- "*" Credential : Verifies
+    
+    Volunteer "*" -- "*" Organization : Joins
+    
+    Volunteer "1" -- "*" Application : Submits
+    Opportunity "1" -- "*" Application : Receives
+    
+    Volunteer "1" -- "*" AttendanceRecord : Generates
+    Opportunity "1" -- "*" AttendanceRecord : Tracks
+    
+    AttendanceRecord "1" -- "1" Certificate : Generates
+    
+    Volunteer "*" -- "*" Skill : Possesses
+    Opportunity "*" -- "*" Skill : Requires
+    
+    %% Classes
+    class User {
+        +int userId
+        +string email
+        +string passwordHash
+        +string phoneNumber
+        +login()
+        +logout()
+        +resetPassword()
+    }
+
+    class Volunteer {
+        +string bio
+        +float totalHours
+        +Location currentLocation
+        +searchOpportunities(filters)
+        +uploadCredential(doc)
+        +checkIn(gpsLocation)
+        +checkOut()
+        +viewPortfolio()
+    }
+
+    class Coordinator {
+        +string jobTitle
+        +verifyOrgStatus()
+        +createShift(opportunity)
+        +validateAttendance(volunteerId)
+        +viewDemandForecast()
+    }
+
+    class Organization {
+        +int orgId
+        +string name
+        +string verificationProof
+        +boolean isVerified
+        +string calendarSyncUrl
+        +getVolunteerStats()
+        +verifyCredential(credId)
+    }
+
+    class Opportunity {
+        +int oppId
+        +string title
+        +string description
+        +Enum visibility
+        +DateTime startTime
+        +DateTime endTime
+        +Location venueLocation
+        +float geoFenceRadius
+        +generateQRCode()
+    }
+
+    class Application {
+        +int appId
+        +DateTime submissionDate
+        +Enum status
+        +string rejectionReason
+        +approve()
+        +reject()
+        +waitlist()
+    }
+
+    class Credential {
+        +int credId
+        +string type
+        +string fileUrl
+        +DateTime expirationDate
+        +boolean isVerified
+        +checkExpiration()
+    }
+
+    class AttendanceRecord {
+        +int recordId
+        +DateTime timeIn
+        +DateTime timeOut
+        +float totalHours
+        +Enum checkInMethod
+        +boolean isConfirmed
+        +verifyLocation(userLoc, venueLoc)
+    }
+
+    class Certificate {
+        +int certId
+        +string coordinatorSignature
+        +DateTime issueDate
+        +string fileUrl
+        +download()
+    }
+
+    class Skill {
+        +int skillId
+        +string name
+        +string description
+    }
+
+    %% Enums (represented as notes for simplicity)
+    note for Application "Status: Pending, Approved, Rejected, Waitlisted"
+    note for AttendanceRecord "Method: GPS, QRCode\nStatus: Pending, Confirmed"
+    note for Credential "Type: Background Check, CPR, Vaccine, etc."
+    note for Opportunity "Visibility: Public, Inner (Private)"
+
+```
