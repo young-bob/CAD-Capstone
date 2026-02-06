@@ -20,6 +20,9 @@ classDiagram
     
     AttendanceRecord "1" -- "1" Certificate : Generates
     
+    Organization "1" -- "*" CertificateTemplate : Defines
+    Certificate "*" -- "1" CertificateTemplate : Uses
+    
     Volunteer "*" -- "*" Skill : Possesses
     Opportunity "*" -- "*" Skill : Requires
     
@@ -104,6 +107,15 @@ classDiagram
         +verifyLocation(userLoc, venueLoc)
     }
 
+    class CertificateTemplate {
+        +int templateId
+        +string name
+        +string districtRegion
+        +Enum type
+        +string layoutConfig
+        +preview()
+    }
+
     class Certificate {
         +int certId
         +string coordinatorSignature
@@ -123,6 +135,6 @@ classDiagram
     note for AttendanceRecord "Method: GPS, QRCode\nStatus: Pending, Confirmed"
     note for Credential "Type: Background Check, CPR, Vaccine, etc."
     note for Opportunity "Visibility: Public, Inner (Private)"
-
+    note for CertificateTemplate "Type: StudentHourLog, StandardCert, DistrictForm"
 
 ```
