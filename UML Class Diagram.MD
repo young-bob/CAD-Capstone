@@ -124,4 +124,5 @@ classDiagram
     note for Credential "Type: Background Check, CPR, Vaccine, etc."
     note for Opportunity "Visibility: Public, Inner (Private)"
 
+
 ```
