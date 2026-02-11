@@ -4,7 +4,7 @@ classDiagram
     User <|-- Volunteer
     User <|-- Coordinator
     
-    Coordinator "1" -- "1" Organization : Manages
+    Coordinator "*" -- "1" Organization : Manages
     Organization "1" -- "*" Opportunity : Publishes
     
     Volunteer "1" -- "*" Credential : Uploads
@@ -25,6 +25,9 @@ classDiagram
     
     Volunteer "*" -- "*" Skill : Possesses
     Opportunity "*" -- "*" Skill : Requires
+
+    Volunteer --> Location
+    Opportunity --> Location
     
     %% Classes
     class User {
@@ -62,6 +65,9 @@ classDiagram
         +string verificationProof
         +boolean isVerified
         +string calendarSyncUrl
+        +string description
+        +string logoUrl
+        +string website
         +getVolunteerStats()
         +verifyCredential(credId)
     }
@@ -70,18 +76,20 @@ classDiagram
         +int oppId
         +string title
         +string description
-        +Enum visibility
+        +OpportunityVisibility visibility
         +DateTime startTime
         +DateTime endTime
         +Location venueLocation
         +float geoFenceRadius
+        +int maxVolunteers
+        +int registeredCount
         +generateQRCode()
     }
 
     class Application {
         +int appId
         +DateTime submissionDate
-        +Enum status
+        +ApplicationStatus status
         +string rejectionReason
         +approve()
         +reject()
@@ -90,7 +98,7 @@ classDiagram
 
     class Credential {
         +int credId
-        +string type
+        +CredentialType type
         +string fileUrl
         +DateTime expirationDate
         +boolean isVerified
@@ -102,8 +110,8 @@ classDiagram
         +DateTime timeIn
         +DateTime timeOut
         +float totalHours
-        +Enum checkInMethod
-        +boolean isConfirmed
+        +AttendanceMethod checkInMethod
+        +AttendanceStatus status
         +verifyLocation(userLoc, venueLoc)
     }
 
@@ -111,7 +119,7 @@ classDiagram
         +int templateId
         +string name
         +string districtRegion
-        +Enum type
+        +CertificateTemplateType type
         +string layoutConfig
         +preview()
     }
@@ -130,11 +138,56 @@ classDiagram
         +string description
     }
 
-    %% Enums (represented as notes for simplicity)
-    note for Application "Status: Pending, Approved, Rejected, Waitlisted"
-    note for AttendanceRecord "Method: GPS, QRCode\nStatus: Pending, Confirmed"
-    note for Credential "Type: Background Check, CPR, Vaccine, etc."
-    note for Opportunity "Visibility: Public, Inner (Private)"
-    note for CertificateTemplate "Type: StudentHourLog, StandardCert, DistrictForm"
+    class Location {
+        +double latitude
+        +double longitude
+        +string address
+        +string city
+        +string province
+        +string postalCode
+    }
+
+    %% Enums
+    class ApplicationStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+        WAITLISTED
+    }
+
+    class AttendanceMethod {
+        <<enumeration>>
+        GPS
+        QR_CODE
+    }
+
+    class AttendanceStatus {
+        <<enumeration>>
+        PENDING
+        CONFIRMED
+        REJECTED
+    }
+
+    class CredentialType {
+        <<enumeration>>
+        BACKGROUND_CHECK
+        CPR_CERTIFICATION
+        VACCINE_RECORD
+        OTHER
+    }
+
+    class OpportunityVisibility {
+        <<enumeration>>
+        PUBLIC
+        INTERNAL
+    }
+
+    class CertificateTemplateType {
+        <<enumeration>>
+        STUDENT_HOUR_LOG
+        STANDARD_CERTIFICATE
+        DISTRICT_FORM
+    }
 
 ```
