@@ -123,14 +123,24 @@ docker_build.bat
 #### Manual Docker Compose Commands
 
 ```bash
-# Build without cache and start services
+# Build without cache
 docker compose build --no-cache
+
+# Create services
 docker compose up -d
 
+# More Docker Compose Commands as follows:
+
 # View logs
-docker compose logs -f
+docker compose logs
 
 # Stop services
+docker compose stop
+
+# Start services
+docker compose start
+
+# Remove services
 docker compose down
 ```
 
