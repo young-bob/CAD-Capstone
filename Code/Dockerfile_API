@@ -1,0 +1,29 @@
+# Base stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /opt/vsms
+EXPOSE 8080
+
+# Install runtime dependencies
+USER root
+RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["Backend/VSMS.API/VSMS.API.csproj", "Backend/VSMS.API/"]
+COPY ["Backend/VSMS.Grains.Interfaces/VSMS.Grains.Interfaces.csproj", "Backend/VSMS.Grains.Interfaces/"]
+RUN dotnet restore "Backend/VSMS.API/VSMS.API.csproj"
+COPY . .
+WORKDIR "/src/Backend/VSMS.API"
+RUN dotnet build "VSMS.API.csproj" -c Release -o /opt/vsms/build
+
+# Publish stage
+FROM build AS publish
+RUN dotnet publish "VSMS.API.csproj" -c Release -o /opt/vsms/publish
+
+# Final stage
+FROM base AS final
+WORKDIR /opt/vsms
+COPY --from=publish /opt/vsms/publish .
+ENTRYPOINT ["/opt/vsms/VSMS.API"]

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.ProfilePage"
+             x:DataType="vm:ProfileViewModel"
+             Title="Profile">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="{Binding ActionText}" Command="{Binding ToggleEditCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="20">
+            <!-- Profile Info -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Email" FontAttributes="Bold" />
+                <Entry Text="{Binding Profile.Email}" IsReadOnly="True" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Phone" FontAttributes="Bold" />
+                <Entry Text="{Binding Profile.PhoneNumber}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Bio" FontAttributes="Bold" />
+                <Editor Text="{Binding Profile.Bio}" HeightRequest="100" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+            
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Total Hours" FontAttributes="Bold" />
+                <Label Text="{Binding Profile.TotalHours}" FontSize="18" />
+            </VerticalStackLayout>
+
+             <!-- Skills (Read-only list for now) -->
+             <Label Text="Skills" FontAttributes="Bold" />
+             <CollectionView ItemsSource="{Binding Profile.Skills}" HeightRequest="100">
+                 <CollectionView.ItemTemplate>
+                     <DataTemplate x:DataType="x:String">
+                         <Label Text="{Binding .}" Padding="5" />
+                     </DataTemplate>
+                 </CollectionView.ItemTemplate>
+             </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

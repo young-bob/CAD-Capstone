@@ -1,0 +1,31 @@
+# Base stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+WORKDIR /opt/vsms
+EXPOSE 11111
+EXPOSE 30000
+
+# Install runtime dependencies
+USER root
+RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY ["Backend/VSMS.Silo/VSMS.Silo.csproj", "Backend/VSMS.Silo/"]
+COPY ["Backend/VSMS.Grains/VSMS.Grains.csproj", "Backend/VSMS.Grains/"]
+COPY ["Backend/VSMS.Grains.Interfaces/VSMS.Grains.Interfaces.csproj", "Backend/VSMS.Grains.Interfaces/"]
+RUN dotnet restore "Backend/VSMS.Silo/VSMS.Silo.csproj"
+COPY . .
+WORKDIR "/src/Backend/VSMS.Silo"
+RUN dotnet build "VSMS.Silo.csproj" -c Release -o /opt/vsms/build
+
+# Publish stage
+FROM build AS publish
+RUN dotnet publish "VSMS.Silo.csproj" -c Release -o /opt/vsms/publish
+
+# Final stage
+FROM base AS final
+WORKDIR /opt/vsms
+COPY --from=publish /opt/vsms/publish .
+ENTRYPOINT ["/opt/vsms/VSMS.Silo"]

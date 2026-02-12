@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.DashboardPage"
+             x:DataType="vm:DashboardViewModel"
+             Title="{Binding Title}">
+    <VerticalStackLayout Padding="20" Spacing="20">
+        <Label Text="{Binding VolunteerName, StringFormat='Welcome, {0}'}" FontSize="24" />
+        <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15">
+            <VerticalStackLayout>
+                 <Label Text="Total Hours" FontSize="14" />
+                 <Label Text="{Binding TotalHours}" FontSize="36" FontAttributes="Bold" />
+            </VerticalStackLayout>
+        </Border>
+        <!-- Add List of Shifts Here -->
+    </VerticalStackLayout>
+</ContentPage>

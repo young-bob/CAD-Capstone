@@ -1,0 +1,125 @@
+using VSMS.Grains.Interfaces;
+using VSMS.Grains.Interfaces.Models;
+using VSMS.Grains.States;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+
+namespace VSMS.Grains;
+
+public class VolunteerGrain : Grain, IVolunteerGrain
+{
+    private readonly IPersistentState<VolunteerState> _state;
+    private readonly ILogger<VolunteerGrain> _logger;
+
+    public VolunteerGrain(
+        [PersistentState("volunteer", "grain-store")] IPersistentState<VolunteerState> state,
+        ILogger<VolunteerGrain> logger)
+    {
+        _state = state;
+        _logger = logger;
+    }
+
+    public Task<VolunteerProfile?> GetProfile()
+    {
+        return Task.FromResult(_state.State.Profile);
+    }
+
+    public async Task UpdateProfile(VolunteerProfile profile)
+    {
+        _state.State.Profile = profile;
+        await _state.WriteStateAsync();
+        _logger.LogInformation("Profile updated for volunteer {VolunteerId}", this.GetPrimaryKey());
+    }
+
+    public async Task AddCredential(Credential credential)
+    {
+        if (_state.State.Credentials == null)
+            _state.State.Credentials = new List<Credential>();
+
+        _state.State.Credentials.Add(credential);
+        await _state.WriteStateAsync();
+    }
+
+    public Task<List<Credential>> GetCredentials()
+    {
+        return Task.FromResult(_state.State.Credentials ?? new List<Credential>());
+    }
+
+    public async Task ApplyForOpportunity(Guid opportunityId)
+    {
+        _logger.LogInformation("Volunteer {VolunteerId} applying for Opportunity {OpportunityId}", this.GetPrimaryKey(), opportunityId);
+
+        var opportunityGrain = GrainFactory.GetGrain<IOpportunityGrain>(opportunityId);
+        var notes = "Applying via VolunteerGrain"; // Placeholder for actual notes
+
+        try
+        {
+            var application = await opportunityGrain.SubmitApplication(this.GetPrimaryKey(), notes);
+
+            if (_state.State.Applications == null)
+                _state.State.Applications = new List<Application>();
+
+            _state.State.Applications.Add(application);
+            await _state.WriteStateAsync();
+
+            _logger.LogInformation("Application submitted successfully. ApplicationId: {ApplicationId}", application.AppId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to submit application for Opportunity {OpportunityId}", opportunityId);
+            throw;
+        }
+    }
+
+    public Task CheckIn(Guid opportunityId, Location location)
+    {
+        _logger.LogInformation("Volunteer {VolunteerId} checking in at Opportunity {OpportunityId}", this.GetPrimaryKey(), opportunityId);
+        // TODO: Implement actual check-in logic with Coordinator validation
+        return Task.CompletedTask;
+    }
+
+    public Task CheckOut(Guid opportunityId)
+    {
+        _logger.LogInformation("Volunteer {VolunteerId} checking out from Opportunity {OpportunityId}", this.GetPrimaryKey(), opportunityId);
+        // TODO: Implement check-out logic
+        return Task.CompletedTask;
+    }
+
+    public Task<List<AttendanceRecord>> GetAttendanceHistory()
+    {
+        return Task.FromResult(_state.State.AttendanceHistory ?? new List<AttendanceRecord>());
+    }
+
+    // Skill management
+    public async Task AddSkill(Guid skillId)
+    {
+        if (!_state.State.SkillIds.Contains(skillId))
+        {
+            _state.State.SkillIds.Add(skillId);
+            await _state.WriteStateAsync();
+
+            // Notify the skill grain to track this volunteer
+            var skillGrain = GrainFactory.GetGrain<ISkillGrain>(skillId);
+            // Note: SkillGrain needs AddVolunteer method made public or accessible
+        }
+    }
+
+    public async Task RemoveSkill(Guid skillId)
+    {
+        if (_state.State.SkillIds.Remove(skillId))
+        {
+            await _state.WriteStateAsync();
+        }
+    }
+
+    public Task<List<Guid>> GetSkills()
+    {
+        return Task.FromResult(_state.State.SkillIds);
+    }
+
+    // Certificate management
+    public Task<List<Guid>> GetCertificates()
+    {
+        return Task.FromResult(_state.State.CertificateIds);
+    }
+}
