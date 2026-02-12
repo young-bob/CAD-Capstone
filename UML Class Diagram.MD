@@ -18,7 +18,7 @@ classDiagram
     Volunteer "1" -- "*" AttendanceRecord : Generates
     Opportunity "1" -- "*" AttendanceRecord : Tracks
     
-    AttendanceRecord "1" -- "1" Certificate : Generates
+    AttendanceRecord "*" -- "1" Certificate : Generates
     
     Organization "1" -- "*" CertificateTemplate : Defines
     Certificate "*" -- "1" CertificateTemplate : Uses
@@ -28,22 +28,29 @@ classDiagram
 
     Volunteer --> Location
     Opportunity --> Location
+    Organization --> Location
     
     %% Classes
     class User {
-        +int userId
+        +Guid userId
         +string email
         +string passwordHash
-        +string phoneNumber
+        +string role
+        +DateTime createdAt
+        +DateTime? lastLoginAt
+        +bool isActive
         +login()
         +logout()
         +resetPassword()
     }
 
     class Volunteer {
+        +string name
+        +string phoneNumber
         +string bio
-        +float totalHours
+        +double totalHours
         +Location currentLocation
+        +List~Guid~ skillIds
         +searchOpportunities(filters)
         +uploadCredential(doc)
         +checkIn(gpsLocation)
@@ -60,20 +67,22 @@ classDiagram
     }
 
     class Organization {
-        +int orgId
+        +Guid organizationId
         +string name
-        +string verificationProof
-        +boolean isVerified
-        +string calendarSyncUrl
         +string description
         +string logoUrl
         +string website
+        +Location location
+        +string verificationProof
+        +bool isVerified
+        +string calendarSyncUrl
         +getVolunteerStats()
         +verifyCredential(credId)
     }
 
     class Opportunity {
-        +int oppId
+        +Guid opportunityId
+        +Guid organizationId
         +string title
         +string description
         +OpportunityVisibility visibility
@@ -87,7 +96,9 @@ classDiagram
     }
 
     class Application {
-        +int appId
+        +Guid appId
+        +Guid volunteerId
+        +Guid opportunityId
         +DateTime submissionDate
         +ApplicationStatus status
         +string rejectionReason
@@ -97,26 +108,29 @@ classDiagram
     }
 
     class Credential {
-        +int credId
+        +Guid credId
+        +Guid volunteerId
         +CredentialType type
         +string fileUrl
         +DateTime expirationDate
-        +boolean isVerified
+        +bool isVerified
         +checkExpiration()
     }
 
     class AttendanceRecord {
-        +int recordId
+        +Guid recordId
+        +Guid volunteerId
+        +Guid opportunityId
         +DateTime timeIn
-        +DateTime timeOut
-        +float totalHours
+        +DateTime? timeOut
+        +double totalHours
         +AttendanceMethod checkInMethod
         +AttendanceStatus status
         +verifyLocation(userLoc, venueLoc)
     }
 
     class CertificateTemplate {
-        +int templateId
+        +Guid templateId
         +string name
         +string districtRegion
         +CertificateTemplateType type
@@ -125,7 +139,9 @@ classDiagram
     }
 
     class Certificate {
-        +int certId
+        +Guid certId
+        +Guid volunteerId
+        +List~Guid~ attendanceRecordIds
         +string coordinatorSignature
         +DateTime issueDate
         +string fileUrl
@@ -133,7 +149,7 @@ classDiagram
     }
 
     class Skill {
-        +int skillId
+        +Guid skillId
         +string name
         +string description
     }
