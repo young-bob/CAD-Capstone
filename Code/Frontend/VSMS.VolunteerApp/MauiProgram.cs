@@ -19,26 +19,53 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
-        // Services
-        builder.Services.AddRefitClient<VSMS.VolunteerApp.Services.IVolunteerApiService>()
-               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:5000")); // TODO: Use DevTunnel/Local IP
+        // Auth token handler
+        builder.Services.AddTransient<AuthTokenHandler>();
 
-        // Views & ViewModels
-        // LoginPage not implemented yet
-        // builder.Services.AddTransient<VSMS.VolunteerApp.Views.LoginPage>();
-        // builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.LoginViewModel>();
+        // Refit API Service with AuthTokenHandler
+        builder.Services.AddRefitClient<IVolunteerApiService>()
+               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:5000")) // TODO: Use DevTunnel/Local IP
+               .AddHttpMessageHandler<AuthTokenHandler>();
 
-        builder.Services.AddTransient<VSMS.VolunteerApp.Views.DashboardPage>();
-        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.DashboardViewModel>();
+        // ---- ViewModels ----
+        builder.Services.AddTransient<LoginViewModel>();
+        builder.Services.AddTransient<RegisterViewModel>();
+        builder.Services.AddTransient<ResetPasswordViewModel>();
+        builder.Services.AddTransient<DashboardViewModel>();
+        builder.Services.AddTransient<OpportunitiesViewModel>();
+        builder.Services.AddTransient<OpportunityDetailViewModel>();
+        builder.Services.AddTransient<ProfileViewModel>();
+        builder.Services.AddTransient<OrganizationProfileViewModel>();
+        builder.Services.AddTransient<ManageOpportunitiesViewModel>();
+        builder.Services.AddTransient<VerifyCredentialsViewModel>();
+        builder.Services.AddTransient<SetOrganizationViewModel>();
+        builder.Services.AddTransient<ManageShiftsViewModel>();
+        builder.Services.AddTransient<ValidateAttendanceViewModel>();
+        builder.Services.AddTransient<CertificatesViewModel>();
+        builder.Services.AddTransient<CertificateDetailViewModel>();
+        builder.Services.AddTransient<GenerateCertificateViewModel>();
+        builder.Services.AddTransient<SkillsViewModel>();
+        builder.Services.AddTransient<SkillDetailViewModel>();
 
-        builder.Services.AddTransient<VSMS.VolunteerApp.Views.OpportunitiesPage>();
-        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.OpportunitiesViewModel>();
-
-        builder.Services.AddTransient<VSMS.VolunteerApp.Views.OpportunityDetailPage>();
-        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.OpportunityDetailViewModel>();
-
-        builder.Services.AddTransient<VSMS.VolunteerApp.Views.ProfilePage>();
-        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.ProfileViewModel>();
+        // ---- Views ----
+        builder.Services.AddTransient<LoginPage>();
+        builder.Services.AddTransient<RegisterPage>();
+        builder.Services.AddTransient<ResetPasswordPage>();
+        builder.Services.AddTransient<DashboardPage>();
+        builder.Services.AddTransient<OpportunitiesPage>();
+        builder.Services.AddTransient<OpportunityDetailPage>();
+        builder.Services.AddTransient<ProfilePage>();
+        builder.Services.AddTransient<OrganizationProfilePage>();
+        builder.Services.AddTransient<ManageOpportunitiesPage>();
+        builder.Services.AddTransient<VerifyCredentialsPage>();
+        builder.Services.AddTransient<SetOrganizationPage>();
+        builder.Services.AddTransient<ManageShiftsPage>();
+        builder.Services.AddTransient<ValidateAttendancePage>();
+        builder.Services.AddTransient<CertificatesPage>();
+        builder.Services.AddTransient<CertificateDetailPage>();
+        builder.Services.AddTransient<GenerateCertificatePage>();
+        builder.Services.AddTransient<SkillsPage>();
+        builder.Services.AddTransient<SkillDetailPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

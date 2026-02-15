@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.CertificatesPage"
+             x:DataType="vm:CertificatesViewModel"
+             Title="My Certificates">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <Label Text="Certificates" FontSize="24" FontAttributes="Bold" />
+
+            <CollectionView ItemsSource="{Binding Certificates}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="No certificates yet." TextColor="Gray" HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:CertificateDetails">
+                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12" Margin="0,0,0,8">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CertificatesViewModel}}, Path=ViewDetailCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <VerticalStackLayout Spacing="3" Grid.Column="0">
+                                    <Label Text="{Binding Id, StringFormat='Certificate: {0}'}" FontSize="14" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding IssuedAt, StringFormat='{0:MMM dd, yyyy}'}" FontSize="12" TextColor="Gray" />
+                                    <HorizontalStackLayout Spacing="5">
+                                        <Label Text="Signed:" FontSize="12" />
+                                        <Label Text="{Binding IsSigned}" FontSize="12" TextColor="Gray" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                                <Button Text="Download" Grid.Column="1" VerticalOptions="Center" FontSize="12" Padding="8,4"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:CertificatesViewModel}}, Path=DownloadCommand}"
+                                        CommandParameter="{Binding .}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VSMS.VolunteerApp.Models;
 using VSMS.VolunteerApp.Services;
 
 namespace VSMS.VolunteerApp.ViewModels;
@@ -25,20 +26,46 @@ public partial class LoginViewModel : BaseViewModel
     {
         if (IsBusy) return;
 
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            await Shell.Current.DisplayAlertAsync("Validation", "Please enter both email and password.", "OK");
+            return;
+        }
+
         try
         {
             IsBusy = true;
-            // var token = await _apiService.Login(new { Email, Password });
-            // await SecureStorage.SetAsync("auth_token", token);
+            var response = await _apiService.Login(new LoginRequest(Email, Password));
+
+            if (response?.Token != null)
+            {
+                await SecureStorage.SetAsync("auth_token", response.Token);
+                await SecureStorage.SetAsync("user_id", response.UserId.ToString());
+                await SecureStorage.SetAsync("user_role", response.Role ?? "Volunteer");
+                await SecureStorage.SetAsync("user_name", response.Name ?? "User");
+            }
+
             await Shell.Current.GoToAsync("//DashboardPage");
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlertAsync("Error", ex.Message, "OK");
+            await Shell.Current.DisplayAlertAsync("Login Failed", ex.Message, "OK");
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    async Task GoToRegisterAsync()
+    {
+        await Shell.Current.GoToAsync(nameof(Views.RegisterPage));
+    }
+
+    [RelayCommand]
+    async Task GoToResetPasswordAsync()
+    {
+        await Shell.Current.GoToAsync(nameof(Views.ResetPasswordPage));
     }
 }

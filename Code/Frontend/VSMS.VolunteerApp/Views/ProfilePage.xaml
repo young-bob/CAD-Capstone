@@ -11,36 +11,36 @@
 
     <ScrollView>
         <VerticalStackLayout Spacing="20" Padding="20">
-            <!-- Profile Info -->
+            <!-- Name -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Name" FontAttributes="Bold" />
+                <Entry Text="{Binding EditName}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <!-- Email (read-only) -->
             <VerticalStackLayout Spacing="5">
                 <Label Text="Email" FontAttributes="Bold" />
                 <Entry Text="{Binding Profile.Email}" IsReadOnly="True" />
             </VerticalStackLayout>
 
+            <!-- Phone -->
             <VerticalStackLayout Spacing="5">
                 <Label Text="Phone" FontAttributes="Bold" />
-                <Entry Text="{Binding Profile.PhoneNumber}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                <Entry Text="{Binding EditPhone}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
             </VerticalStackLayout>
 
+            <!-- Bio -->
             <VerticalStackLayout Spacing="5">
                 <Label Text="Bio" FontAttributes="Bold" />
-                <Editor Text="{Binding Profile.Bio}" HeightRequest="100" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                <Editor Text="{Binding EditBio}" HeightRequest="100"
+                        IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
             </VerticalStackLayout>
             
+            <!-- Total Hours -->
             <VerticalStackLayout Spacing="5">
                 <Label Text="Total Hours" FontAttributes="Bold" />
-                <Label Text="{Binding Profile.TotalHours}" FontSize="18" />
+                <Label Text="{Binding Profile.TotalHours, StringFormat='{0:F1}'}" FontSize="18" />
             </VerticalStackLayout>
-
-             <!-- Skills (Read-only list for now) -->
-             <Label Text="Skills" FontAttributes="Bold" />
-             <CollectionView ItemsSource="{Binding Profile.Skills}" HeightRequest="100">
-                 <CollectionView.ItemTemplate>
-                     <DataTemplate x:DataType="x:String">
-                         <Label Text="{Binding .}" Padding="5" />
-                     </DataTemplate>
-                 </CollectionView.ItemTemplate>
-             </CollectionView>
 
             <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
         </VerticalStackLayout>

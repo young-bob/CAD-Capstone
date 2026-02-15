@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.SkillDetailPage"
+             x:DataType="vm:SkillDetailViewModel"
+             Title="Skill Details">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <Label Text="{Binding Skill.Name}" FontSize="24" FontAttributes="Bold" />
+            <Label Text="{Binding Skill.Description}" FontSize="16" TextColor="Gray" />
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <!-- Volunteers with this skill -->
+            <Label Text="Volunteers with this skill" FontSize="18" FontAttributes="Bold" />
+            <CollectionView ItemsSource="{Binding Volunteers}" HeightRequest="200">
+                <CollectionView.EmptyView>
+                    <Label Text="No volunteers found." TextColor="Gray" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:VolunteerProfile">
+                        <HorizontalStackLayout Spacing="10" Padding="0,3">
+                            <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" />
+                            <Label Text="{Binding Email}" FontSize="14" TextColor="Gray" />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <!-- Opportunities requiring this skill -->
+            <Label Text="Opportunities requiring this skill" FontSize="18" FontAttributes="Bold" />
+            <CollectionView ItemsSource="{Binding Opportunities}" HeightRequest="200">
+                <CollectionView.EmptyView>
+                    <Label Text="No opportunities found." TextColor="Gray" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OpportunityDetails">
+                        <HorizontalStackLayout Spacing="10" Padding="0,3">
+                            <Label Text="{Binding Title}" FontSize="14" FontAttributes="Bold" />
+                            <Label Text="{Binding VenueLocation.City}" FontSize="14" TextColor="Gray" />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

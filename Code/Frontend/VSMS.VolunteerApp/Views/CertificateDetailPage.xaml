@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.CertificateDetailPage"
+             x:DataType="vm:CertificateDetailViewModel"
+             Title="Certificate Details">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <Label Text="Certificate" FontSize="24" FontAttributes="Bold" />
+            <Label Text="{Binding Certificate.Id, StringFormat='ID: {0}'}" FontSize="14" TextColor="Gray" />
+            <Label Text="{Binding Certificate.VolunteerName, StringFormat='Volunteer: {0}'}" FontSize="16" />
+            <Label Text="{Binding Certificate.IssuedAt, StringFormat='Issued: {0:MMM dd, yyyy}'}" FontSize="14" />
+
+            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="Signature Status" FontAttributes="Bold" />
+                    <Label Text="{Binding SignatureStatus}" FontSize="16" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Sign Section -->
+            <VerticalStackLayout Spacing="10" IsVisible="{Binding CanSign}">
+                <Label Text="Sign this Certificate" FontSize="18" FontAttributes="Bold" />
+                <Entry Text="{Binding SignatureText}" Placeholder="Enter your digital signature" />
+                <Button Text="Sign Certificate" Command="{Binding SignCommand}" IsEnabled="{Binding IsNotBusy}"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" />
+            </VerticalStackLayout>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

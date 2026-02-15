@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.OrganizationProfilePage"
+             x:DataType="vm:OrganizationProfileViewModel"
+             Title="Organization Profile">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="{Binding ActionText}" Command="{Binding ToggleEditCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <!-- Verification Badge -->
+            <HorizontalStackLayout Spacing="10">
+                <Label Text="{Binding Organization.Name}" FontSize="24" FontAttributes="Bold" />
+                <Border StrokeShape="RoundRectangle 12" Padding="5,2"
+                        BackgroundColor="{Binding VerificationColor}"
+                        IsVisible="True">
+                    <Label Text="{Binding VerificationText}" FontSize="12" TextColor="White" />
+                </Border>
+            </HorizontalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Description" FontAttributes="Bold" />
+                <Editor Text="{Binding EditDescription}" HeightRequest="80"
+                        IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Website" FontAttributes="Bold" />
+                <Entry Text="{Binding EditWebsite}"
+                       IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Logo URL" FontAttributes="Bold" />
+                <Entry Text="{Binding EditLogoUrl}"
+                       IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <Label Text="Location" FontSize="18" FontAttributes="Bold" Margin="0,10,0,0" />
+            <Label Text="{Binding Organization.Location.Address}" />
+            <Label Text="{Binding Organization.Location.City}" />
+            <Label Text="{Binding Organization.Location.Province}" />
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Calendar Sync URL" FontAttributes="Bold" />
+                <Entry Text="{Binding EditCalendarSyncUrl}"
+                       IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+            </VerticalStackLayout>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

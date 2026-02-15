@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.SkillsPage"
+             x:DataType="vm:SkillsViewModel"
+             Title="Skills">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="+ Add" Command="{Binding ShowAddFormCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <!-- Add Form -->
+            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15"
+                    IsVisible="{Binding IsAdding}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Add New Skill" FontSize="18" FontAttributes="Bold" />
+                    <Entry Text="{Binding NewSkillName}" Placeholder="Skill name" />
+                    <Editor Text="{Binding NewSkillDescription}" Placeholder="Description" HeightRequest="60" />
+                    <HorizontalStackLayout Spacing="10">
+                        <Button Text="Add" Command="{Binding AddSkillCommand}" IsEnabled="{Binding IsNotBusy}"
+                                BackgroundColor="{StaticResource Primary}" TextColor="White" />
+                        <Button Text="Cancel" Command="{Binding CancelAddCommand}" BackgroundColor="Gray" TextColor="White" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Skills List -->
+            <CollectionView ItemsSource="{Binding Skills}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="No skills found." TextColor="Gray" HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Skill">
+                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12" Margin="0,0,0,5">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SkillsViewModel}}, Path=ViewDetailCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" />
+                                <Label Text="{Binding Description}" FontSize="13" TextColor="Gray" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -27,8 +27,7 @@ public partial class OpportunityDetailViewModel : BaseViewModel
         try
         {
             IsBusy = true;
-            await Task.Delay(1000); // Simulate network call
-            // await _apiService.Apply(Opportunity.Id);
+            await Task.Delay(1000);
             await Shell.Current.DisplayAlertAsync("Success", $"You have applied to {Opportunity.Title}!", "OK");
             await Shell.Current.GoToAsync("..");
         }

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.LoginPage"
+             x:DataType="vm:LoginViewModel"
+             Shell.NavBarIsVisible="False">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="30" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="400">
+
+            <!-- App Logo / Title -->
+            <Label Text="VSMS" FontSize="40" FontAttributes="Bold" HorizontalOptions="Center"
+                   TextColor="{StaticResource Primary}" />
+            <Label Text="Volunteer Service Management" FontSize="14" HorizontalOptions="Center"
+                   TextColor="Gray" Margin="0,-15,0,10" />
+
+            <!-- Email -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Email" FontAttributes="Bold" />
+                <Entry Text="{Binding Email}" Placeholder="you@example.com" Keyboard="Email" />
+            </VerticalStackLayout>
+
+            <!-- Password -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Password" FontAttributes="Bold" />
+                <Entry Text="{Binding Password}" Placeholder="Enter password" IsPassword="True" />
+            </VerticalStackLayout>
+
+            <!-- Login Button -->
+            <Button Text="Login" Command="{Binding LoginCommand}" IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    CornerRadius="8" HeightRequest="50" FontAttributes="Bold" />
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+
+            <!-- Links -->
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="5">
+                <Label Text="Don't have an account?" />
+                <Label Text="Register" TextColor="{StaticResource Primary}" FontAttributes="Bold">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoToRegisterCommand}" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </HorizontalStackLayout>
+
+            <Label Text="Forgot Password?" TextColor="{StaticResource Primary}" HorizontalOptions="Center">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding GoToResetPasswordCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

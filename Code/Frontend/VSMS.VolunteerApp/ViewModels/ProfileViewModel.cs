@@ -10,18 +10,18 @@ public partial class ProfileViewModel : BaseViewModel
 {
     private readonly IVolunteerApiService _apiService;
 
-    [ObservableProperty]
-    private VolunteerProfile _profile;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ActionText))]
-    private bool _isEditing;
+    [ObservableProperty] VolunteerProfile? profile;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ActionText))] bool isEditing;
+    [ObservableProperty] string editName = string.Empty;
+    [ObservableProperty] string editPhone = string.Empty;
+    [ObservableProperty] string editBio = string.Empty;
 
     public string ActionText => IsEditing ? "Save" : "Edit";
 
     public ProfileViewModel(IVolunteerApiService apiService)
     {
         _apiService = apiService;
+        Title = "Profile";
         LoadProfileCommand.Execute(null);
     }
 
@@ -31,20 +31,45 @@ public partial class ProfileViewModel : BaseViewModel
         IsBusy = true;
         try
         {
-            // Mock data for now
-            await Task.Delay(500);
-            Profile = new VolunteerProfile(
-                "volunteer@example.com",
-                "555-0123",
-                "Passionate about community service.",
-                25.5,
-                new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
-                new List<string> { "Gardening", "Teaching" }
-            );
+            var userIdStr = await SecureStorage.GetAsync("user_id");
+            if (Guid.TryParse(userIdStr, out var userId))
+            {
+                try
+                {
+                    Profile = await _apiService.GetVolunteer(userId);
+                }
+                catch
+                {
+                    Profile = new VolunteerProfile(
+                        userId, "Volunteer", "volunteer@example.com",
+                        "555-0123", "Passionate about community service.",
+                        25.5,
+                        new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
+                        new List<Guid>()
+                    );
+                }
+            }
+            else
+            {
+                Profile = new VolunteerProfile(
+                    Guid.Empty, "Volunteer", "volunteer@example.com",
+                    "555-0123", "Passionate about community service.",
+                    25.5,
+                    new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
+                    new List<Guid>()
+                );
+            }
+
+            if (Profile != null)
+            {
+                EditName = Profile.Name ?? "";
+                EditPhone = Profile.PhoneNumber ?? "";
+                EditBio = Profile.Bio ?? "";
+            }
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Unable to load profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
         }
         finally
         {
@@ -67,17 +92,24 @@ public partial class ProfileViewModel : BaseViewModel
 
     private async Task SaveProfileAsync()
     {
+        if (Profile == null) return;
+
         IsBusy = true;
         try
         {
-            // Simulate API call
-            await Task.Delay(1000);
+            var updated = new VolunteerProfile(
+                Profile.UserId, EditName, Profile.Email, EditPhone, EditBio,
+                Profile.TotalHours, Profile.CurrentLocation, Profile.SkillIds
+            );
+
+            await _apiService.UpdateVolunteer(Profile.UserId, updated);
+            Profile = updated;
             IsEditing = false;
-            await Shell.Current.DisplayAlert("Success", "Profile updated successfully.", "OK");
+            await Shell.Current.DisplayAlertAsync("Success", "Profile updated successfully.", "OK");
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Unable to save profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
         }
         finally
         {

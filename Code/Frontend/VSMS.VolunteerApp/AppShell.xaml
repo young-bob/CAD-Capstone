@@ -4,28 +4,100 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:views="clr-namespace:VSMS.VolunteerApp.Views"
-    Shell.FlyoutBehavior="Disabled">
+    Shell.FlyoutBehavior="Flyout">
 
-    <!-- LoginPage not implemented yet
+    <!-- Login (non-flyout) -->
     <ShellContent
         Title="Login"
         ContentTemplate="{DataTemplate views:LoginPage}"
-        Route="LoginPage" />
-    -->
+        Route="LoginPage"
+        FlyoutItemIsVisible="False" />
 
-    <ShellContent
-        Title="Opportunities"
-        ContentTemplate="{DataTemplate views:OpportunitiesPage}"
-        Route="OpportunitiesPage" />
+    <!-- Common Tabs -->
+    <FlyoutItem Title="Dashboard" Icon="{x:Null}">
+        <ShellContent
+            Title="Dashboard"
+            ContentTemplate="{DataTemplate views:DashboardPage}"
+            Route="DashboardPage" />
+    </FlyoutItem>
 
-    <ShellContent
-        Title="Dashboard"
-        ContentTemplate="{DataTemplate views:DashboardPage}"
-        Route="DashboardPage" />
+    <FlyoutItem Title="Opportunities" Icon="{x:Null}">
+        <ShellContent
+            Title="Opportunities"
+            ContentTemplate="{DataTemplate views:OpportunitiesPage}"
+            Route="OpportunitiesPage" />
+    </FlyoutItem>
 
-    <ShellContent
-        Title="Profile"
-        ContentTemplate="{DataTemplate views:ProfilePage}"
-        Route="ProfilePage" />
+    <FlyoutItem Title="Profile" Icon="{x:Null}">
+        <ShellContent
+            Title="Profile"
+            ContentTemplate="{DataTemplate views:ProfilePage}"
+            Route="ProfilePage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Skills" Icon="{x:Null}">
+        <ShellContent
+            Title="Skills"
+            ContentTemplate="{DataTemplate views:SkillsPage}"
+            Route="SkillsPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Certificates" Icon="{x:Null}">
+        <ShellContent
+            Title="Certificates"
+            ContentTemplate="{DataTemplate views:CertificatesPage}"
+            Route="CertificatesPage" />
+    </FlyoutItem>
+
+    <!-- Organization Section -->
+    <FlyoutItem Title="Organization" Icon="{x:Null}">
+        <ShellContent
+            Title="Organization Profile"
+            ContentTemplate="{DataTemplate views:OrganizationProfilePage}"
+            Route="OrganizationProfilePage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Manage Opportunities" Icon="{x:Null}">
+        <ShellContent
+            Title="Manage Opportunities"
+            ContentTemplate="{DataTemplate views:ManageOpportunitiesPage}"
+            Route="ManageOpportunitiesPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Verify Credentials" Icon="{x:Null}">
+        <ShellContent
+            Title="Verify Credentials"
+            ContentTemplate="{DataTemplate views:VerifyCredentialsPage}"
+            Route="VerifyCredentialsPage" />
+    </FlyoutItem>
+
+    <!-- Coordinator Section -->
+    <FlyoutItem Title="Set Organization" Icon="{x:Null}">
+        <ShellContent
+            Title="Set Organization"
+            ContentTemplate="{DataTemplate views:SetOrganizationPage}"
+            Route="SetOrganizationPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Create Shift" Icon="{x:Null}">
+        <ShellContent
+            Title="Create Shift"
+            ContentTemplate="{DataTemplate views:ManageShiftsPage}"
+            Route="ManageShiftsPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Validate Attendance" Icon="{x:Null}">
+        <ShellContent
+            Title="Validate Attendance"
+            ContentTemplate="{DataTemplate views:ValidateAttendancePage}"
+            Route="ValidateAttendancePage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Generate Certificate" Icon="{x:Null}">
+        <ShellContent
+            Title="Generate Certificate"
+            ContentTemplate="{DataTemplate views:GenerateCertificatePage}"
+            Route="GenerateCertificatePage" />
+    </FlyoutItem>
 
 </Shell>

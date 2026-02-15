@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.RegisterPage"
+             x:DataType="vm:RegisterViewModel"
+             Title="Register"
+             Shell.NavBarIsVisible="True">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="30" Spacing="15" MaximumWidthRequest="400">
+
+            <Label Text="Create Account" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center"
+                   TextColor="{StaticResource Primary}" Margin="0,0,0,10" />
+
+            <!-- Name -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Full Name" FontAttributes="Bold" />
+                <Entry Text="{Binding Name}" Placeholder="John Doe" />
+            </VerticalStackLayout>
+
+            <!-- Email -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Email" FontAttributes="Bold" />
+                <Entry Text="{Binding Email}" Placeholder="you@example.com" Keyboard="Email" />
+            </VerticalStackLayout>
+
+            <!-- Password -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Password" FontAttributes="Bold" />
+                <Entry Text="{Binding Password}" Placeholder="Min 8 characters" IsPassword="True" />
+            </VerticalStackLayout>
+
+            <!-- Phone -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Phone Number" FontAttributes="Bold" />
+                <Entry Text="{Binding PhoneNumber}" Placeholder="555-0123" Keyboard="Telephone" />
+            </VerticalStackLayout>
+
+            <!-- Role -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Role" FontAttributes="Bold" />
+                <Picker Title="Select your role" SelectedItem="{Binding SelectedRole}"
+                        ItemsSource="{Binding Roles}" />
+            </VerticalStackLayout>
+
+            <!-- Bio -->
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Bio" FontAttributes="Bold" />
+                <Editor Text="{Binding Bio}" Placeholder="Tell us about yourself..." HeightRequest="80" />
+            </VerticalStackLayout>
+
+            <!-- Location -->
+            <Label Text="Location" FontSize="18" FontAttributes="Bold" Margin="0,10,0,0" />
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Address" />
+                <Entry Text="{Binding Address}" Placeholder="123 Main St" />
+            </VerticalStackLayout>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                <VerticalStackLayout Spacing="5" Grid.Column="0">
+                    <Label Text="City" />
+                    <Entry Text="{Binding City}" Placeholder="City" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Spacing="5" Grid.Column="1">
+                    <Label Text="Province" />
+                    <Entry Text="{Binding Province}" Placeholder="ON" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Postal Code" />
+                <Entry Text="{Binding PostalCode}" Placeholder="N2L 3G1" />
+            </VerticalStackLayout>
+
+            <!-- Register Button -->
+            <Button Text="Register" Command="{Binding RegisterCommand}" IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White"
+                    CornerRadius="8" HeightRequest="50" FontAttributes="Bold" Margin="0,10,0,0" />
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="5" Margin="0,0,0,20">
+                <Label Text="Already have an account?" />
+                <Label Text="Login" TextColor="{StaticResource Primary}" FontAttributes="Bold">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding GoToLoginCommand}" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </HorizontalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

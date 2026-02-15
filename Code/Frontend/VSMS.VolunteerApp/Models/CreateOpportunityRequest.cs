@@ -1,7 +1,6 @@
 namespace VSMS.VolunteerApp.Models;
 
-public record OpportunityDetails(
-    Guid Id,
+public record CreateOpportunityRequest(
     Guid OrganizationId,
     string? Title,
     string? Description,
@@ -10,6 +9,5 @@ public record OpportunityDetails(
     DateTime EndTime,
     Location? VenueLocation,
     float GeoFenceRadius,
-    int MaxVolunteers,
-    int RegisteredCount
+    int MaxVolunteers
 );

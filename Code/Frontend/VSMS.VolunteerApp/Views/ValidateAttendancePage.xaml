@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.ValidateAttendancePage"
+             x:DataType="vm:ValidateAttendanceViewModel"
+             Title="Validate Attendance">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Center">
+            <Label Text="Validate Attendance" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Volunteer ID" FontAttributes="Bold" />
+                <Entry Text="{Binding VolunteerIdText}" Placeholder="Enter volunteer UUID" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Opportunity" FontAttributes="Bold" />
+                <Picker Title="Select Opportunity" ItemsSource="{Binding Opportunities}"
+                        SelectedItem="{Binding SelectedOpportunity}"
+                        ItemDisplayBinding="{Binding Title}" />
+            </VerticalStackLayout>
+
+            <Button Text="Validate" Command="{Binding ValidateCommand}" IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="50" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

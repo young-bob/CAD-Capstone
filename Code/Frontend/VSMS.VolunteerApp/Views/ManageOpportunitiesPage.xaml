@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.ManageOpportunitiesPage"
+             x:DataType="vm:ManageOpportunitiesViewModel"
+             Title="Manage Opportunities">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="+ New" Command="{Binding ShowCreateFormCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <!-- Create Form (toggled) -->
+            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15"
+                    IsVisible="{Binding IsCreating}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Create New Opportunity" FontSize="18" FontAttributes="Bold" />
+
+                    <Entry Text="{Binding NewTitle}" Placeholder="Title" />
+                    <Editor Text="{Binding NewDescription}" Placeholder="Description" HeightRequest="60" />
+
+                    <Picker Title="Visibility" SelectedIndex="{Binding NewVisibility}">
+                        <Picker.Items>
+                            <x:String>Public</x:String>
+                            <x:String>Private</x:String>
+                        </Picker.Items>
+                    </Picker>
+
+                    <Label Text="Start Time" />
+                    <DatePicker Date="{Binding NewStartDate}" />
+                    <TimePicker Time="{Binding NewStartTime}" />
+
+                    <Label Text="End Time" />
+                    <DatePicker Date="{Binding NewEndDate}" />
+                    <TimePicker Time="{Binding NewEndTime}" />
+
+                    <Entry Text="{Binding NewAddress}" Placeholder="Venue Address" />
+                    <Entry Text="{Binding NewCity}" Placeholder="City" />
+                    <Entry Text="{Binding NewProvince}" Placeholder="Province" />
+                    <Entry Text="{Binding NewPostalCode}" Placeholder="Postal Code" />
+                    <Entry Text="{Binding NewGeoFenceRadius}" Placeholder="Geo-fence Radius (m)" Keyboard="Numeric" />
+                    <Entry Text="{Binding NewMaxVolunteers}" Placeholder="Max Volunteers" Keyboard="Numeric" />
+
+                    <HorizontalStackLayout Spacing="10">
+                        <Button Text="Create" Command="{Binding CreateOpportunityCommand}" IsEnabled="{Binding IsNotBusy}"
+                                BackgroundColor="{StaticResource Primary}" TextColor="White" />
+                        <Button Text="Cancel" Command="{Binding CancelCreateCommand}" BackgroundColor="Gray" TextColor="White" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Opportunities List -->
+            <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label Text="No opportunities yet. Tap '+ New' to create one." TextColor="Gray" HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OpportunityDetails">
+                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold" Grid.Row="0" Grid.Column="0" />
+                                <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}" FontSize="13" TextColor="Gray" Grid.Row="1" Grid.Column="0" />
+                                <Label Text="{Binding MaxVolunteers, StringFormat='Max: {0}'}" FontSize="13" Grid.Row="2" Grid.Column="0" />
+                                <Button Text="Publish" Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
+                                        VerticalOptions="Center" FontSize="12" Padding="8,4"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ManageOpportunitiesViewModel}}, Path=PublishCommand}"
+                                        CommandParameter="{Binding .}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

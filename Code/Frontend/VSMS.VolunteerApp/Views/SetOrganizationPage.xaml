@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.SetOrganizationPage"
+             x:DataType="vm:SetOrganizationViewModel"
+             Title="Set Organization">
+    <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Center">
+        <Label Text="Link to Your Organization" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+        <Label Text="Enter the Organization ID to associate with your coordinator account." TextColor="Gray" HorizontalOptions="Center" />
+
+        <Entry Text="{Binding OrganizationIdText}" Placeholder="Organization ID" />
+
+        <Button Text="Set Organization" Command="{Binding SetOrganizationCommand}" IsEnabled="{Binding IsNotBusy}"
+                BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="50" />
+        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+    </VerticalStackLayout>
+</ContentPage>

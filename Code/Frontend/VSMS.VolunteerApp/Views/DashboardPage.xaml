@@ -2,17 +2,53 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
              x:Class="VSMS.VolunteerApp.Views.DashboardPage"
              x:DataType="vm:DashboardViewModel"
              Title="{Binding Title}">
-    <VerticalStackLayout Padding="20" Spacing="20">
-        <Label Text="{Binding VolunteerName, StringFormat='Welcome, {0}'}" FontSize="24" />
-        <Border Stroke="Gray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15">
-            <VerticalStackLayout>
-                 <Label Text="Total Hours" FontSize="14" />
-                 <Label Text="{Binding TotalHours}" FontSize="36" FontAttributes="Bold" />
-            </VerticalStackLayout>
-        </Border>
-        <!-- Add List of Shifts Here -->
-    </VerticalStackLayout>
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Logout" Command="{Binding LogoutCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+            <!-- Welcome Section -->
+            <Label Text="{Binding VolunteerName, StringFormat='Welcome, {0}!'}" FontSize="24" FontAttributes="Bold" />
+            <Label Text="{Binding UserRole, StringFormat='Role: {0}'}" FontSize="14" TextColor="Gray" />
+
+            <!-- Stats Card -->
+            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15">
+                <Border.Shadow>
+                    <Shadow Brush="Black" Offset="2,2" Radius="5" Opacity="0.1" />
+                </Border.Shadow>
+                <VerticalStackLayout>
+                    <Label Text="Total Volunteer Hours" FontSize="14" TextColor="Gray" />
+                    <Label Text="{Binding TotalHours, StringFormat='{0:F1}'}" FontSize="36" FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Upcoming Opportunities -->
+            <Label Text="Upcoming Opportunities" FontSize="18" FontAttributes="Bold" Margin="0,10,0,0" />
+
+            <CollectionView ItemsSource="{Binding UpcomingOpportunities}" HeightRequest="300">
+                <CollectionView.EmptyView>
+                    <Label Text="No upcoming opportunities." TextColor="Gray" HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OpportunityDetails">
+                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="10" Margin="0,0,0,5">
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold" />
+                                <Label Text="{Binding VenueLocation.City}" FontSize="13" TextColor="Gray" />
+                                <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}" FontSize="13" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

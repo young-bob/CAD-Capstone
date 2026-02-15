@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.GenerateCertificatePage"
+             x:DataType="vm:GenerateCertificateViewModel"
+             Title="Generate Certificate">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+            <Label Text="Generate a Certificate" FontSize="20" FontAttributes="Bold" />
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Volunteer ID" FontAttributes="Bold" />
+                <Entry Text="{Binding VolunteerIdText}" Placeholder="Enter volunteer UUID" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Attendance Record IDs (comma-separated)" FontAttributes="Bold" />
+                <Editor Text="{Binding AttendanceIdsText}" Placeholder="id1, id2, id3" HeightRequest="60" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="5">
+                <Label Text="Template ID" FontAttributes="Bold" />
+                <Entry Text="{Binding TemplateIdText}" Placeholder="Enter template UUID" />
+            </VerticalStackLayout>
+
+            <Button Text="Generate" Command="{Binding GenerateCommand}" IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="50" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
