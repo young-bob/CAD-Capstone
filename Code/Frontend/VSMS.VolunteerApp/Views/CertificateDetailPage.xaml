@@ -4,30 +4,57 @@
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              x:Class="VSMS.VolunteerApp.Views.CertificateDetailPage"
              x:DataType="vm:CertificateDetailViewModel"
-             Title="Certificate Details">
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
-            <Label Text="Certificate" FontSize="24" FontAttributes="Bold" />
-            <Label Text="{Binding Certificate.Id, StringFormat='ID: {0}'}" FontSize="14" TextColor="Gray" />
-            <Label Text="{Binding Certificate.VolunteerName, StringFormat='Volunteer: {0}'}" FontSize="16" />
-            <Label Text="{Binding Certificate.IssuedAt, StringFormat='Issued: {0:MMM dd, yyyy}'}" FontSize="14" />
+             Title="Certificate Detail">
 
-            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12">
-                <VerticalStackLayout Spacing="5">
-                    <Label Text="Signature Status" FontAttributes="Bold" />
-                    <Label Text="{Binding SignatureStatus}" FontSize="16" />
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Header -->
+            <Label Text="Certificate Details" Style="{StaticResource PageHeader}" />
+
+            <!-- Certificate Info Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="🏆" FontSize="48" HorizontalOptions="Center" />
+                    <Label Text="Volunteer Certificate" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📋" FontSize="14" />
+                        <Label Text="Certificate ID" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.CertificateId}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="👤" FontSize="14" />
+                        <Label Text="Volunteer" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.VolunteerId}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📅" FontSize="14" />
+                        <Label Text="Issued" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.IssuedAt, StringFormat='{0:MMMM dd, yyyy}'}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📝" FontSize="14" />
+                        <Label Text="Template" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.TemplateId}" Style="{StaticResource MutedText}" />
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Sign Section -->
-            <VerticalStackLayout Spacing="10" IsVisible="{Binding CanSign}">
-                <Label Text="Sign this Certificate" FontSize="18" FontAttributes="Bold" />
-                <Entry Text="{Binding SignatureText}" Placeholder="Enter your digital signature" />
-                <Button Text="Sign Certificate" Command="{Binding SignCommand}" IsEnabled="{Binding IsNotBusy}"
-                        BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" />
-            </VerticalStackLayout>
+            <!-- Actions -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Grid.Column="0" Text="Download" Command="{Binding DownloadCommand}"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        CornerRadius="8" HeightRequest="48" FontAttributes="Bold" />
+                <Button Grid.Column="1" Text="Sign" Command="{Binding SignCommand}"
+                        Style="{StaticResource OutlineButton}" HeightRequest="48" />
+            </Grid>
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

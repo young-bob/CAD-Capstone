@@ -15,6 +15,10 @@ public partial class ProfileViewModel : BaseViewModel
     [ObservableProperty] string editName = string.Empty;
     [ObservableProperty] string editPhone = string.Empty;
     [ObservableProperty] string editBio = string.Empty;
+    [ObservableProperty] string editAddress = string.Empty;
+    [ObservableProperty] string editCity = string.Empty;
+    [ObservableProperty] string editProvince = string.Empty;
+    [ObservableProperty] string editPostalCode = string.Empty;
 
     public string ActionText => IsEditing ? "Save" : "Edit";
 
@@ -60,12 +64,7 @@ public partial class ProfileViewModel : BaseViewModel
                 );
             }
 
-            if (Profile != null)
-            {
-                EditName = Profile.Name ?? "";
-                EditPhone = Profile.PhoneNumber ?? "";
-                EditBio = Profile.Bio ?? "";
-            }
+            PopulateEditFields();
         }
         catch (Exception ex)
         {
@@ -75,6 +74,18 @@ public partial class ProfileViewModel : BaseViewModel
         {
             IsBusy = false;
         }
+    }
+
+    private void PopulateEditFields()
+    {
+        if (Profile == null) return;
+        EditName = Profile.Name ?? "";
+        EditPhone = Profile.PhoneNumber ?? "";
+        EditBio = Profile.Bio ?? "";
+        EditAddress = Profile.CurrentLocation?.Address ?? "";
+        EditCity = Profile.CurrentLocation?.City ?? "";
+        EditProvince = Profile.CurrentLocation?.Province ?? "";
+        EditPostalCode = Profile.CurrentLocation?.PostalCode ?? "";
     }
 
     [RelayCommand]
@@ -90,6 +101,13 @@ public partial class ProfileViewModel : BaseViewModel
         }
     }
 
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        PopulateEditFields();
+        IsEditing = false;
+    }
+
     private async Task SaveProfileAsync()
     {
         if (Profile == null) return;
@@ -97,9 +115,15 @@ public partial class ProfileViewModel : BaseViewModel
         IsBusy = true;
         try
         {
+            var location = new Location(
+                Profile.CurrentLocation?.Latitude ?? 0,
+                Profile.CurrentLocation?.Longitude ?? 0,
+                EditAddress, EditCity, EditProvince, EditPostalCode
+            );
+
             var updated = new VolunteerProfile(
                 Profile.UserId, EditName, Profile.Email, EditPhone, EditBio,
-                Profile.TotalHours, Profile.CurrentLocation, Profile.SkillIds
+                Profile.TotalHours, location, Profile.SkillIds
             );
 
             await _apiService.UpdateVolunteer(Profile.UserId, updated);

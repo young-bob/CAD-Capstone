@@ -4,45 +4,90 @@
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              x:Class="VSMS.VolunteerApp.Views.ProfilePage"
              x:DataType="vm:ProfileViewModel"
-             Title="Profile">
+             Title="My Profile">
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="{Binding ActionText}" Command="{Binding ToggleEditCommand}" />
+        <ToolbarItem Text="Cancel" Command="{Binding CancelEditCommand}" />
     </ContentPage.ToolbarItems>
 
     <ScrollView>
-        <VerticalStackLayout Spacing="20" Padding="20">
-            <!-- Name -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Name" FontAttributes="Bold" />
-                <Entry Text="{Binding EditName}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Header -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="My Profile" Style="{StaticResource PageHeader}" />
+                <Label Text="Manage your volunteer profile" Style="{StaticResource MutedText}" />
             </VerticalStackLayout>
 
-            <!-- Email (read-only) -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Email" FontAttributes="Bold" />
-                <Entry Text="{Binding Profile.Email}" IsReadOnly="True" />
-            </VerticalStackLayout>
+            <!-- Total Hours Stat Card -->
+            <Border Style="{StaticResource StatCardStyle}">
+                <HorizontalStackLayout Spacing="16">
+                    <Label Text="⏱" FontSize="32" VerticalOptions="Center" />
+                    <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                        <Label Text="Total Volunteer Hours" Style="{StaticResource MutedText}" FontSize="12" />
+                        <Label Text="{Binding Profile.TotalHours, StringFormat='{0:F1}'}" FontSize="32" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+            </Border>
 
-            <!-- Phone -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Phone" FontAttributes="Bold" />
-                <Entry Text="{Binding EditPhone}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
-            </VerticalStackLayout>
+            <!-- Personal Info Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Personal Information" Style="{StaticResource SectionTitle}" />
 
-            <!-- Bio -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Bio" FontAttributes="Bold" />
-                <Editor Text="{Binding EditBio}" HeightRequest="100"
-                        IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
-            </VerticalStackLayout>
-            
-            <!-- Total Hours -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Total Hours" FontAttributes="Bold" />
-                <Label Text="{Binding Profile.TotalHours, StringFormat='{0:F1}'}" FontSize="18" />
-            </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Name" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding EditName}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Email" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding Profile.Email}" IsReadOnly="True" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Phone" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding EditPhone}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Bio" FontAttributes="Bold" FontSize="13" />
+                        <Editor Text="{Binding EditBio}" HeightRequest="80"
+                                IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Location Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Location" Style="{StaticResource SectionTitle}" />
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Address" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding EditAddress}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="6" Grid.Column="0">
+                            <Label Text="City" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding EditCity}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="6" Grid.Column="1">
+                            <Label Text="Province" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding EditProvince}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Postal Code" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding EditPostalCode}" IsReadOnly="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using VSMS.VolunteerApp.Models;
 using VSMS.VolunteerApp.Services;
 using VSMS.VolunteerApp.Views;
-using Location = VSMS.VolunteerApp.Models.Location;
 
 namespace VSMS.VolunteerApp.ViewModels;
 
@@ -12,10 +11,22 @@ public partial class OpportunitiesViewModel : BaseViewModel
 {
     private readonly IVolunteerApiService _apiService;
 
-    public ObservableCollection<OpportunityDetails> Opportunities { get; } = new();
+    private List<OpportunityDetails> _allOpportunities = new();
+    public ObservableCollection<OpportunityDetails> FilteredOpportunities { get; } = new();
+
+    // Keep Opportunities for backward compatibility
+    public ObservableCollection<OpportunityDetails> Opportunities => FilteredOpportunities;
 
     [ObservableProperty]
     bool isRefreshing;
+
+    [ObservableProperty]
+    string searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        ApplyFilter();
+    }
 
     public OpportunitiesViewModel(IVolunteerApiService apiService)
     {
@@ -32,47 +43,9 @@ public partial class OpportunitiesViewModel : BaseViewModel
         try
         {
             IsBusy = true;
-            Opportunities.Clear();
-
-            try
-            {
-                var items = await _apiService.GetOpportunities();
-                foreach (var item in items)
-                {
-                    Opportunities.Add(item);
-                }
-            }
-            catch
-            {
-                var items = new List<OpportunityDetails>
-                {
-                   new OpportunityDetails(
-                       Guid.NewGuid(), Guid.NewGuid(),
-                       "Community Cleanup",
-                       "Help clean up the park",
-                       OpportunityVisibility.Public,
-                       DateTime.UtcNow.AddDays(2),
-                       DateTime.UtcNow.AddDays(2).AddHours(4),
-                       new Location(43.46, -80.52, "Waterloo Park", "Waterloo", "ON", "N2L 3G1"),
-                       100f, 10, 0
-                   ),
-                   new OpportunityDetails(
-                       Guid.NewGuid(), Guid.NewGuid(),
-                       "Food Bank Helper",
-                       "Sort food donations",
-                       OpportunityVisibility.Public,
-                       DateTime.UtcNow.AddDays(5),
-                       DateTime.UtcNow.AddDays(5).AddHours(3),
-                       new Location(43.45, -80.49, "123 King St", "Kitchener", "ON", "N2H 1A1"),
-                       50f, 5, 2
-                   )
-                };
-
-                foreach (var item in items)
-                {
-                    Opportunities.Add(item);
-                }
-            }
+            var items = await _apiService.GetOpportunities();
+            _allOpportunities = items ?? new List<OpportunityDetails>();
+            ApplyFilter();
         }
         catch (Exception ex)
         {
@@ -82,6 +55,25 @@ public partial class OpportunitiesViewModel : BaseViewModel
         {
             IsBusy = false;
             IsRefreshing = false;
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        FilteredOpportunities.Clear();
+        var query = SearchText?.Trim() ?? "";
+
+        var filtered = string.IsNullOrEmpty(query)
+            ? _allOpportunities
+            : _allOpportunities.Where(o =>
+                (o.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (o.Description?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (o.VenueLocation?.City?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
+            ).ToList();
+
+        foreach (var item in filtered)
+        {
+            FilteredOpportunities.Add(item);
         }
     }
 

@@ -4,51 +4,72 @@
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              x:Class="VSMS.VolunteerApp.Views.LoginPage"
              x:DataType="vm:LoginViewModel"
+             Title="Login"
              Shell.NavBarIsVisible="False">
 
     <ScrollView>
-        <VerticalStackLayout Padding="30" Spacing="20" VerticalOptions="Center" MaximumWidthRequest="400">
+        <VerticalStackLayout VerticalOptions="Center" Padding="24" Spacing="0" MaximumWidthRequest="420">
 
-            <!-- App Logo / Title -->
-            <Label Text="VSMS" FontSize="40" FontAttributes="Bold" HorizontalOptions="Center"
-                   TextColor="{StaticResource Primary}" />
-            <Label Text="Volunteer Service Management" FontSize="14" HorizontalOptions="Center"
-                   TextColor="Gray" Margin="0,-15,0,10" />
-
-            <!-- Email -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Email" FontAttributes="Bold" />
-                <Entry Text="{Binding Email}" Placeholder="you@example.com" Keyboard="Email" />
+            <!-- VSMS Branding -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="4" Margin="0,0,0,24">
+                <Label Text="♥" FontSize="36" TextColor="{StaticResource Primary}" HorizontalOptions="Center" />
+                <Label Text="VSMS" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center" />
             </VerticalStackLayout>
 
-            <!-- Password -->
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Password" FontAttributes="Bold" />
-                <Entry Text="{Binding Password}" Placeholder="Enter password" IsPassword="True" />
-            </VerticalStackLayout>
+            <!-- Login Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="16">
 
-            <!-- Login Button -->
-            <Button Text="Login" Command="{Binding LoginCommand}" IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="{StaticResource Primary}" TextColor="White"
-                    CornerRadius="8" HeightRequest="50" FontAttributes="Bold" />
+                    <!-- Header -->
+                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                        <Label Text="Welcome back" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        <Label Text="Sign in to your account to continue" Style="{StaticResource MutedText}" HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+                    <!-- Email -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Email" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding Email}" Placeholder="you@example.com" Keyboard="Email" />
+                    </VerticalStackLayout>
 
-            <!-- Links -->
-            <HorizontalStackLayout HorizontalOptions="Center" Spacing="5">
-                <Label Text="Don't have an account?" />
-                <Label Text="Register" TextColor="{StaticResource Primary}" FontAttributes="Bold">
-                    <Label.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding GoToRegisterCommand}" />
-                    </Label.GestureRecognizers>
-                </Label>
-            </HorizontalStackLayout>
+                    <!-- Password -->
+                    <VerticalStackLayout Spacing="6">
+                        <HorizontalStackLayout>
+                            <Label Text="Password" FontAttributes="Bold" FontSize="13" HorizontalOptions="StartAndExpand" />
+                            <Label Text="Forgot password?" TextColor="{StaticResource Primary}" FontSize="12">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding GoToResetPasswordCommand}" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </HorizontalStackLayout>
+                        <Entry Text="{Binding Password}" Placeholder="Min 8 characters" IsPassword="True" />
+                    </VerticalStackLayout>
 
-            <Label Text="Forgot Password?" TextColor="{StaticResource Primary}" HorizontalOptions="Center">
-                <Label.GestureRecognizers>
-                    <TapGestureRecognizer Command="{Binding GoToResetPasswordCommand}" />
-                </Label.GestureRecognizers>
-            </Label>
+                    <!-- Sign In Button -->
+                    <Button Text="Sign in"
+                            Command="{Binding LoginCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="48"
+                            FontAttributes="Bold"
+                            FontSize="16" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+                    <!-- Register Link -->
+                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="4" Margin="0,8,0,0">
+                        <Label Text="Don't have an account?" Style="{StaticResource MutedText}" />
+                        <Label Text="Sign up" TextColor="{StaticResource Primary}" FontAttributes="Bold" FontSize="14">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoToRegisterCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </HorizontalStackLayout>
+
+                </VerticalStackLayout>
+            </Border>
 
         </VerticalStackLayout>
     </ScrollView>

@@ -15,13 +15,10 @@ public partial class RegisterViewModel : BaseViewModel
     [ObservableProperty] string password = string.Empty;
     [ObservableProperty] string phoneNumber = string.Empty;
     [ObservableProperty] string bio = string.Empty;
-    [ObservableProperty] string selectedRole = "Volunteer";
     [ObservableProperty] string address = string.Empty;
     [ObservableProperty] string city = string.Empty;
     [ObservableProperty] string province = string.Empty;
     [ObservableProperty] string postalCode = string.Empty;
-
-    public List<string> Roles { get; } = new() { "Volunteer", "Coordinator", "Organization" };
 
     public RegisterViewModel(IVolunteerApiService apiService)
     {
@@ -51,7 +48,7 @@ public partial class RegisterViewModel : BaseViewModel
             IsBusy = true;
 
             var location = new Location(0, 0, Address, City, Province, PostalCode);
-            var request = new RegisterRequest(Name, Email, Password, SelectedRole, PhoneNumber, Bio, location);
+            var request = new RegisterRequest(Name, Email, Password, "Volunteer", PhoneNumber, Bio, location);
             await _apiService.Register(request);
 
             await Shell.Current.DisplayAlertAsync("Success", "Account created! Please login.", "OK");

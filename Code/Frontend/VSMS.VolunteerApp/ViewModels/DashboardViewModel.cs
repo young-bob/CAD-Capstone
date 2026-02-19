@@ -13,6 +13,8 @@ public partial class DashboardViewModel : BaseViewModel
     [ObservableProperty] string volunteerName = "User";
     [ObservableProperty] string userRole = "Volunteer";
     [ObservableProperty] double totalHours = 0;
+    [ObservableProperty] int opportunityCount = 0;
+    [ObservableProperty] int upcomingCount = 0;
 
     public ObservableCollection<OpportunityDetails> UpcomingOpportunities { get; } = new();
 
@@ -37,6 +39,7 @@ public partial class DashboardViewModel : BaseViewModel
             if (!string.IsNullOrEmpty(storedName)) VolunteerName = storedName;
             if (!string.IsNullOrEmpty(storedRole)) UserRole = storedRole;
 
+            // Load user info
             try
             {
                 var userInfo = await _apiService.GetCurrentUser();
@@ -48,11 +51,36 @@ public partial class DashboardViewModel : BaseViewModel
             }
             catch { /* Use stored values */ }
 
+            // Load volunteer profile for total hours
+            try
+            {
+                var userIdStr = await SecureStorage.GetAsync("user_id");
+                if (Guid.TryParse(userIdStr, out var userId))
+                {
+                    var profile = await _apiService.GetVolunteer(userId);
+                    if (profile != null)
+                    {
+                        TotalHours = profile.TotalHours;
+                    }
+                }
+            }
+            catch { /* Ignore */ }
+
+            // Load opportunities for stats and upcoming list
             try
             {
                 var opportunities = await _apiService.GetOpportunities();
+                OpportunityCount = opportunities.Count;
+
+                var upcoming = opportunities
+                    .Where(o => o.StartTime > DateTime.UtcNow)
+                    .OrderBy(o => o.StartTime)
+                    .Take(5)
+                    .ToList();
+
+                UpcomingCount = upcoming.Count;
                 UpcomingOpportunities.Clear();
-                foreach (var opp in opportunities.Take(5))
+                foreach (var opp in upcoming)
                 {
                     UpcomingOpportunities.Add(opp);
                 }

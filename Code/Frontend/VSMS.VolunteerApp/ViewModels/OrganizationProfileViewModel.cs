@@ -75,4 +75,14 @@ public partial class OrganizationProfileViewModel : BaseViewModel
         }
         else { IsEditing = true; }
     }
+
+    [RelayCommand]
+    void CancelEdit()
+    {
+        EditDescription = Organization?.Description ?? "";
+        EditWebsite = Organization?.Website ?? "";
+        EditLogoUrl = Organization?.LogoUrl ?? "";
+        EditCalendarSyncUrl = Organization?.CalendarSyncUrl ?? "";
+        IsEditing = false;
+    }
 }

@@ -5,25 +5,49 @@
              x:Class="VSMS.VolunteerApp.Views.ValidateAttendancePage"
              x:DataType="vm:ValidateAttendanceViewModel"
              Title="Validate Attendance">
+
     <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Center">
-            <Label Text="Validate Attendance" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+        <VerticalStackLayout VerticalOptions="Center" Padding="24" Spacing="0" MaximumWidthRequest="480">
 
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Volunteer ID" FontAttributes="Bold" />
-                <Entry Text="{Binding VolunteerIdText}" Placeholder="Enter volunteer UUID" />
+            <!-- Icon Header -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="8" Margin="0,0,0,24">
+                <Border BackgroundColor="{StaticResource SuccessLight}" StrokeShape="RoundRectangle 16"
+                        Stroke="Transparent" HeightRequest="64" WidthRequest="64" Padding="0"
+                        HorizontalOptions="Center">
+                    <Label Text="✅" FontSize="28" HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+                <Label Text="Validate Attendance" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" />
+                <Label Text="Confirm a volunteer's participation" Style="{StaticResource MutedText}" HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
-            <VerticalStackLayout Spacing="5">
-                <Label Text="Opportunity" FontAttributes="Bold" />
-                <Picker Title="Select Opportunity" ItemsSource="{Binding Opportunities}"
-                        SelectedItem="{Binding SelectedOpportunity}"
-                        ItemDisplayBinding="{Binding Title}" />
-            </VerticalStackLayout>
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Volunteer ID" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding VolunteerIdText}" Placeholder="Enter volunteer UUID" />
+                    </VerticalStackLayout>
 
-            <Button Text="Validate" Command="{Binding ValidateCommand}" IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="50" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Opportunity" FontAttributes="Bold" FontSize="13" />
+                        <Picker Title="Select opportunity..."
+                                ItemsSource="{Binding Opportunities}"
+                                SelectedItem="{Binding SelectedOpportunity}"
+                                ItemDisplayBinding="{Binding Title}" />
+                    </VerticalStackLayout>
+
+                    <Button Text="Validate Attendance"
+                            Command="{Binding ValidateCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            BackgroundColor="{StaticResource Success}"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="48"
+                            FontAttributes="Bold" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+                </VerticalStackLayout>
+            </Border>
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

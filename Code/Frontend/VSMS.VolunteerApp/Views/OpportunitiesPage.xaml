@@ -3,43 +3,88 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
-             xmlns:converters="clr-namespace:VSMS.VolunteerApp.Converters"
              x:Class="VSMS.VolunteerApp.Views.OpportunitiesPage"
              x:DataType="vm:OpportunitiesViewModel"
-             Title="{Binding Title}">
-
-    <ContentPage.Resources>
-        <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
-    </ContentPage.Resources>
+             Title="Browse Opportunities">
 
     <RefreshView Command="{Binding LoadOpportunitiesCommand}" IsRefreshing="{Binding IsRefreshing}">
-        <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None">
-            <CollectionView.EmptyView>
-                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                    <Label Text="No opportunities found." HorizontalOptions="Center" />
-                    <Button Text="Refresh" Command="{Binding LoadOpportunitiesCommand}" Margin="0,20,0,0" />
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- Header -->
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Browse Opportunities" Style="{StaticResource PageHeader}" />
+                    <Label Text="Find meaningful volunteer work near you." Style="{StaticResource MutedText}" />
                 </VerticalStackLayout>
-            </CollectionView.EmptyView>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:OpportunityDetails">
-                    <Grid Padding="5">
-                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="10" HeightRequest="120">
-                            <Border.Shadow>
-                                <Shadow Brush="Black" Offset="2,2" Radius="5" Opacity="0.1" />
-                            </Border.Shadow>
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}" 
-                                                      CommandParameter="{Binding .}" />
-                            </Border.GestureRecognizers>
-                            <VerticalStackLayout Spacing="5">
-                                <Label Text="{Binding Title}" FontSize="18" FontAttributes="Bold" />
-                                <Label Text="{Binding VenueLocation.City}" FontSize="14" TextColor="Gray" />
-                                <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}" FontSize="14" />
+
+                <!-- Search Bar -->
+                <SearchBar Placeholder="Search opportunities..." Text="{Binding SearchText}" />
+
+                <!-- Results -->
+                <CollectionView ItemsSource="{Binding FilteredOpportunities}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource CardStyle}" HorizontalOptions="Fill">
+                            <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Padding="20">
+                                <Label Text="🔍" FontSize="40" HorizontalOptions="Center" />
+                                <Label Text="No opportunities found" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" />
+                                <Label Text="Try adjusting your search or check back later." Style="{StaticResource MutedText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
                             </VerticalStackLayout>
                         </Border>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:OpportunityDetails">
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}"
+                                                          CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="10">
+                                    <!-- Title row with status -->
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding Title}" FontSize="17" FontAttributes="Bold" Grid.Column="0" LineBreakMode="TailTruncation" />
+                                        <Border Style="{StaticResource BadgeStyle}" Grid.Column="1" VerticalOptions="Start">
+                                            <Label Text="{Binding Visibility}" FontSize="11" TextColor="{StaticResource Primary}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Description -->
+                                    <Label Text="{Binding Description}" Style="{StaticResource MutedText}" LineBreakMode="TailTruncation" MaxLines="2" />
+
+                                    <!-- Info row -->
+                                    <HorizontalStackLayout Spacing="16">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="📅" FontSize="13" />
+                                            <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, yyyy}'}" Style="{StaticResource MutedText}" FontSize="12" />
+                                        </HorizontalStackLayout>
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="📍" FontSize="13" />
+                                            <Label Text="{Binding VenueLocation.City}" Style="{StaticResource MutedText}" FontSize="12" />
+                                        </HorizontalStackLayout>
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="👥" FontSize="13" />
+                                            <Label Style="{StaticResource MutedText}" FontSize="12">
+                                                <Label.FormattedText>
+                                                    <FormattedString>
+                                                        <Span Text="{Binding RegisteredCount}" />
+                                                        <Span Text="/" />
+                                                        <Span Text="{Binding MaxVolunteers}" />
+                                                    </FormattedString>
+                                                </Label.FormattedText>
+                                            </Label>
+                                        </HorizontalStackLayout>
+                                    </HorizontalStackLayout>
+
+                                    <!-- View Details -->
+                                    <Label Text="View Details ›" TextColor="{StaticResource Primary}" FontAttributes="Bold" FontSize="13" HorizontalOptions="End" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+            </VerticalStackLayout>
+        </ScrollView>
     </RefreshView>
 </ContentPage>

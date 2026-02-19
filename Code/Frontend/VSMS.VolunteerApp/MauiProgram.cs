@@ -24,7 +24,7 @@ public static class MauiProgram
 
         // Refit API Service with AuthTokenHandler
         builder.Services.AddRefitClient<IVolunteerApiService>()
-               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:5000")) // TODO: Use DevTunnel/Local IP
+               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:8080")) // TODO: Use DevTunnel/Local IP
                .AddHttpMessageHandler<AuthTokenHandler>();
 
         // ---- ViewModels ----

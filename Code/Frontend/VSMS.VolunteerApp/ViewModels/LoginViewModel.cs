@@ -32,6 +32,12 @@ public partial class LoginViewModel : BaseViewModel
             return;
         }
 
+        if (!Email.Contains("@") || !Email.Contains("."))
+        {
+            await Shell.Current.DisplayAlertAsync("Validation", "Please enter a valid email address.", "OK");
+            return;
+        }
+
         try
         {
             IsBusy = true;

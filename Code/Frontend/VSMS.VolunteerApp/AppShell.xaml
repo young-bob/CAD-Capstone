@@ -1,103 +1,85 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Shell
     x:Class="VSMS.VolunteerApp.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:views="clr-namespace:VSMS.VolunteerApp.Views"
-    Shell.FlyoutBehavior="Flyout">
+    xmlns:local="clr-namespace:VSMS.VolunteerApp.Views"
+    FlyoutBehavior="Flyout"
+    FlyoutBackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource OffBlack}}">
 
-    <!-- Login (non-flyout) -->
-    <ShellContent
-        Title="Login"
-        ContentTemplate="{DataTemplate views:LoginPage}"
-        Route="LoginPage"
-        FlyoutItemIsVisible="False" />
+    <!-- Flyout Header -->
+    <Shell.FlyoutHeaderTemplate>
+        <DataTemplate>
+            <VerticalStackLayout Padding="20,32,20,20" BackgroundColor="{StaticResource Primary}" Spacing="8">
+                <HorizontalStackLayout Spacing="8">
+                    <Label Text="♥" FontSize="24" TextColor="White" VerticalOptions="Center" />
+                    <Label Text="VSMS" FontSize="22" FontAttributes="Bold" TextColor="White" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+                <Label Text="Volunteer Service Management" TextColor="#DDDDFB" FontSize="12" />
+            </VerticalStackLayout>
+        </DataTemplate>
+    </Shell.FlyoutHeaderTemplate>
 
-    <!-- Common Tabs -->
+    <!-- Login / Register (no flyout) -->
+    <ShellContent Route="LoginPage" ContentTemplate="{DataTemplate local:LoginPage}" FlyoutItemIsVisible="False" Shell.FlyoutBehavior="Disabled" Shell.NavBarIsVisible="False" />
+
+    <!-- Volunteer Section -->
     <FlyoutItem Title="Dashboard" Icon="{x:Null}">
-        <ShellContent
-            Title="Dashboard"
-            ContentTemplate="{DataTemplate views:DashboardPage}"
-            Route="DashboardPage" />
+        <ShellContent Route="DashboardPage" ContentTemplate="{DataTemplate local:DashboardPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Opportunities" Icon="{x:Null}">
-        <ShellContent
-            Title="Opportunities"
-            ContentTemplate="{DataTemplate views:OpportunitiesPage}"
-            Route="OpportunitiesPage" />
+    <FlyoutItem Title="Opportunities">
+        <ShellContent Route="OpportunitiesPage" ContentTemplate="{DataTemplate local:OpportunitiesPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Profile" Icon="{x:Null}">
-        <ShellContent
-            Title="Profile"
-            ContentTemplate="{DataTemplate views:ProfilePage}"
-            Route="ProfilePage" />
+    <FlyoutItem Title="My Profile">
+        <ShellContent Route="ProfilePage" ContentTemplate="{DataTemplate local:ProfilePage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Skills" Icon="{x:Null}">
-        <ShellContent
-            Title="Skills"
-            ContentTemplate="{DataTemplate views:SkillsPage}"
-            Route="SkillsPage" />
+    <FlyoutItem Title="Certificates">
+        <ShellContent Route="CertificatesPage" ContentTemplate="{DataTemplate local:CertificatesPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Certificates" Icon="{x:Null}">
-        <ShellContent
-            Title="Certificates"
-            ContentTemplate="{DataTemplate views:CertificatesPage}"
-            Route="CertificatesPage" />
-    </FlyoutItem>
-
-    <!-- Organization Section -->
-    <FlyoutItem Title="Organization" Icon="{x:Null}">
-        <ShellContent
-            Title="Organization Profile"
-            ContentTemplate="{DataTemplate views:OrganizationProfilePage}"
-            Route="OrganizationProfilePage" />
-    </FlyoutItem>
-
-    <FlyoutItem Title="Manage Opportunities" Icon="{x:Null}">
-        <ShellContent
-            Title="Manage Opportunities"
-            ContentTemplate="{DataTemplate views:ManageOpportunitiesPage}"
-            Route="ManageOpportunitiesPage" />
-    </FlyoutItem>
-
-    <FlyoutItem Title="Verify Credentials" Icon="{x:Null}">
-        <ShellContent
-            Title="Verify Credentials"
-            ContentTemplate="{DataTemplate views:VerifyCredentialsPage}"
-            Route="VerifyCredentialsPage" />
+    <FlyoutItem Title="Skills">
+        <ShellContent Route="SkillsPage" ContentTemplate="{DataTemplate local:SkillsPage}" />
     </FlyoutItem>
 
     <!-- Coordinator Section -->
-    <FlyoutItem Title="Set Organization" Icon="{x:Null}">
-        <ShellContent
-            Title="Set Organization"
-            ContentTemplate="{DataTemplate views:SetOrganizationPage}"
-            Route="SetOrganizationPage" />
+    <FlyoutItem Title="──── Coordinator ────" IsEnabled="False">
+        <ShellContent ContentTemplate="{DataTemplate local:DashboardPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Create Shift" Icon="{x:Null}">
-        <ShellContent
-            Title="Create Shift"
-            ContentTemplate="{DataTemplate views:ManageShiftsPage}"
-            Route="ManageShiftsPage" />
+    <FlyoutItem Title="Manage Opportunities">
+        <ShellContent Route="ManageOpportunitiesPage" ContentTemplate="{DataTemplate local:ManageOpportunitiesPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Validate Attendance" Icon="{x:Null}">
-        <ShellContent
-            Title="Validate Attendance"
-            ContentTemplate="{DataTemplate views:ValidateAttendancePage}"
-            Route="ValidateAttendancePage" />
+    <FlyoutItem Title="Create Shift">
+        <ShellContent Route="ManageShiftsPage" ContentTemplate="{DataTemplate local:ManageShiftsPage}" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Generate Certificate" Icon="{x:Null}">
-        <ShellContent
-            Title="Generate Certificate"
-            ContentTemplate="{DataTemplate views:GenerateCertificatePage}"
-            Route="GenerateCertificatePage" />
+    <FlyoutItem Title="Validate Attendance">
+        <ShellContent Route="ValidateAttendancePage" ContentTemplate="{DataTemplate local:ValidateAttendancePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Generate Certificate">
+        <ShellContent Route="GenerateCertificatePage" ContentTemplate="{DataTemplate local:GenerateCertificatePage}" />
+    </FlyoutItem>
+
+    <!-- Organization Admin Section -->
+    <FlyoutItem Title="──── Admin ────" IsEnabled="False">
+        <ShellContent ContentTemplate="{DataTemplate local:DashboardPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Organization Profile">
+        <ShellContent Route="OrganizationProfilePage" ContentTemplate="{DataTemplate local:OrganizationProfilePage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Set Organization">
+        <ShellContent Route="SetOrganizationPage" ContentTemplate="{DataTemplate local:SetOrganizationPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Verify Credentials">
+        <ShellContent Route="VerifyCredentialsPage" ContentTemplate="{DataTemplate local:VerifyCredentialsPage}" />
     </FlyoutItem>
 
 </Shell>

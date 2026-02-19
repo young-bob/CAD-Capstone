@@ -27,8 +27,8 @@ public partial class OpportunityDetailViewModel : BaseViewModel
         try
         {
             IsBusy = true;
-            await Task.Delay(1000);
-            await Shell.Current.DisplayAlertAsync("Success", $"You have applied to {Opportunity.Title}!", "OK");
+            // No signup API endpoint exists yet — show success message
+            await Shell.Current.DisplayAlertAsync("Success", $"You have signed up for '{Opportunity.Title}'!", "OK");
             await Shell.Current.GoToAsync("..");
         }
         catch (Exception ex)
@@ -39,5 +39,11 @@ public partial class OpportunityDetailViewModel : BaseViewModel
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    async Task GoBackAsync()
+    {
+        await Shell.Current.GoToAsync("..");
     }
 }

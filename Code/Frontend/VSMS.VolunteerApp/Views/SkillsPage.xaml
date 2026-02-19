@@ -6,49 +6,70 @@
              x:Class="VSMS.VolunteerApp.Views.SkillsPage"
              x:DataType="vm:SkillsViewModel"
              Title="Skills">
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="+ Add" Command="{Binding ShowAddFormCommand}" />
-    </ContentPage.ToolbarItems>
 
     <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
-            <!-- Add Form -->
-            <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15"
-                    IsVisible="{Binding IsAdding}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Add New Skill" FontSize="18" FontAttributes="Bold" />
-                    <Entry Text="{Binding NewSkillName}" Placeholder="Skill name" />
-                    <Editor Text="{Binding NewSkillDescription}" Placeholder="Description" HeightRequest="60" />
-                    <HorizontalStackLayout Spacing="10">
-                        <Button Text="Add" Command="{Binding AddSkillCommand}" IsEnabled="{Binding IsNotBusy}"
-                                BackgroundColor="{StaticResource Primary}" TextColor="White" />
-                        <Button Text="Cancel" Command="{Binding CancelAddCommand}" BackgroundColor="Gray" TextColor="White" />
-                    </HorizontalStackLayout>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Header -->
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="4" Grid.Column="0">
+                    <Label Text="Skills" Style="{StaticResource PageHeader}" />
+                    <Label Text="Browse and manage volunteer skills" Style="{StaticResource MutedText}" />
+                </VerticalStackLayout>
+                <Button Grid.Column="1" Text="+ Add Skill"
+                        Command="{Binding ShowAddFormCommand}" Style="{StaticResource OutlineButton}" VerticalOptions="Start" />
+            </Grid>
+
+            <!-- Add Skill Form -->
+            <Border Style="{StaticResource CardStyle}" IsVisible="{Binding IsAddFormVisible}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Add New Skill" Style="{StaticResource SectionTitle}" />
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Skill Name" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding NewSkillName}" Placeholder="e.g., First Aid" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Description" FontAttributes="Bold" FontSize="13" />
+                        <Editor Text="{Binding NewSkillDescription}" Placeholder="Describe the skill..." HeightRequest="60" />
+                    </VerticalStackLayout>
+                    <Button Text="Add Skill" Command="{Binding AddSkillCommand}" IsEnabled="{Binding IsNotBusy}"
+                            BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="44" FontAttributes="Bold" />
                 </VerticalStackLayout>
             </Border>
 
             <!-- Skills List -->
             <CollectionView ItemsSource="{Binding Skills}" SelectionMode="None">
                 <CollectionView.EmptyView>
-                    <Label Text="No skills found." TextColor="Gray" HorizontalOptions="Center" />
+                    <Border Style="{StaticResource CardStyle}" HorizontalOptions="Fill">
+                        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Padding="20">
+                            <Label Text="💡" FontSize="40" HorizontalOptions="Center" />
+                            <Label Text="No skills found" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Border>
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:Skill">
-                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="12" Margin="0,0,0,5">
+                        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:SkillsViewModel}}, Path=ViewDetailCommand}"
                                                       CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
-                            <VerticalStackLayout Spacing="3">
-                                <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" />
-                                <Label Text="{Binding Description}" FontSize="13" TextColor="Gray" LineBreakMode="TailTruncation" />
-                            </VerticalStackLayout>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <VerticalStackLayout Spacing="4" Grid.Column="0" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" FontSize="15" FontAttributes="Bold" />
+                                    <Label Text="{Binding Description}" Style="{StaticResource MutedText}" FontSize="12" LineBreakMode="TailTruncation" MaxLines="2" />
+                                </VerticalStackLayout>
+                                <Border Style="{StaticResource BadgeStyle}" Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="Skill" FontSize="11" TextColor="{StaticResource Primary}" />
+                                </Border>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
