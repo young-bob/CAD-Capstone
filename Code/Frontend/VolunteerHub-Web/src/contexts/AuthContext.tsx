@@ -1,8 +1,30 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchApi, getAuthToken, setAuthToken, removeAuthToken, decodeToken } from "@/lib/apiClient";
 
 export type AppRole = "volunteer" | "coordinator" | "admin";
+
+// Mimicking structure so we don't break the whole app
+export interface User {
+  id: string;
+  email: string;
+  user_metadata: {
+    full_name?: string;
+  };
+}
+
+export interface Session {
+  access_token: string;
+  user: User;
+}
+
+export interface UserData {
+  userId?: string;
+  id?: string;
+  email?: string;
+  name?: string;
+  fullName?: string;
+  role?: string;
+}
 
 interface AuthContextType {
   session: Session | null;
@@ -10,20 +32,11 @@ interface AuthContextType {
   roles: AppRole[];
   primaryRole: AppRole;
   loading: boolean;
+  signIn: (token: string, userData: UserData) => void;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-async function fetchUserRoles(userId: string): Promise<AppRole[]> {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-
-  if (error || !data) return ["volunteer"];
-  return data.map((r) => r.role as AppRole);
-}
 
 function getPrimaryRole(roles: AppRole[]): AppRole {
   if (roles.includes("admin")) return "admin";
@@ -37,45 +50,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadRoles = async (userId: string) => {
-      try {
-        const userRoles = await fetchUserRoles(userId);
-        if (isMounted) setRoles(userRoles);
-      } catch {
-        if (isMounted) setRoles(["volunteer"]);
+  const signIn = (token: string, userData: UserData) => {
+    setAuthToken(token);
+    
+    // Map .NET UserInfo to our User shape
+    const newUser: User = {
+      id: userData.userId || userData.id || "",
+      email: userData.email || "",
+      user_metadata: {
+        full_name: userData.name || userData.fullName || "",
       }
     };
 
-    // Listener for ongoing auth changes — does NOT control loading
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!isMounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+    const newSession: Session = {
+      access_token: token,
+      user: newUser
+    };
 
-        if (session?.user) {
-          // Defer Supabase call to avoid deadlock
-          setTimeout(() => loadRoles(session.user.id), 0);
-        } else {
-          setRoles([]);
-        }
-      }
-    );
+    setSession(newSession);
+    setUser(newUser);
+    
+    const role: AppRole = userData.role?.toLowerCase() as AppRole || "volunteer";
+    setRoles([role]);
+  };
 
-    // Initial load — controls loading state
+  useEffect(() => {
+    let isMounted = true;
+
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
+        const token = getAuthToken();
+        if (!token) {
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Validate token structure
+        const decoded = decodeToken(token) as { exp: number };
+        if (!decoded || decoded.exp * 1000 < Date.now()) {
+          removeAuthToken();
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-        if (session?.user) {
-          await loadRoles(session.user.id);
+        const userData = await fetchApi<UserData>("/Auth/me");
+        if (isMounted) {
+          signIn(token, userData);
+        }
+      } catch (error) {
+        console.error("Auth initialization failed", error);
+        removeAuthToken();
+        if (isMounted) {
+          setSession(null);
+          setUser(null);
+          setRoles([]);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -86,21 +114,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setUser(null);
-    setRoles([]);
+  const handleSignOut = async () => {
+    try {
+      await fetchApi("/Auth/logout", { method: "POST" });
+    } catch (e) {
+      console.error("Logout API failed, continuing client logout", e);
+    } finally {
+      removeAuthToken();
+      setSession(null);
+      setUser(null);
+      setRoles([]);
+    }
   };
 
   const primaryRole = getPrimaryRole(roles);
 
   return (
-    <AuthContext.Provider value={{ session, user, roles, primaryRole, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, roles, primaryRole, loading, signIn, signOut: handleSignOut }}>
       {children}
     </AuthContext.Provider>
   );

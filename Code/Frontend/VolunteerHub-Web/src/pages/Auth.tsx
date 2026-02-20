@@ -4,8 +4,9 @@ import { Shield, Mail, Lock, User, Loader2, Eye, EyeOff, Users, ClipboardCheck }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchApi } from "@/lib/apiClient";
 import type { AppRole } from "@/contexts/AuthContext";
 
 const Auth = () => {
@@ -16,6 +17,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"volunteer" | "coordinator">("volunteer");
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,33 +25,39 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const responseData = await fetchApi<{ token: string; userId: string; role: string; name: string }>("/Auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+          requireAuth: false
+        });
+        
+        signIn(responseData.token, responseData);
         toast.success("Welcome back!");
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin,
-          },
+        await fetchApi("/Auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            name: fullName,
+            email,
+            password,
+            role: selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1) // Backend expects "Volunteer" or "Coordinator"
+          }),
+          requireAuth: false
         });
-        if (error) throw error;
         
-        // Update role if coordinator was selected (trigger defaults to volunteer)
-        if (data.user && selectedRole === "coordinator") {
-          const { error: roleError } = await supabase
-            .from("user_roles")
-            .update({ role: "coordinator" as AppRole })
-            .eq("user_id", data.user.id);
-          if (roleError) console.error("Role update error:", roleError);
-        }
+        // Auto login after registration
+        const loginData = await fetchApi<{ token: string; userId: string; role: string; name: string }>("/Auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+          requireAuth: false
+        });
         
-        toast.success("Check your email to verify your account.");
+        signIn(loginData.token, loginData);
+        toast.success("Account created successfully.");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
