@@ -80,6 +80,7 @@ graph TB
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | **Mobile** | .NET MAUI 10 | Cross-platform UI (iOS/Android/Windows) |
+| **Web** | React 18, Vite, Tailwind CSS | Web Frontend UI |
 | **API** | ASP.NET Core 10 | REST API, JWT Authentication |
 | **Business** | Orleans 10 | Distributed Actor Framework |
 | **Data** | PostgreSQL or CockroachDB | Relational Database or NoSQL |
