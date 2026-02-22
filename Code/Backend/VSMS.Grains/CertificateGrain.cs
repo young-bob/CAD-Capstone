@@ -1,7 +1,7 @@
-using VSMS.Grains.Interfaces;
-using VSMS.Grains.Interfaces.Models;
 using Orleans;
 using Orleans.Runtime;
+using VSMS.Grains.Interfaces;
+using VSMS.Grains.Interfaces.Models;
 
 namespace VSMS.Grains;
 
@@ -50,6 +50,10 @@ public class CertificateGrain : Grain, ICertificateGrain
                 CoordinatorSignature = coordinatorSignature
             };
             await _state.WriteStateAsync();
+        }
+        else
+        {
+            throw new InvalidOperationException("Cannot sign a certificate that hasn't been generated.");
         }
     }
 }

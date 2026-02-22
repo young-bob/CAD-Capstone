@@ -28,9 +28,18 @@ public partial class LoginViewModel : BaseViewModel
         try
         {
             IsBusy = true;
-            // var token = await _apiService.Login(new { Email, Password });
-            // await SecureStorage.SetAsync("auth_token", token);
-            await Shell.Current.GoToAsync("//DashboardPage");
+            var response = await _apiService.Login(new { Email, Password });
+
+            if (!string.IsNullOrEmpty(response.Token))
+            {
+                await Services.TokenStorage.SetAsync("auth_token", response.Token);
+                await Services.TokenStorage.SetAsync("user_id", response.UserId.ToString());
+                await Shell.Current.GoToAsync("//MainTabs");
+            }
+            else
+            {
+                await Shell.Current.DisplayAlertAsync("Error", "Invalid authentication token received.", "OK");
+            }
         }
         catch (Exception ex)
         {
@@ -40,5 +49,11 @@ public partial class LoginViewModel : BaseViewModel
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    async Task GoToRegisterAsync()
+    {
+        await Shell.Current.GoToAsync(nameof(Views.RegisterPage));
     }
 }

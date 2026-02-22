@@ -20,13 +20,14 @@ public static class MauiProgram
             });
 
         // Services
+        builder.Services.AddTransient<AuthHeaderHandler>();
         builder.Services.AddRefitClient<VSMS.VolunteerApp.Services.IVolunteerApiService>()
-               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:5000")); // TODO: Use DevTunnel/Local IP
+               .ConfigureHttpClient(c => c.BaseAddress = new Uri("http://localhost:8080"))
+               .AddHttpMessageHandler<AuthHeaderHandler>();
 
         // Views & ViewModels
-        // LoginPage not implemented yet
-        // builder.Services.AddTransient<VSMS.VolunteerApp.Views.LoginPage>();
-        // builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.LoginViewModel>();
+        builder.Services.AddTransient<VSMS.VolunteerApp.Views.LoginPage>();
+        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.LoginViewModel>();
 
         builder.Services.AddTransient<VSMS.VolunteerApp.Views.DashboardPage>();
         builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.DashboardViewModel>();
@@ -39,6 +40,9 @@ public static class MauiProgram
 
         builder.Services.AddTransient<VSMS.VolunteerApp.Views.ProfilePage>();
         builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.ProfileViewModel>();
+
+        builder.Services.AddTransient<VSMS.VolunteerApp.Views.RegisterPage>();
+        builder.Services.AddTransient<VSMS.VolunteerApp.ViewModels.RegisterViewModel>();
 
 #if DEBUG
         builder.Logging.AddDebug();

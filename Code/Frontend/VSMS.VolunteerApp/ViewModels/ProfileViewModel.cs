@@ -11,7 +11,7 @@ public partial class ProfileViewModel : BaseViewModel
     private readonly IVolunteerApiService _apiService;
 
     [ObservableProperty]
-    private VolunteerProfile _profile;
+    private VolunteerProfile? _profile;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActionText))]
@@ -31,20 +31,19 @@ public partial class ProfileViewModel : BaseViewModel
         IsBusy = true;
         try
         {
-            // Mock data for now
-            await Task.Delay(500);
-            Profile = new VolunteerProfile(
-                "volunteer@example.com",
-                "555-0123",
-                "Passionate about community service.",
-                25.5,
-                new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
-                new List<string> { "Gardening", "Teaching" }
-            );
+            var userIdString = await Services.TokenStorage.GetAsync("user_id");
+            if (Guid.TryParse(userIdString, out var userId))
+            {
+                Profile = await _apiService.GetProfile(userId);
+            }
+            else
+            {
+                await Shell.Current.DisplayAlertAsync("Error", "User session not found. Please log in again.", "OK");
+            }
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Unable to load profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
         }
         finally
         {
@@ -67,21 +66,34 @@ public partial class ProfileViewModel : BaseViewModel
 
     private async Task SaveProfileAsync()
     {
+        if (Profile == null) return;
+
         IsBusy = true;
         try
         {
-            // Simulate API call
-            await Task.Delay(1000);
-            IsEditing = false;
-            await Shell.Current.DisplayAlert("Success", "Profile updated successfully.", "OK");
+            var userIdString = await Services.TokenStorage.GetAsync("user_id");
+            if (Guid.TryParse(userIdString, out var userId))
+            {
+                await _apiService.UpdateProfile(userId, Profile);
+                IsEditing = false;
+                await Shell.Current.DisplayAlertAsync("Success", "Profile updated successfully.", "OK");
+            }
         }
         catch (Exception ex)
         {
-            await Shell.Current.DisplayAlert("Error", $"Unable to save profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    private async Task LogoutAsync()
+    {
+        Services.TokenStorage.Remove("auth_token");
+        Services.TokenStorage.Remove("user_id");
+        await Shell.Current.GoToAsync("//LoginPage");
     }
 }

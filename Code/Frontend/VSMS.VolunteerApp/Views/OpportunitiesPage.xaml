@@ -6,7 +6,7 @@
              xmlns:converters="clr-namespace:VSMS.VolunteerApp.Converters"
              x:Class="VSMS.VolunteerApp.Views.OpportunitiesPage"
              x:DataType="vm:OpportunitiesViewModel"
-             Title="{Binding Title}">
+             Title="Opportunities">
 
     <ContentPage.Resources>
         <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
@@ -15,27 +15,65 @@
     <RefreshView Command="{Binding LoadOpportunitiesCommand}" IsRefreshing="{Binding IsRefreshing}">
         <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None">
             <CollectionView.EmptyView>
-                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-                    <Label Text="No opportunities found." HorizontalOptions="Center" />
-                    <Button Text="Refresh" Command="{Binding LoadOpportunitiesCommand}" Margin="0,20,0,0" />
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="15" Padding="40">
+                    <Label Text="🔍" FontSize="48" HorizontalOptions="Center" />
+                    <Label Text="No opportunities found"
+                           FontSize="18" FontAttributes="Bold"
+                           HorizontalOptions="Center" />
+                    <Label Text="Pull down to refresh or check back later"
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}"
+                           HorizontalOptions="Center"
+                           HorizontalTextAlignment="Center" />
+                    <Button Text="Refresh"
+                            Command="{Binding LoadOpportunitiesCommand}"
+                            BackgroundColor="#0D9488"
+                            TextColor="White"
+                            CornerRadius="12"
+                            Margin="0,10,0,0"
+                            HorizontalOptions="Center" />
                 </VerticalStackLayout>
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:OpportunityDetails">
-                    <Grid Padding="5">
-                        <Border Stroke="LightGray" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="10" HeightRequest="120">
+                    <Grid Padding="16,6">
+                        <Border StrokeShape="RoundRectangle 14"
+                                Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
+                                StrokeThickness="1"
+                                Padding="16"
+                                BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
                             <Border.Shadow>
-                                <Shadow Brush="Black" Offset="2,2" Radius="5" Opacity="0.1" />
+                                <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.06" />
                             </Border.Shadow>
                             <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}" 
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}"
                                                       CommandParameter="{Binding .}" />
                             </Border.GestureRecognizers>
-                            <VerticalStackLayout Spacing="5">
-                                <Label Text="{Binding Title}" FontSize="18" FontAttributes="Bold" />
-                                <Label Text="{Binding VenueLocation.City}" FontSize="14" TextColor="Gray" />
-                                <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}" FontSize="14" />
-                            </VerticalStackLayout>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                <!-- Color accent -->
+                                <BoxView Grid.Column="0"
+                                         WidthRequest="4"
+                                         CornerRadius="2"
+                                         Color="#0D9488"
+                                         VerticalOptions="Fill" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="{Binding Title}"
+                                           FontSize="17" FontAttributes="Bold"
+                                           LineBreakMode="TailTruncation" />
+                                    <HorizontalStackLayout Spacing="6">
+                                        <Label Text="📍" FontSize="13" />
+                                        <Label Text="{Binding VenueLocation.City}"
+                                               FontSize="13"
+                                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
+                                    </HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="6">
+                                        <Label Text="🕐" FontSize="13" />
+                                        <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}"
+                                               FontSize="13"
+                                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                            </Grid>
                         </Border>
                     </Grid>
                 </DataTemplate>

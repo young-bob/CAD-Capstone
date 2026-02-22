@@ -6,26 +6,32 @@
     xmlns:views="clr-namespace:VSMS.VolunteerApp.Views"
     Shell.FlyoutBehavior="Disabled">
 
-    <!-- LoginPage not implemented yet
+    <!-- Login (no tabs visible) -->
     <ShellContent
         Title="Login"
         ContentTemplate="{DataTemplate views:LoginPage}"
-        Route="LoginPage" />
-    -->
+        Route="LoginPage"
+        Shell.TabBarIsVisible="False" />
 
-    <ShellContent
-        Title="Opportunities"
-        ContentTemplate="{DataTemplate views:OpportunitiesPage}"
-        Route="OpportunitiesPage" />
+    <!-- Main App with Bottom Tab Bar -->
+    <TabBar Route="MainTabs">
+        <ShellContent
+            Title="Dashboard"
+            Icon="tab_dashboard.svg"
+            ContentTemplate="{DataTemplate views:DashboardPage}"
+            Route="DashboardPage" />
 
-    <ShellContent
-        Title="Dashboard"
-        ContentTemplate="{DataTemplate views:DashboardPage}"
-        Route="DashboardPage" />
+        <ShellContent
+            Title="Opportunities"
+            Icon="tab_opportunities.svg"
+            ContentTemplate="{DataTemplate views:OpportunitiesPage}"
+            Route="OpportunitiesPage" />
 
-    <ShellContent
-        Title="Profile"
-        ContentTemplate="{DataTemplate views:ProfilePage}"
-        Route="ProfilePage" />
+        <ShellContent
+            Title="Profile"
+            Icon="tab_profile.svg"
+            ContentTemplate="{DataTemplate views:ProfilePage}"
+            Route="ProfilePage" />
+    </TabBar>
 
 </Shell>

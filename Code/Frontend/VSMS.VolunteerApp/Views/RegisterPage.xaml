@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.RegisterPage"
+             x:DataType="viewmodels:RegisterViewModel"
+             Title="Create Account"
+             Shell.NavBarIsVisible="False">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="18" Padding="30,50,30,30" VerticalOptions="Center">
+
+            <!-- Logo -->
+            <Image
+                Source="vsms_logo.png"
+                SemanticProperties.Description="VSMS Logo"
+                HeightRequest="90"
+                WidthRequest="90"
+                Aspect="AspectFit"
+                HorizontalOptions="Center" />
+
+            <Label
+                Text="Join VSMS"
+                FontSize="28"
+                FontAttributes="Bold"
+                TextColor="#0D9488"
+                HorizontalOptions="Center" />
+
+            <Label
+                Text="Create your volunteer account"
+                FontSize="14"
+                HorizontalOptions="Center"
+                TextColor="{AppThemeBinding Light=Gray, Dark=#A0AEC0}" />
+
+            <!-- Registration Form Card -->
+            <Border StrokeShape="RoundRectangle 16"
+                    Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
+                    StrokeThickness="1"
+                    Padding="20"
+                    Margin="0,5,0,0"
+                    BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
+                <Border.Shadow>
+                    <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
+                </Border.Shadow>
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Full Name" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
+                    <Entry Placeholder="John Doe" Text="{Binding Name}"
+                           ClearButtonVisibility="WhileEditing" />
+
+                    <Label Text="Email" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
+                    <Entry Placeholder="you@example.com" Text="{Binding Email}"
+                           Keyboard="Email" ClearButtonVisibility="WhileEditing" />
+
+                    <Label Text="Phone (optional)" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
+                    <Entry Placeholder="+1 234 567 8900" Text="{Binding PhoneNumber}"
+                           Keyboard="Telephone" ClearButtonVisibility="WhileEditing" />
+
+                    <Label Text="Password" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
+                    <Entry Placeholder="••••••••" Text="{Binding Password}"
+                           IsPassword="True" ClearButtonVisibility="WhileEditing" />
+
+                    <Label Text="Confirm Password" FontSize="13" FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
+                    <Entry Placeholder="••••••••" Text="{Binding ConfirmPassword}"
+                           IsPassword="True" ClearButtonVisibility="WhileEditing" />
+
+                    <Button
+                        Text="Create Account"
+                        Command="{Binding RegisterCommand}"
+                        BackgroundColor="#0D9488"
+                        TextColor="White"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        CornerRadius="12"
+                        HeightRequest="50"
+                        Margin="0,5,0,0"
+                        HorizontalOptions="Fill" />
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Color="#0D9488"
+                HorizontalOptions="Center" />
+
+            <Button
+                Text="Already have an account? Sign In"
+                Command="{Binding GoToLoginCommand}"
+                BackgroundColor="Transparent"
+                TextColor="#0D9488"
+                FontSize="14"
+                HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
