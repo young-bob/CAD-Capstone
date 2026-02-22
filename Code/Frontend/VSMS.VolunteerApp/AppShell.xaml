@@ -13,25 +13,32 @@
         Route="LoginPage"
         Shell.TabBarIsVisible="False" />
 
+    <!-- Register (no tabs visible) -->
+    <ShellContent
+        Title="Register"
+        ContentTemplate="{DataTemplate views:RegisterPage}"
+        Route="RegisterPage"
+        Shell.TabBarIsVisible="False" />
+
     <!-- Main App with Bottom Tab Bar -->
     <TabBar Route="MainTabs">
-        <ShellContent
-            Title="Dashboard"
-            Icon="tab_dashboard.svg"
-            ContentTemplate="{DataTemplate views:DashboardPage}"
-            Route="DashboardPage" />
+        <Tab Title="Dashboard" Route="DashboardTab">
+            <ShellContent
+                ContentTemplate="{DataTemplate views:DashboardPage}"
+                Route="DashboardPage" />
+        </Tab>
 
-        <ShellContent
-            Title="Opportunities"
-            Icon="tab_opportunities.svg"
-            ContentTemplate="{DataTemplate views:OpportunitiesPage}"
-            Route="OpportunitiesPage" />
+        <Tab Title="Opportunities" Route="OpportunitiesTab">
+            <ShellContent
+                ContentTemplate="{DataTemplate views:OpportunitiesPage}"
+                Route="OpportunitiesPage" />
+        </Tab>
 
-        <ShellContent
-            Title="Profile"
-            Icon="tab_profile.svg"
-            ContentTemplate="{DataTemplate views:ProfilePage}"
-            Route="ProfilePage" />
+        <Tab Title="Profile" Route="ProfileTab">
+            <ShellContent
+                ContentTemplate="{DataTemplate views:ProfilePage}"
+                Route="ProfilePage" />
+        </Tab>
     </TabBar>
 
 </Shell>

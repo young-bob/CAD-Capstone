@@ -9,7 +9,7 @@
         <ToolbarItem Text="{Binding ActionText}" Command="{Binding ToggleEditCommand}" />
     </ContentPage.ToolbarItems>
 
-    <ScrollView>
+    <ScrollView HorizontalScrollBarVisibility="Never">
         <VerticalStackLayout Spacing="16" Padding="20">
 
             <!-- Profile Header -->
@@ -96,7 +96,7 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="🎯  Skills" FontSize="15" FontAttributes="Bold"
                            TextColor="#0D9488" />
-                    <CollectionView ItemsSource="{Binding Profile.Skills}" HeightRequest="80">
+                    <CollectionView ItemsSource="{Binding Profile.Skills}" HeightRequest="80" HorizontalScrollBarVisibility="Never">
                         <CollectionView.ItemsLayout>
                             <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
                         </CollectionView.ItemsLayout>

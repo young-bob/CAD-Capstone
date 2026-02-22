@@ -59,7 +59,7 @@ public partial class RegisterViewModel : BaseViewModel
             });
 
             await Shell.Current.DisplayAlertAsync("Success", "Registration successful! Please log in.", "OK");
-            await Shell.Current.GoToAsync("..");
+            await Shell.Current.GoToAsync("//LoginPage");
         }
         catch (Refit.ApiException ex)
         {
@@ -81,6 +81,6 @@ public partial class RegisterViewModel : BaseViewModel
     [RelayCommand]
     async Task GoToLoginAsync()
     {
-        await Shell.Current.GoToAsync("..");
+        await Shell.Current.GoToAsync("//LoginPage");
     }
 }

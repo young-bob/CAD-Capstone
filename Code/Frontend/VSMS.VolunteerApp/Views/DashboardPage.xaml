@@ -6,7 +6,7 @@
              x:DataType="vm:DashboardViewModel"
              Title="Dashboard">
 
-    <ScrollView>
+    <ScrollView HorizontalScrollBarVisibility="Never">
         <VerticalStackLayout Padding="20" Spacing="20">
 
             <!-- Welcome Header -->

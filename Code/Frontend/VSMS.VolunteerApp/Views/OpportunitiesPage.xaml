@@ -13,7 +13,7 @@
     </ContentPage.Resources>
 
     <RefreshView Command="{Binding LoadOpportunitiesCommand}" IsRefreshing="{Binding IsRefreshing}">
-        <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None">
+        <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None" HorizontalScrollBarVisibility="Never">
             <CollectionView.EmptyView>
                 <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="15" Padding="40">
                     <Label Text="🔍" FontSize="48" HorizontalOptions="Center" />
