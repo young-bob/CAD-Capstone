@@ -19,7 +19,9 @@ public partial class DashboardViewModel : BaseViewModel
     public ObservableCollection<OpportunityDetails> UpcomingOpportunities { get; } = new();
 
     public DashboardViewModel(IVolunteerApiService apiService)
+    public DashboardViewModel(IVolunteerApiService apiService)
     {
+        _apiService = apiService;
         _apiService = apiService;
         Title = "Dashboard";
         LoadDataCommand.Execute(null);

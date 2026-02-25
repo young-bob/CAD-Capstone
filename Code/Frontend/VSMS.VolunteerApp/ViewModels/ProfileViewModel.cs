@@ -69,6 +69,7 @@ public partial class ProfileViewModel : BaseViewModel
         catch (Exception ex)
         {
             await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
         }
         finally
         {
@@ -112,6 +113,8 @@ public partial class ProfileViewModel : BaseViewModel
     {
         if (Profile == null) return;
 
+        if (Profile == null) return;
+
         IsBusy = true;
         try
         {
@@ -134,10 +137,19 @@ public partial class ProfileViewModel : BaseViewModel
         catch (Exception ex)
         {
             await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    private async Task LogoutAsync()
+    {
+        Services.TokenStorage.Remove("auth_token");
+        Services.TokenStorage.Remove("user_id");
+        await Shell.Current.GoToAsync("//LoginPage");
     }
 }

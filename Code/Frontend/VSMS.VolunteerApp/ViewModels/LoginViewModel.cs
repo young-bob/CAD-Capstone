@@ -24,6 +24,7 @@ public partial class LoginViewModel : BaseViewModel
     [RelayCommand]
     async Task LoginAsync()
     {
+        Console.WriteLine($"[LoginViewModel] LoginAsync invoked. IsBusy={IsBusy} Email={Email}");
         if (IsBusy) return;
 
         if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
