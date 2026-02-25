@@ -278,6 +278,76 @@ graph LR
     style DB3 fill:#fce4ec,stroke:#c2185b
 ```
 
+### Cross-cloud Migration
+
+``` mermaid
+flowchart LR
+    classDef aws fill:#FFD280,stroke:#E68A00,stroke-width:2px,color:black
+    classDef gcp fill:#AECBFA,stroke:#1A73E8,stroke-width:2px,color:black
+
+    subgraph Phase1 [Phase 1: Initial Deployment]
+        direction LR
+        A1(AWS Node 1):::aws --- A2(AWS Node 2):::aws
+        A1 --- A3(AWS Node 3):::aws
+        A2 --- A3
+    end
+
+    subgraph Phase2 [Phase 2: Cross-Cloud Expansion & Initial Rebalancing]
+        direction LR
+        B1(AWS Node 1):::aws
+        B2(AWS Node 2):::aws
+        B3(AWS Node 3):::aws
+        G1(GCP Node 1):::gcp
+        G2(GCP Node 2):::gcp
+        
+        %% Intra-cloud Mesh Connections (Solid lines)
+        B1 --- B2 --- B3 --- B1
+        G1 --- G2
+        
+        %% Cross-cloud Mesh Data Sync Connections (Dotted lines)
+        B1 -.- G1
+        B1 -.- G2
+        B2 -.- G1
+        B2 -.- G2
+        B3 -.- G1
+        B3 -.- G2
+    end
+
+    subgraph Phase3 [Phase 3: Node Replacement & Secondary Rebalancing]
+        direction LR
+        C2(AWS Node 2):::aws
+        C3(AWS Node 3):::aws
+        H1(GCP Node 1):::gcp
+        H2(GCP Node 2):::gcp
+        H3(GCP Node 3):::gcp
+        
+        %% Intra-cloud Mesh Connections (Solid lines)
+        C2 --- C3
+        H1 --- H2 --- H3 --- H1
+        
+        %% Cross-cloud Mesh Data Sync Connections (Dotted lines)
+        C2 -.- H1
+        C2 -.- H2
+        C2 -.- H3
+        C3 -.- H1
+        C3 -.- H2
+        C3 -.- H3
+    end
+
+    subgraph Phase4 [Phase 4: Migration Complete]
+        direction LR
+        I1(GCP Node 1):::gcp --- I2(GCP Node 2):::gcp
+        I1 --- I3(GCP Node 3):::gcp
+        I2 --- I3
+    end
+
+    Phase1 ==>|"1\. Deploy 2 nodes in GCP"| Phase2
+    Phase2 ==>|"2\. Decommission 1 AWS node & Add 1 new node in GCP"| Phase3
+    Phase3 ==>|"4\. Decommission remaining 2 AWS nodes"| Phase4
+```
+
+
+
 ### Technology Stack
 
 | Layer | Technology | Purpose |
