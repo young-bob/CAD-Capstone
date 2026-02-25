@@ -1,28 +1,28 @@
 ``` shell
 VSMS (Volunteer Service Management System)
 ├── Backend
-│   ├── VSMS.Grains.Interfaces
-│   ├── VSMS.Grains  
-│   ├── VSMS.API
-│   ├── VSMS.Silo
-│   └── VSMS.SQL
-└── Frontend
-    └── VSMS.VolunteerApp
-        ├── Models
-        ├── Views
-        ├── ViewModels
-        ├── Services
-        └── Platforms
-            ├── Android
-            ├── iOS
-            ├── MacCatalyst
-            └── Windows
+│   ├── VSMS.API
+│   ├── VSMS.Grains
+│   ├── VSMS.Grains.Interfaces
+│   ├── VSMS.Silo
+│   └── VSMS.SQL
+├── Frontend
+│   └── VSMS.VolunteerApp
+│       └── Platforms
+│           ├── Android
+│           ├── iOS
+│           ├── MacCatalyst
+│           └── Windows
+└── Tests
+    ├── VSMS.API.Tests
+    ├── VSMS.Grains.Tests
+    └── VSMS.VolunteerApp.Tests
 ```
 
 ## System Architecture
 
 ```mermaid
-graph TB
+graph LR
     subgraph MobileLayer ["📱 Presentation Layer - .NET MAUI"]
         MobileApp["VSMS.VolunteerApp"]
         subgraph MauiComponents ["Components"]
@@ -78,7 +78,7 @@ graph TB
 
 ## Logical Architecture Diagram of Single Node
 ``` mermaid
-graph TB
+graph LR
     subgraph MobileLayer ["📱 User Client"]
         MobileApp["VSMS.VolunteerApp"]
     end
@@ -110,8 +110,9 @@ graph TB
 ```
 
 ## Physical Architecture Diagram of Single Node
+
 ``` mermaid
-graph TB
+graph LR
     subgraph Client ["📱 User Client"]
         Mobile["VSMS.VolunteerApp"]
     end
@@ -142,7 +143,7 @@ graph TB
 ## Logical Architecture Diagram of Three-Node Sample
 
 ``` mermaid
-graph TB
+graph LR
     subgraph MobileLayer ["📱 User Client"]
         MobileApp["VSMS.VolunteerApp"]
     end
@@ -197,7 +198,7 @@ graph TB
 ## Physical Architecture Diagram of Three-Node Sample
 
 ``` mermaid
-graph TB
+graph LR
     subgraph Clients ["📱 User Client"]
         Mobile["VSMS.VolunteerApp"]
     end
