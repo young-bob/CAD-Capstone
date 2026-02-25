@@ -10,6 +10,7 @@ import { fetchApi } from "@/lib/apiClient";
 import type { AppRole } from "@/contexts/AuthContext";
 
 const Auth = () => {
+  const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

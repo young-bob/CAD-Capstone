@@ -27,13 +27,14 @@ export interface UserData {
 }
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  session: string | null;
+  user: AuthUser | null;
   roles: AppRole[];
   primaryRole: AppRole;
   loading: boolean;
   signIn: (token: string, userData: UserData) => void;
   signOut: () => Promise<void>;
+  login: (token: string, user: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,8 +46,8 @@ function getPrimaryRole(roles: AppRole[]): AppRole {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setRoles([]);
         }
       } finally {
-        if (isMounted) setLoading(false);
+        setLoading(false);
       }
     };
 
@@ -116,6 +117,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isMounted = false;
     };
   }, []);
+
+  const login = (token: string, authUser: AuthUser) => {
+    setToken(token);
+    setSession(token);
+    setUser(authUser);
+    const appRole = mapRole(authUser.role);
+    setRoles([appRole]);
+  };
 
   const handleSignOut = async () => {
     try {
