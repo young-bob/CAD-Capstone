@@ -12,7 +12,8 @@ public interface IVolunteerGrain : IGrainWithGuidKey
     Task AddCredential(Credential credential);
     Task<List<Credential>> GetCredentials();
 
-    Task ApplyForOpportunity(Guid opportunityId);
+    Task<Application> ApplyForOpportunity(Guid opportunityId);
+    Task<List<Application>> GetApplications();
 
     Task CheckIn(Guid opportunityId, Location location);
     Task CheckOut(Guid opportunityId);

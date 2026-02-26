@@ -17,7 +17,7 @@ public class OrganizationController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetProfile(string id)
+    public async Task<IActionResult> GetProfile(Guid id)
     {
         var grain = _client.GetGrain<IOrganizationGrain>(id);
         var profile = await grain.GetProfile();
@@ -29,7 +29,7 @@ public class OrganizationController : ControllerBase
     }
 
     [HttpPost("{id}")]
-    public async Task<IActionResult> UpdateProfile(string id, [FromBody] OrganizationProfile profile)
+    public async Task<IActionResult> UpdateProfile(Guid id, [FromBody] OrganizationProfile profile)
     {
         var grain = _client.GetGrain<IOrganizationGrain>(id);
         await grain.UpdateProfile(profile);
@@ -37,7 +37,7 @@ public class OrganizationController : ControllerBase
     }
 
     [HttpPost("{id}/verify-credential")]
-    public async Task<IActionResult> VerifyCredential(string id, [FromBody] VerifyCredentialRequest request)
+    public async Task<IActionResult> VerifyCredential(Guid id, [FromBody] VerifyCredentialRequest request)
     {
         var grain = _client.GetGrain<IOrganizationGrain>(id);
         await grain.VerifyCredential(request.VolunteerId, request.CredentialId);
@@ -45,7 +45,7 @@ public class OrganizationController : ControllerBase
     }
 
     [HttpPost("{id}/publish-opportunity")]
-    public async Task<IActionResult> PublishOpportunity(string id, [FromBody] PublishOpportunityRequest request)
+    public async Task<IActionResult> PublishOpportunity(Guid id, [FromBody] PublishOpportunityRequest request)
     {
         var grain = _client.GetGrain<IOrganizationGrain>(id);
         await grain.PublishOpportunity(request.OpportunityId);
@@ -53,7 +53,7 @@ public class OrganizationController : ControllerBase
     }
 
     [HttpGet("{id}/opportunities")]
-    public async Task<IActionResult> GetPublishedOpportunities(string id)
+    public async Task<IActionResult> GetPublishedOpportunities(Guid id)
     {
         var grain = _client.GetGrain<IOrganizationGrain>(id);
         var opportunities = await grain.GetPublishedOpportunities();

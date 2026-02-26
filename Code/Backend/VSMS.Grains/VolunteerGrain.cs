@@ -45,30 +45,23 @@ public class VolunteerGrain : Grain, IVolunteerGrain
         return Task.FromResult(_state.State.Credentials ?? new List<Credential>());
     }
 
-    public async Task ApplyForOpportunity(Guid opportunityId)
+    public async Task<Application> ApplyForOpportunity(Guid opportunityId)
     {
         _logger.LogInformation("Volunteer {VolunteerId} applying for Opportunity {OpportunityId}", this.GetPrimaryKey(), opportunityId);
 
         var opportunityGrain = GrainFactory.GetGrain<IOpportunityGrain>(opportunityId);
-        var notes = "Applying via VolunteerGrain"; // Placeholder for actual notes
+        var application = await opportunityGrain.SubmitApplication(this.GetPrimaryKey(), string.Empty);
 
-        try
-        {
-            var application = await opportunityGrain.SubmitApplication(this.GetPrimaryKey(), notes);
+        _state.State.Applications.Add(application);
+        await _state.WriteStateAsync();
 
-            if (_state.State.Applications == null)
-                _state.State.Applications = new List<Application>();
+        _logger.LogInformation("Application submitted. ApplicationId: {ApplicationId}", application.AppId);
+        return application;
+    }
 
-            _state.State.Applications.Add(application);
-            await _state.WriteStateAsync();
-
-            _logger.LogInformation("Application submitted successfully. ApplicationId: {ApplicationId}", application.AppId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to submit application for Opportunity {OpportunityId}", opportunityId);
-            throw;
-        }
+    public Task<List<Application>> GetApplications()
+    {
+        return Task.FromResult(_state.State.Applications);
     }
 
     public Task CheckIn(Guid opportunityId, Location location)

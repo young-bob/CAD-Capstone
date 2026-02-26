@@ -15,6 +15,14 @@ public class CoordinatorController : ControllerBase
         _client = client;
     }
 
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetCoordinator(Guid id)
+    {
+        var grain = _client.GetGrain<ICoordinatorGrain>(id);
+        var organizationId = await grain.GetOrganizationId();
+        return Ok(new { organizationId });
+    }
+
     [HttpPost("{id}/organization")]
     public async Task<IActionResult> SetOrganization(Guid id, [FromBody] SetOrganizationRequest request)
     {

@@ -13,7 +13,7 @@ public class OpportunityGrain : Grain, IOpportunityGrain
     private readonly ILogger<OpportunityGrain> _logger;
 
     public OpportunityGrain(
-        [PersistentState("opportunity", "OrleansStorage")] IPersistentState<OpportunityState> state,
+        [PersistentState("opportunity", "grain-store")] IPersistentState<OpportunityState> state,
         ILogger<OpportunityGrain> logger)
     {
         _state = state;
@@ -33,15 +33,9 @@ public class OpportunityGrain : Grain, IOpportunityGrain
 
     public async Task<Application> SubmitApplication(Guid volunteerId, string notes)
     {
-        // Concurrency Control: Check Capacity
         if (_state.State.Details == null)
         {
             throw new InvalidOperationException("Opportunity details not set.");
-        }
-
-        if (_state.State.Details.RegisteredCount >= _state.State.Details.MaxVolunteers)
-        {
-            throw new InvalidOperationException("Opportunity is full.");
         }
 
         // Check if already applied
@@ -50,38 +44,26 @@ public class OpportunityGrain : Grain, IOpportunityGrain
             throw new InvalidOperationException("Already applied.");
         }
 
+        // Auto-waitlist when full instead of throwing exception
+        var isFull = _state.State.Details.RegisteredCount >= _state.State.Details.MaxVolunteers;
+        var initialStatus = isFull ? ApplicationStatus.Waitlisted : ApplicationStatus.Pending;
+
         var application = new Application(
             Guid.NewGuid(),
             volunteerId,
             this.GetPrimaryKey(),
             DateTime.UtcNow,
-            ApplicationStatus.Pending,
+            initialStatus,
             string.Empty
         );
 
         _state.State.Applications.Add(application);
-
-        // Update Registered Count (assuming pending counts as registered or update logic later)
-        // Usually only Approved counts, but if auto-approve or reservation...
-        // For now, let's assume Pending doesn't take a slot, or it does? 
-        // Plan says: "Checks RegisteredCount < MaxVolunteers". 
-        // Let's increment registered count only on Approval? Or on SignUp?
-        // If "Sign-Up" implies instant registration, then increment. 
-        // If "Application" implies approval needed, then don't increment yet.
-        // UML says "Application: Submits". So probably needs approval.
-        // But for "Sign Up" problem mentioned in feasibility, it implies claiming a spot.
-        // I'll assume for this implementation that SubmitApplication reserves a spot if Auto-Approve, 
-        // or just creates Application. 
-        // If just creates Application, then capacity check should be on Approval.
-        // However, usually we want to limit applications too (waitlist).
-        // Let's keep it simple: create application.
-
         await _state.WriteStateAsync();
 
         return application;
     }
 
-    public async Task ProcessApplication(Guid applicationId, ApplicationStatus status)
+    public async Task ProcessApplication(Guid applicationId, ApplicationStatus status, string? rejectionReason = null)
     {
         var appIndex = _state.State.Applications.FindIndex(a => a.AppId == applicationId);
         if (appIndex == -1) throw new KeyNotFoundException("Application not found");
@@ -112,12 +94,28 @@ public class OpportunityGrain : Grain, IOpportunityGrain
             }
         }
 
-        _state.State.Applications[appIndex] = app with { Status = status };
+        var reason = status == ApplicationStatus.Rejected ? (rejectionReason ?? string.Empty) : string.Empty;
+        _state.State.Applications[appIndex] = app with { Status = status, RejectionReason = reason };
         await _state.WriteStateAsync();
     }
 
     public Task<List<Application>> GetApplications()
     {
         return Task.FromResult(_state.State.Applications);
+    }
+
+    public Task<List<Application>> GetEnrollments()
+    {
+        var enrolled = _state.State.Applications
+            .Where(a => a.Status == ApplicationStatus.Approved)
+            .ToList();
+        return Task.FromResult(enrolled);
+    }
+
+    public async Task DeleteOpportunity()
+    {
+        _state.State.Details = null;
+        _state.State.Applications.Clear();
+        await _state.WriteStateAsync();
     }
 }
