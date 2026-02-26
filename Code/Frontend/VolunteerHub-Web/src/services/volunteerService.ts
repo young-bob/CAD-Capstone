@@ -1,4 +1,5 @@
-import { apiClient } from '@/lib/apiClient';
+import { fetchApi } from '@/lib/apiClient';
+import type { Application } from './opportunityService';
 
 export interface Location {
   latitude: number;
@@ -22,8 +23,19 @@ export interface VolunteerProfile {
 
 export const volunteerService = {
   getProfile: (id: string) =>
-    apiClient.get<VolunteerProfile>(`/api/volunteer/${id}`),
+    fetchApi<VolunteerProfile>(`/volunteer/${id}`),
 
   updateProfile: (id: string, profile: VolunteerProfile) =>
-    apiClient.post<void>(`/api/volunteer/${id}`, profile),
+    fetchApi<void>(`/volunteer/${id}`, {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    }),
+
+  apply: (volunteerId: string, opportunityId: string) =>
+    fetchApi<Application>(`/volunteer/${volunteerId}/apply/${opportunityId}`, {
+      method: 'POST',
+    }),
+
+  getApplications: (volunteerId: string) =>
+    fetchApi<Application[]>(`/volunteer/${volunteerId}/applications`),
 };

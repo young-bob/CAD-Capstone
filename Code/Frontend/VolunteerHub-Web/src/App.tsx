@@ -13,6 +13,13 @@ import Analytics from "./pages/Analytics";
 import AdminDashboard from "./pages/AdminDashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import CoordinatorOpportunities from "./pages/CoordinatorOpportunities";
+import CreateOpportunity from "./pages/CreateOpportunity";
+import EditOpportunity from "./pages/EditOpportunity";
+import ApplicationsReview from "./pages/ApplicationsReview";
+import CoordinatorEnrollments from "./pages/CoordinatorEnrollments";
+import VolunteerApplications from "./pages/VolunteerApplications";
+import VolunteerEnrollments from "./pages/VolunteerEnrollments";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -37,6 +44,8 @@ const AppRoutes = () => {
           <>
             <Route path="/" element={<Dashboard />} />
             <Route path="/opportunities" element={<Opportunities />} />
+            <Route path="/volunteer/applications" element={<VolunteerApplications />} />
+            <Route path="/volunteer/enrollments" element={<VolunteerEnrollments />} />
             <Route path="/certificates" element={<Certificates />} />
           </>
         )}
@@ -44,7 +53,12 @@ const AppRoutes = () => {
         {/* Coordinator routes */}
         {primaryRole === "coordinator" && (
           <>
-            <Route path="/" element={<Navigate to="/attendance" replace />} />
+            <Route path="/" element={<Navigate to="/coordinator/opportunities" replace />} />
+            <Route path="/coordinator/opportunities" element={<CoordinatorOpportunities />} />
+            <Route path="/coordinator/opportunities/new" element={<CreateOpportunity />} />
+            <Route path="/coordinator/opportunities/:id/edit" element={<EditOpportunity />} />
+            <Route path="/coordinator/opportunities/:id/applications" element={<ApplicationsReview />} />
+            <Route path="/coordinator/enrollments" element={<CoordinatorEnrollments />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/analytics" element={<Analytics />} />
           </>

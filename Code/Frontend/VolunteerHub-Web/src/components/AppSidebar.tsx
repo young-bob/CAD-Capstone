@@ -10,16 +10,24 @@ import {
   Shield,
   LogOut,
   Building2,
+  Briefcase,
+  Users,
+  FileText,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth, AppRole } from "@/contexts/AuthContext";
 
 const volunteerNav = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/opportunities", icon: Search, label: "Opportunities" },
+  { to: "/volunteer/applications", icon: FileText, label: "My Applications" },
+  { to: "/volunteer/enrollments", icon: ClipboardList, label: "My Enrollments" },
   { to: "/certificates", icon: Award, label: "Certificates" },
 ];
 
 const coordinatorNav = [
+  { to: "/coordinator/opportunities", icon: Briefcase, label: "My Opportunities" },
+  { to: "/coordinator/enrollments", icon: Users, label: "Enrollments" },
   { to: "/attendance", icon: ClipboardCheck, label: "Attendance" },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
 ];

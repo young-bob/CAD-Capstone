@@ -3,7 +3,6 @@ import { fetchApi, getAuthToken, setAuthToken, removeAuthToken, decodeToken } fr
 
 export type AppRole = "volunteer" | "coordinator" | "admin";
 
-// Mimicking structure so we don't break the whole app
 export interface User {
   id: string;
   email: string;
@@ -27,14 +26,13 @@ export interface UserData {
 }
 
 interface AuthContextType {
-  session: string | null;
-  user: AuthUser | null;
+  session: Session | null;
+  user: User | null;
   roles: AppRole[];
   primaryRole: AppRole;
   loading: boolean;
   signIn: (token: string, userData: UserData) => void;
   signOut: () => Promise<void>;
-  login: (token: string, user: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,32 +44,31 @@ function getPrimaryRole(roles: AppRole[]): AppRole {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
   const signIn = (token: string, userData: UserData) => {
     setAuthToken(token);
-    
-    // Map .NET UserInfo to our User shape
+
     const newUser: User = {
-      id: userData.userId || userData.id || "",
-      email: userData.email || "",
+      id: userData.userId ?? userData.id ?? "",
+      email: userData.email ?? "",
       user_metadata: {
-        full_name: userData.name || userData.fullName || "",
-      }
+        full_name: userData.name ?? userData.fullName ?? "",
+      },
     };
 
     const newSession: Session = {
       access_token: token,
-      user: newUser
+      user: newUser,
     };
 
     setSession(newSession);
     setUser(newUser);
-    
-    const role: AppRole = userData.role?.toLowerCase() as AppRole || "volunteer";
+
+    const role = (userData.role?.toLowerCase() ?? "volunteer") as AppRole;
     setRoles([role]);
   };
 
@@ -86,15 +83,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // Validate token structure
-        const decoded = decodeToken(token) as { exp: number };
-        if (!decoded || decoded.exp * 1000 < Date.now()) {
+        const decoded = decodeToken(token) as { exp?: number } | null;
+        if (!decoded || (decoded.exp && decoded.exp * 1000 < Date.now())) {
           removeAuthToken();
           if (isMounted) setLoading(false);
           return;
         }
 
-        const userData = await fetchApi<UserData>("/Auth/me");
+        const userData = await fetchApi<UserData>("/auth/me");
         if (isMounted) {
           signIn(token, userData);
         }
@@ -107,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setRoles([]);
         }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -118,17 +114,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const login = (token: string, authUser: AuthUser) => {
-    setToken(token);
-    setSession(token);
-    setUser(authUser);
-    const appRole = mapRole(authUser.role);
-    setRoles([appRole]);
-  };
-
   const handleSignOut = async () => {
     try {
-      await fetchApi("/Auth/logout", { method: "POST" });
+      await fetchApi("/auth/logout", { method: "POST" });
     } catch (e) {
       console.error("Logout API failed, continuing client logout", e);
     } finally {

@@ -23,9 +23,13 @@ interface Props {
   index: number;
   isHighlighted: boolean;
   onHover: (id: number | null) => void;
+  onApply?: () => void;
+  isApplied?: boolean;
+  isFull?: boolean;
+  applying?: boolean;
 }
 
-const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover }: Props) => {
+const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onApply, isApplied, isFull, applying }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -128,13 +132,21 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover }: Pr
               }`}
             />
           </button>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              size="sm"
-              className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs font-semibold shadow-sm"
-            >
-              Apply
-            </Button>
+          <motion.div whileHover={!isApplied && !isFull ? { scale: 1.05 } : {}} whileTap={!isApplied && !isFull ? { scale: 0.95 } : {}}>
+            {isApplied ? (
+              <Badge className="bg-secondary/10 text-secondary border-0 text-[10px]">Applied</Badge>
+            ) : isFull ? (
+              <Badge variant="destructive" className="text-[10px]">Full</Badge>
+            ) : (
+              <Button
+                size="sm"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs font-semibold shadow-sm"
+                onClick={(e) => { e.stopPropagation(); onApply?.(); }}
+                disabled={applying}
+              >
+                {applying ? "Applying..." : "Apply"}
+              </Button>
+            )}
           </motion.div>
         </div>
       </div>

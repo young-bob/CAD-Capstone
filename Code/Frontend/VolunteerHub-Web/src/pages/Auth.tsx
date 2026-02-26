@@ -7,10 +7,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchApi } from "@/lib/apiClient";
-import type { AppRole } from "@/contexts/AuthContext";
 
 const Auth = () => {
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +17,6 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"volunteer" | "coordinator">("volunteer");
-  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
