@@ -8,6 +8,7 @@ export interface Opportunity {
   id: number;
   title: string;
   org: string;
+  orgId: string;
   orgType: string;
   distance: string;
   hours: string;
@@ -16,6 +17,7 @@ export interface Opportunity {
   spots: number;
   recommended: boolean;
   description: string;
+  orgIsActive?: boolean;
 }
 
 interface Props {
@@ -23,9 +25,10 @@ interface Props {
   index: number;
   isHighlighted: boolean;
   onHover: (id: number | null) => void;
+  onApply: (opportunity: Opportunity) => void;
 }
 
-const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover }: Props) => {
+const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onApply }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -46,9 +49,8 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover }: Pr
       transition={{ delay: index * 0.04, duration: 0.3 }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`card-elevated p-5 cursor-pointer transition-all duration-200 ${
-        isHighlighted ? "ring-2 ring-primary/40 shadow-elevated" : ""
-      }`}
+      className={`card-elevated p-5 cursor-pointer transition-all duration-200 ${isHighlighted ? "ring-2 ring-primary/40 shadow-elevated" : ""
+        }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2 flex-1 min-w-0">
@@ -123,14 +125,17 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover }: Pr
             className="p-1.5 rounded-full hover:bg-muted transition-colors"
           >
             <Heart
-              className={`w-4 h-4 transition-colors ${
-                saved ? "fill-destructive text-destructive" : "text-muted-foreground"
-              }`}
+              className={`w-4 h-4 transition-colors ${saved ? "fill-destructive text-destructive" : "text-muted-foreground"
+                }`}
             />
           </button>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onApply(opp);
+              }}
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs font-semibold shadow-sm"
             >
               Apply

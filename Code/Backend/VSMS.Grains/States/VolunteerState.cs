@@ -23,4 +23,7 @@ public class VolunteerState
 
     [Id(5)]
     public List<Guid> CertificateIds { get; set; } = new();
+
+    [Id(6)]
+    public List<Guid> JoinedOrganizations { get; set; } = new();
 }

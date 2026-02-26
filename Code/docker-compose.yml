@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile_Silo
     image: vsms-silo
     container_name: vsms-silo
+    restart: on-failure
     environment:
       - ORLEANS_CLUSTERING_TYPE=AdoNet
       - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=vsms;Username=root;Password=root123
@@ -43,6 +44,7 @@ services:
       dockerfile: Dockerfile_API
     image: vsms-api
     container_name: vsms-api
+    restart: on-failure
     environment:
       - ORLEANS_CLUSTERING_TYPE=AdoNet
       - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=vsms;Username=root;Password=root123
@@ -61,5 +63,3 @@ networks:
   vsms-net:
     driver: bridge
     name: vsms-net
-
-

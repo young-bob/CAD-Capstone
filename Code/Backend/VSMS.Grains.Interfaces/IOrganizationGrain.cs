@@ -12,4 +12,8 @@ public interface IOrganizationGrain : IGrainWithStringKey
     Task PublishOpportunity(Guid opportunityId);
 
     Task<List<Guid>> GetPublishedOpportunities();
+
+    Task SubmitApplication(Guid userId);
+    Task<List<Guid>> GetPendingApplications();
+    Task ApproveApplication(Guid userId);
 }

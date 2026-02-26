@@ -19,6 +19,9 @@ public class OrganizationGrain : Grain, IOrganizationGrain
     {
         _state.State.Profile = profile;
         await _state.WriteStateAsync();
+
+        var registry = GrainFactory.GetGrain<IRegistryGrain>(0);
+        await registry.RegisterOrganization(profile);
     }
 
     public Task<OrganizationProfile> GetProfile()
@@ -26,13 +29,15 @@ public class OrganizationGrain : Grain, IOrganizationGrain
         return Task.FromResult(_state.State.Profile ?? new OrganizationProfile(
             Guid.Empty,    // OrganizationId
             string.Empty,  // Name
+            string.Empty,  // ContactEmail
             string.Empty,  // Description
             string.Empty,  // LogoUrl
             string.Empty,  // Website
             new Location(0, 0, "", "", "", ""),  // Location
             string.Empty,  // VerificationProof
             false,         // IsVerified
-            string.Empty   // CalendarSyncUrl
+            string.Empty,  // CalendarSyncUrl
+            true           // IsActive
         ));
     }
 
@@ -63,5 +68,28 @@ public class OrganizationGrain : Grain, IOrganizationGrain
     public Task<List<Guid>> GetPublishedOpportunities()
     {
         return Task.FromResult(_state.State.PublishedOpportunities);
+    }
+
+    public async Task SubmitApplication(Guid userId)
+    {
+        if (!_state.State.PendingVolunteerApplications.ContainsKey(userId))
+        {
+            _state.State.PendingVolunteerApplications[userId] = DateTime.UtcNow;
+            await _state.WriteStateAsync();
+        }
+    }
+
+    public Task<List<Guid>> GetPendingApplications()
+    {
+        return Task.FromResult(_state.State.PendingVolunteerApplications.Keys.ToList());
+    }
+
+    public async Task ApproveApplication(Guid userId)
+    {
+        if (_state.State.PendingVolunteerApplications.ContainsKey(userId))
+        {
+            _state.State.PendingVolunteerApplications.Remove(userId);
+            await _state.WriteStateAsync();
+        }
     }
 }

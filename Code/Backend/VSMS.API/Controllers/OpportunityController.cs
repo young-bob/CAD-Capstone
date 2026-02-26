@@ -34,6 +34,15 @@ public class OpportunityController : ControllerBase
         var opportunityId = Guid.NewGuid();
         var grain = _client.GetGrain<IOpportunityGrain>(opportunityId);
 
+        var orgGrain = _client.GetGrain<IOrganizationGrain>(request.OrganizationId.ToString());
+        var orgProfile = await orgGrain.GetProfile();
+
+        if (orgProfile == null || orgProfile.OrganizationId == Guid.Empty)
+            return NotFound("Organization not found.");
+
+        if (!orgProfile.IsActive)
+            return BadRequest("This organization is currently inactive. You cannot create new opportunities.");
+
         var details = new OpportunityDetails(
             opportunityId,
             request.OrganizationId,
@@ -51,7 +60,6 @@ public class OpportunityController : ControllerBase
         await grain.UpdateDetails(details);
 
         // Also notify the organization grain
-        var orgGrain = _client.GetGrain<IOrganizationGrain>(request.OrganizationId.ToString());
         await orgGrain.PublishOpportunity(opportunityId);
 
         return CreatedAtAction(nameof(GetOpportunity), new { id = opportunityId }, details);

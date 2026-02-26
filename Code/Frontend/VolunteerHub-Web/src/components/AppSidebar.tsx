@@ -10,6 +10,7 @@ import {
   Shield,
   LogOut,
   Building2,
+  Building,
 } from "lucide-react";
 import { useAuth, AppRole } from "@/contexts/AuthContext";
 
@@ -20,20 +21,26 @@ const volunteerNav = [
 ];
 
 const coordinatorNav = [
+  { to: "/coordinator", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/opportunities", icon: Search, label: "Opportunities" },
   { to: "/attendance", icon: ClipboardCheck, label: "Attendance" },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
 ];
 
 const adminNav = [
   { to: "/admin", icon: Building2, label: "Admin Overview" },
-  { to: "/attendance", icon: ClipboardCheck, label: "Attendance" },
-  { to: "/analytics", icon: BarChart3, label: "Analytics" },
-  { to: "/opportunities", icon: Search, label: "Opportunities" },
+  { to: "/admin/users", icon: ClipboardCheck, label: "Users" },
+  { to: "/admin/organizations", icon: Building, label: "Organizations" },
+];
+
+const organizationManagerNav = [
+  { to: "/organization/dashboard", icon: Building2, label: "Org Dashboard" },
 ];
 
 function getNavItems(role: AppRole) {
   if (role === "admin") return adminNav;
   if (role === "coordinator") return coordinatorNav;
+  if (role === "organizationmanager") return organizationManagerNav;
   return volunteerNav;
 }
 

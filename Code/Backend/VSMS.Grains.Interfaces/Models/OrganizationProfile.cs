@@ -6,11 +6,13 @@ namespace VSMS.Grains.Interfaces.Models;
 public record OrganizationProfile(
     Guid OrganizationId,
     string Name,
+    string ContactEmail,
     string Description,
     string LogoUrl,
     string Website,
     Location Location,
     string VerificationProof,
     bool IsVerified,
-    string CalendarSyncUrl
+    string CalendarSyncUrl,
+    bool IsActive = true
 );

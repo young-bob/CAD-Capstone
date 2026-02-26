@@ -4,12 +4,14 @@ import { Sparkles } from "lucide-react";
 import OpportunityFilters, { Filters, defaultFilters } from "@/components/opportunities/OpportunityFilters";
 import OpportunityCard, { Opportunity } from "@/components/opportunities/OpportunityCard";
 import OpportunityMap from "@/components/opportunities/OpportunityMap";
+import ApplicationDialog from "@/components/opportunities/ApplicationDialog";
 
 const opportunities: Opportunity[] = [
   {
     id: 1,
     title: "Weekend Food Distribution",
     org: "City Food Bank",
+    orgId: "00000000-0000-0000-0000-000000000001",
     orgType: "Food Bank",
     distance: "1.2 km",
     hours: "3-4 hrs",
@@ -23,6 +25,7 @@ const opportunities: Opportunity[] = [
     id: 2,
     title: "Senior Companion Program",
     org: "Elder Care Center",
+    orgId: "00000000-0000-0000-0000-000000000002",
     orgType: "Healthcare",
     distance: "2.8 km",
     hours: "2-3 hrs",
@@ -36,6 +39,7 @@ const opportunities: Opportunity[] = [
     id: 3,
     title: "Community Garden Cleanup",
     org: "Green Spaces Initiative",
+    orgId: "00000000-0000-0000-0000-000000000003",
     orgType: "Environment",
     distance: "0.8 km",
     hours: "2 hrs",
@@ -49,6 +53,7 @@ const opportunities: Opportunity[] = [
     id: 4,
     title: "After-School Tutoring",
     org: "Bright Futures Academy",
+    orgId: "00000000-0000-0000-0000-000000000004",
     orgType: "Education",
     distance: "3.5 km",
     hours: "1.5 hrs",
@@ -57,11 +62,13 @@ const opportunities: Opportunity[] = [
     spots: 2,
     recommended: false,
     description: "Tutor elementary and middle school students in math and English. Help with homework, build study skills, and inspire confidence in young learners.",
+    orgIsActive: false,
   },
   {
     id: 5,
     title: "Animal Shelter Assistant",
     org: "Happy Paws Shelter",
+    orgId: "00000000-0000-0000-0000-000000000005",
     orgType: "Animal Welfare",
     distance: "4.1 km",
     hours: "3 hrs",
@@ -75,6 +82,7 @@ const opportunities: Opportunity[] = [
     id: 6,
     title: "Hospital Visitor Program",
     org: "Regional Medical Center",
+    orgId: "00000000-0000-0000-0000-000000000006",
     orgType: "Healthcare",
     distance: "5.2 km",
     hours: "2 hrs",
@@ -89,9 +97,13 @@ const opportunities: Opportunity[] = [
 const Opportunities = () => {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
 
   const filtered = useMemo(() => {
     return opportunities.filter((o) => {
+      // Hide inactive organization opportunities fully
+      if (o.orgIsActive === false) return false;
+
       // Search
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -170,6 +182,7 @@ const Opportunities = () => {
                 index={i}
                 isHighlighted={highlightedId === opp.id}
                 onHover={setHighlightedId}
+                onApply={setSelectedOpportunity}
               />
             ))
           )}
@@ -188,6 +201,12 @@ const Opportunities = () => {
           </div>
         </div>
       </div>
+
+      <ApplicationDialog
+        opportunity={selectedOpportunity}
+        isOpen={!!selectedOpportunity}
+        onClose={() => setSelectedOpportunity(null)}
+      />
     </div>
   );
 };

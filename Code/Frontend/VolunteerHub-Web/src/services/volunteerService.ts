@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/apiClient';
+import { fetchApi } from '@/lib/apiClient';
 
 export interface Location {
   latitude: number;
@@ -21,9 +21,17 @@ export interface VolunteerProfile {
 }
 
 export const volunteerService = {
-  getProfile: (id: string) =>
-    apiClient.get<VolunteerProfile>(`/api/volunteer/${id}`),
+  getProfile: async (id: string) =>
+    await fetchApi<VolunteerProfile>(`/api/Volunteer/${id}`),
 
-  updateProfile: (id: string, profile: VolunteerProfile) =>
-    apiClient.post<void>(`/api/volunteer/${id}`, profile),
+  updateProfile: async (id: string, profile: VolunteerProfile) =>
+    await fetchApi<void>(`/api/Volunteer/${id}`, { method: "POST", body: JSON.stringify(profile) }),
+
+  isMemberOf: async (id: string, organizationId: string) => {
+    const res = await fetchApi<{ isMember: boolean }>(`/api/Volunteer/${id}/organizations/${organizationId}/is-member`);
+    return res.isMember;
+  },
+
+  applyToOrganization: async (id: string, organizationId: string) =>
+    await fetchApi<void>(`/api/Volunteer/${id}/organizations/${organizationId}/apply`, { method: "POST" }),
 };
