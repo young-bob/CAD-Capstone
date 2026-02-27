@@ -28,7 +28,7 @@ services:
     restart: on-failure
     environment:
       - ORLEANS_CLUSTERING_TYPE=AdoNet
-      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=vsms;Username=root;Password=root123
+      - ConnectionStrings__PostgreSQL=Host=10.20.30.3;Port=5432;Database=vsms;Username=root;Password=root123
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,7 +47,7 @@ services:
     restart: on-failure
     environment:
       - ORLEANS_CLUSTERING_TYPE=AdoNet
-      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=vsms;Username=root;Password=root123
+      - ConnectionStrings__PostgreSQL=Host=10.20.30.3;Port=5432;Database=vsms;Username=root;Password=root123
       # Override JWT keys for docker if needed, or use appsettings defaults
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_ENVIRONMENT=Development
