@@ -24,15 +24,10 @@ public class OrganizationGrain : Grain, IOrganizationGrain
     public Task<OrganizationProfile> GetProfile()
     {
         return Task.FromResult(_state.State.Profile ?? new OrganizationProfile(
-            Guid.Empty,    // OrganizationId
-            string.Empty,  // Name
-            string.Empty,  // Description
-            string.Empty,  // LogoUrl
-            string.Empty,  // Website
-            new Location(0, 0, "", "", "", ""),  // Location
-            string.Empty,  // VerificationProof
-            false,         // IsVerified
-            string.Empty   // CalendarSyncUrl
+            Guid.Empty,
+            string.Empty,
+            string.Empty,
+            null, null, null, null, false, null
         ));
     }
 

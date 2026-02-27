@@ -1,100 +1,111 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodels="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              x:Class="VSMS.VolunteerApp.Views.RegisterPage"
-             x:DataType="viewmodels:RegisterViewModel"
-             Title="Create Account"
+             x:DataType="vm:RegisterViewModel"
+             Title="Register"
              Shell.NavBarIsVisible="False">
 
     <ScrollView>
-        <VerticalStackLayout Spacing="18" Padding="30,50,30,30" VerticalOptions="Center">
+        <VerticalStackLayout VerticalOptions="Center" Padding="24" Spacing="0" MaximumWidthRequest="480">
 
-            <!-- Logo -->
-            <Image
-                Source="vsms_logo.png"
-                SemanticProperties.Description="VSMS Logo"
-                HeightRequest="90"
-                WidthRequest="90"
-                Aspect="AspectFit"
-                HorizontalOptions="Center" />
+            <!-- VSMS Branding -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="4" Margin="0,0,0,20">
+                <Label Text="♥" FontSize="36" TextColor="{StaticResource Primary}" HorizontalOptions="Center" />
+                <Label Text="VSMS" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
 
-            <Label
-                Text="Join VSMS"
-                FontSize="28"
-                FontAttributes="Bold"
-                TextColor="#0D9488"
-                HorizontalOptions="Center" />
+            <!-- Register Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
 
-            <Label
-                Text="Create your volunteer account"
-                FontSize="14"
-                HorizontalOptions="Center"
-                TextColor="{AppThemeBinding Light=Gray, Dark=#A0AEC0}" />
+                    <!-- Header -->
+                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                        <Label Text="Create your account" FontSize="22" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        <Label Text="Start making a difference today" Style="{StaticResource MutedText}" HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
 
-            <!-- Registration Form Card -->
-            <Border StrokeShape="RoundRectangle 16"
-                    Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                    StrokeThickness="1"
-                    Padding="20"
-                    Margin="0,5,0,0"
-                    BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
-                </Border.Shadow>
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Full Name" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
-                    <Entry Placeholder="John Doe" Text="{Binding Name}"
-                           ClearButtonVisibility="WhileEditing" />
+                    <!-- Name + Email row -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="6" Grid.Column="0">
+                            <Label Text="Full Name" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding Name}" Placeholder="John Doe" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="6" Grid.Column="1">
+                            <Label Text="Email" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding Email}" Placeholder="you@example.com" Keyboard="Email" />
+                        </VerticalStackLayout>
+                    </Grid>
 
-                    <Label Text="Email" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
-                    <Entry Placeholder="you@example.com" Text="{Binding Email}"
-                           Keyboard="Email" ClearButtonVisibility="WhileEditing" />
+                    <!-- Password + Phone row -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="6" Grid.Column="0">
+                            <Label Text="Password" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding Password}" Placeholder="Min 8 characters" IsPassword="True" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="6" Grid.Column="1">
+                            <Label Text="Phone Number" FontAttributes="Bold" FontSize="13" />
+                            <Entry Text="{Binding PhoneNumber}" Placeholder="555-0123" Keyboard="Telephone" />
+                        </VerticalStackLayout>
+                    </Grid>
 
-                    <Label Text="Phone (optional)" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
-                    <Entry Placeholder="+1 234 567 8900" Text="{Binding PhoneNumber}"
-                           Keyboard="Telephone" ClearButtonVisibility="WhileEditing" />
+                    <!-- Bio -->
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Bio" FontAttributes="Bold" FontSize="13" />
+                        <Editor Text="{Binding Bio}" Placeholder="Tell us about yourself..." HeightRequest="70" />
+                    </VerticalStackLayout>
 
-                    <Label Text="Password" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
-                    <Entry Placeholder="••••••••" Text="{Binding Password}"
-                           IsPassword="True" ClearButtonVisibility="WhileEditing" />
+                    <!-- Location Section -->
+                    <Label Text="Location" FontSize="16" FontAttributes="Bold" Margin="0,4,0,0" />
 
-                    <Label Text="Confirm Password" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#A0AEC0}" />
-                    <Entry Placeholder="••••••••" Text="{Binding ConfirmPassword}"
-                           IsPassword="True" ClearButtonVisibility="WhileEditing" />
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Address" FontSize="13" />
+                        <Entry Text="{Binding Address}" Placeholder="123 Main St" />
+                    </VerticalStackLayout>
 
-                    <Button
-                        Text="Create Account"
-                        Command="{Binding RegisterCommand}"
-                        BackgroundColor="#0D9488"
-                        TextColor="White"
-                        FontAttributes="Bold"
-                        FontSize="16"
-                        CornerRadius="12"
-                        HeightRequest="50"
-                        Margin="0,5,0,0"
-                        HorizontalOptions="Fill" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="6" Grid.Column="0">
+                            <Label Text="City" FontSize="13" />
+                            <Entry Text="{Binding City}" Placeholder="City" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="6" Grid.Column="1">
+                            <Label Text="Province" FontSize="13" />
+                            <Entry Text="{Binding Province}" Placeholder="ON" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Postal Code" FontSize="13" />
+                        <Entry Text="{Binding PostalCode}" Placeholder="N2L 3G1" />
+                    </VerticalStackLayout>
+
+                    <!-- Register Button -->
+                    <Button Text="Create Account"
+                            Command="{Binding RegisterCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="48"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Margin="0,6,0,0" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+                    <!-- Login Link -->
+                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="4" Margin="0,4,0,8">
+                        <Label Text="Already have an account?" Style="{StaticResource MutedText}" />
+                        <Label Text="Sign in" TextColor="{StaticResource Primary}" FontAttributes="Bold" FontSize="14">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoToLoginCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </HorizontalStackLayout>
+
                 </VerticalStackLayout>
             </Border>
-
-            <ActivityIndicator
-                IsRunning="{Binding IsBusy}"
-                IsVisible="{Binding IsBusy}"
-                Color="#0D9488"
-                HorizontalOptions="Center" />
-
-            <Button
-                Text="Already have an account? Sign In"
-                Command="{Binding GoToLoginCommand}"
-                BackgroundColor="Transparent"
-                TextColor="#0D9488"
-                FontSize="14"
-                HorizontalOptions="Center" />
 
         </VerticalStackLayout>
     </ScrollView>

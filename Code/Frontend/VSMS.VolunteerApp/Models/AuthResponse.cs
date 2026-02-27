@@ -1,8 +1,8 @@
 namespace VSMS.VolunteerApp.Models;
 
 public record AuthResponse(
-    string Token,
+    string? Token,
     Guid UserId,
-    string Email,
-    string Role
+    string? Role,
+    string? Name
 );

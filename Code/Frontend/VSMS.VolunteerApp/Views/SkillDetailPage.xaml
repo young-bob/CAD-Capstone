@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.SkillDetailPage"
+             x:DataType="vm:SkillDetailViewModel"
+             Title="Skill Detail">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Skill Name + Badge -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="{Binding Skill.Name}" Style="{StaticResource PageHeader}" Grid.Column="0" />
+                <Border Style="{StaticResource BadgeStyle}" Grid.Column="1" VerticalOptions="Start">
+                    <Label Text="Skill" FontSize="12" TextColor="{StaticResource Primary}" />
+                </Border>
+            </Grid>
+
+            <!-- Description -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Description" Style="{StaticResource SectionTitle}" />
+                    <Label Text="{Binding Skill.Description}" Style="{StaticResource MutedText}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Volunteers with this Skill -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Volunteers" Style="{StaticResource SectionTitle}" />
+                    <CollectionView ItemsSource="{Binding Volunteers}" HeightRequest="200">
+                        <CollectionView.EmptyView>
+                            <Label Text="No volunteers with this skill yet" Style="{StaticResource MutedText}" />
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:VolunteerProfile">
+                                <HorizontalStackLayout Spacing="8" Padding="0,4">
+                                    <Label Text="👤" FontSize="14" VerticalOptions="Center" />
+                                    <Label Text="{Binding Name}" FontSize="14" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Related Opportunities -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Related Opportunities" Style="{StaticResource SectionTitle}" />
+                    <CollectionView ItemsSource="{Binding Opportunities}" HeightRequest="200">
+                        <CollectionView.EmptyView>
+                            <Label Text="No opportunities requiring this skill" Style="{StaticResource MutedText}" />
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:OpportunityDetails">
+                                <HorizontalStackLayout Spacing="8" Padding="0,4">
+                                    <Label Text="📋" FontSize="14" VerticalOptions="Center" />
+                                    <Label Text="{Binding Title}" FontSize="14" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

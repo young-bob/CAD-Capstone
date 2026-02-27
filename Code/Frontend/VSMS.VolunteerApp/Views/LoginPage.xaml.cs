@@ -1,4 +1,3 @@
-using Microsoft.Maui.Controls;
 using VSMS.VolunteerApp.ViewModels;
 
 namespace VSMS.VolunteerApp.Views;

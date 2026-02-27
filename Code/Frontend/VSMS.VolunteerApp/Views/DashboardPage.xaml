@@ -2,96 +2,130 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
              x:Class="VSMS.VolunteerApp.Views.DashboardPage"
              x:DataType="vm:DashboardViewModel"
              Title="Dashboard">
 
-    <ScrollView HorizontalScrollBarVisibility="Never">
+    <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="20">
 
             <!-- Welcome Header -->
-            <Border StrokeShape="RoundRectangle 16"
-                    StrokeThickness="0"
-                    Padding="24"
-                    BackgroundColor="#0D9488">
-                <Border.Shadow>
-                    <Shadow Brush="#0D9488" Offset="0,4" Radius="16" Opacity="0.3" />
-                </Border.Shadow>
-                <VerticalStackLayout Spacing="8">
-                    <Label Text="{Binding VolunteerName, StringFormat='Welcome back, {0}!'}"
-                           FontSize="22" FontAttributes="Bold" TextColor="White" />
-                    <Label Text="Here's your volunteering summary"
-                           FontSize="14" TextColor="#B2DFDB" />
-                </VerticalStackLayout>
-            </Border>
+            <VerticalStackLayout Spacing="4">
+                <Label Style="{StaticResource PageHeader}">
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="Welcome back, " />
+                            <Span Text="{Binding VolunteerName}" />
+                            <Span Text="!" />
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+                <Label Text="Here's an overview of your activity." Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
 
-            <!-- Stats Cards Row -->
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                <!-- Total Hours Card -->
-                <Border Grid.Column="0"
-                        StrokeShape="RoundRectangle 14"
-                        Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                        StrokeThickness="1"
-                        Padding="20"
-                        BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                    <Border.Shadow>
-                        <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.06" />
-                    </Border.Shadow>
-                    <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
-                        <Label Text="⏱️" FontSize="28" HorizontalOptions="Center" />
-                        <Label Text="{Binding TotalHours, StringFormat='{0:F1}'}"
-                               FontSize="32" FontAttributes="Bold"
-                               TextColor="#0D9488"
-                               HorizontalOptions="Center" />
-                        <Label Text="Total Hours" FontSize="12"
-                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}"
-                               HorizontalOptions="Center" />
+            <!-- Stat Cards Grid (2x2) -->
+            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+
+                <!-- Total Hours -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Row="0" Grid.Column="0">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="⏱" FontSize="24" />
+                        <Label Text="Total Hours" Style="{StaticResource MutedText}" FontSize="12" />
+                        <Label Text="{Binding TotalHours, StringFormat='{0:F1}'}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- Status Card -->
-                <Border Grid.Column="1"
-                        StrokeShape="RoundRectangle 14"
-                        Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                        StrokeThickness="1"
-                        Padding="20"
-                        BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                    <Border.Shadow>
-                        <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.06" />
-                    </Border.Shadow>
-                    <VerticalStackLayout Spacing="6" HorizontalOptions="Center">
-                        <Label Text="✅" FontSize="28" HorizontalOptions="Center" />
-                        <Label Text="Active"
-                               FontSize="20" FontAttributes="Bold"
-                               TextColor="#10B981"
-                               HorizontalOptions="Center" />
-                        <Label Text="Status" FontSize="12"
-                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}"
-                               HorizontalOptions="Center" />
+                <!-- Opportunities -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Row="0" Grid.Column="1">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="📋" FontSize="24" />
+                        <Label Text="Opportunities" Style="{StaticResource MutedText}" FontSize="12" />
+                        <Label Text="{Binding OpportunityCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
                     </VerticalStackLayout>
                 </Border>
+
+                <!-- Upcoming -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Row="1" Grid.Column="0">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="📅" FontSize="24" />
+                        <Label Text="Upcoming" Style="{StaticResource MutedText}" FontSize="12" />
+                        <Label Text="{Binding UpcomingCount}" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Role -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Row="1" Grid.Column="1">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="👤" FontSize="24" />
+                        <Label Text="Your Role" Style="{StaticResource MutedText}" FontSize="12" />
+                        <Label Text="{Binding UserRole}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    </VerticalStackLayout>
+                </Border>
+
             </Grid>
 
-            <!-- Quick Actions -->
-            <Label Text="Quick Actions" FontSize="18" FontAttributes="Bold" Margin="0,5,0,0" />
+            <!-- Upcoming Opportunities -->
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Upcoming Opportunities" Style="{StaticResource SectionTitle}" />
+                <Label Text="Your next volunteering activities" Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
 
-            <Border StrokeShape="RoundRectangle 14"
-                    Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                    StrokeThickness="1"
-                    Padding="16"
-                    BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="💡  Browse available volunteer opportunities in the Opportunities tab."
-                           FontSize="14"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#CBD5E0}" />
-                    <Label Text="👤  Update your profile and skills in the Profile tab."
-                           FontSize="14"
-                           TextColor="{AppThemeBinding Light=#4A5568, Dark=#CBD5E0}" />
-                </VerticalStackLayout>
-            </Border>
+            <CollectionView ItemsSource="{Binding UpcomingOpportunities}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Border Style="{StaticResource CardStyle}" HorizontalOptions="Fill">
+                        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Padding="20">
+                            <Label Text="📋" FontSize="40" HorizontalOptions="Center" />
+                            <Label Text="No upcoming opportunities" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" />
+                            <Label Text="Browse opportunities to get started!" Style="{StaticResource MutedText}" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OpportunityDetails">
+                        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                                <!-- Title -->
+                                <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold" Grid.Row="0" Grid.Column="0" />
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                               Color="#0D9488" HorizontalOptions="Center" />
+                                <!-- Date badge -->
+                                <Border Style="{StaticResource BadgeStyle}" Grid.Row="0" Grid.Column="1" VerticalOptions="Start">
+                                    <Label Text="{Binding StartTime, StringFormat='{0:MMM dd}'}" FontSize="11" TextColor="{StaticResource Primary}" />
+                                </Border>
+
+                                <!-- Description -->
+                                <Label Text="{Binding Description}" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Style="{StaticResource MutedText}" LineBreakMode="TailTruncation" MaxLines="2" />
+
+                                <!-- Location -->
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Spacing="12">
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Label Text="📍" FontSize="12" />
+                                        <Label Text="{Binding VenueLocation.City}" Style="{StaticResource MutedText}" FontSize="12" />
+                                    </HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Label Text="👥" FontSize="12" />
+                                        <Label Style="{StaticResource MutedText}" FontSize="12">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding RegisteredCount}" />
+                                                    <Span Text="/" />
+                                                    <Span Text="{Binding MaxVolunteers}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </HorizontalStackLayout>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+            <!-- Logout Button -->
+            <Button Text="Log out" Command="{Binding LogoutCommand}" Style="{StaticResource OutlineButton}" Margin="0,10,0,20" />
 
         </VerticalStackLayout>
     </ScrollView>

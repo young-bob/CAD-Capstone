@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
+             x:Class="VSMS.VolunteerApp.Views.ManageOpportunitiesPage"
+             x:DataType="vm:ManageOpportunitiesViewModel"
+             Title="Manage Opportunities">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Header -->
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Manage Opportunities" Style="{StaticResource PageHeader}" />
+                <Label Text="Create and manage your organization's volunteer opportunities" Style="{StaticResource MutedText}" />
+            </VerticalStackLayout>
+
+            <!-- Create Opportunity Card -->
+            <Border Style="{StaticResource CardStyle}" IsVisible="{Binding IsFormVisible}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Create Opportunity" Style="{StaticResource SectionTitle}" />
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Title" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding NewTitle}" Placeholder="Opportunity title" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Description" FontAttributes="Bold" FontSize="13" />
+                        <Editor Text="{Binding NewDescription}" Placeholder="Describe the opportunity..." HeightRequest="70" />
+                    </VerticalStackLayout>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="6" Grid.Column="0">
+                            <Label Text="Start Date" FontAttributes="Bold" FontSize="13" />
+                            <DatePicker Date="{Binding NewStartDate}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Spacing="6" Grid.Column="1">
+                            <Label Text="End Date" FontAttributes="Bold" FontSize="13" />
+                            <DatePicker Date="{Binding NewEndDate}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Max Volunteers" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding NewMaxVolunteers}" Placeholder="10" Keyboard="Numeric" />
+                    </VerticalStackLayout>
+
+                    <!-- Location -->
+                    <Label Text="Venue Location" FontSize="16" FontAttributes="Bold" Margin="0,4,0,0" />
+                    <VerticalStackLayout Spacing="6">
+                        <Entry Text="{Binding NewAddress}" Placeholder="Address" />
+                    </VerticalStackLayout>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Entry Text="{Binding NewCity}" Placeholder="City" Grid.Column="0" />
+                        <Entry Text="{Binding NewProvince}" Placeholder="Province" Grid.Column="1" />
+                    </Grid>
+                    <Entry Text="{Binding NewPostalCode}" Placeholder="Postal Code" />
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Grid.Column="0" Text="Create" Command="{Binding CreateOpportunityCommand}" IsEnabled="{Binding IsNotBusy}"
+                                BackgroundColor="{StaticResource Primary}" TextColor="White" CornerRadius="8" HeightRequest="44" FontAttributes="Bold" />
+                        <Button Grid.Column="1" Text="Cancel" Command="{Binding ToggleFormCommand}"
+                                Style="{StaticResource OutlineButton}" HeightRequest="44" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Toolbar -->
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsFormVisible, Converter={StaticResource InvertedBoolConverter}}">
+                <Label Text="Your Opportunities" Style="{StaticResource SectionTitle}" VerticalOptions="Center" Grid.Column="0" />
+                <Button Grid.Column="1" Text="+ New" Command="{Binding ToggleFormCommand}"
+                        Style="{StaticResource OutlineButton}" VerticalOptions="Start" />
+            </Grid>
+
+            <!-- Opportunities Table -->
+            <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Border Style="{StaticResource CardStyle}" HorizontalOptions="Fill">
+                        <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Padding="20">
+                            <Label Text="📋" FontSize="40" HorizontalOptions="Center" />
+                            <Label Text="No opportunities yet" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" />
+                            <Label Text="Create your first opportunity to get started." Style="{StaticResource MutedText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:OpportunityDetails">
+                        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                <Label Text="{Binding Title}" FontSize="15" FontAttributes="Bold" Grid.Row="0" Grid.Column="0" />
+                                <Border Style="{StaticResource BadgeStyle}" Grid.Row="0" Grid.Column="1" VerticalOptions="Start">
+                                    <Label Text="{Binding Visibility}" FontSize="10" TextColor="{StaticResource Primary}" />
+                                </Border>
+                                <Button Grid.Row="0" Grid.Column="2" Text="📢"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ManageOpportunitiesViewModel}}, Path=PublishCommand}"
+                                        CommandParameter="{Binding .}"
+                                        BackgroundColor="Transparent" FontSize="16"
+                                        WidthRequest="40" HeightRequest="40" Padding="0" />
+                                <HorizontalStackLayout Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Spacing="12">
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Label Text="📅" FontSize="12" />
+                                        <Label Text="{Binding StartTime, StringFormat='{0:MMM dd}'}" Style="{StaticResource MutedText}" FontSize="12" />
+                                    </HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Label Text="👥" FontSize="12" />
+                                        <Label Style="{StaticResource MutedText}" FontSize="12">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding RegisteredCount}" />
+                                                    <Span Text="/" />
+                                                    <Span Text="{Binding MaxVolunteers}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </HorizontalStackLayout>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

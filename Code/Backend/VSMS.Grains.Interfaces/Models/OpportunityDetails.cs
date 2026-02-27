@@ -15,5 +15,6 @@ public record OpportunityDetails(
     Location VenueLocation,
     float GeoFenceRadius,
     int MaxVolunteers,
-    int RegisteredCount
+    int RegisteredCount,
+    List<Guid>? RequiredSkillIds = null
 );

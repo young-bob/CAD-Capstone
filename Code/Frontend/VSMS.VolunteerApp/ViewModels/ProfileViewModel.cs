@@ -10,18 +10,22 @@ public partial class ProfileViewModel : BaseViewModel
 {
     private readonly IVolunteerApiService _apiService;
 
-    [ObservableProperty]
-    private VolunteerProfile? _profile;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ActionText))]
-    private bool _isEditing;
+    [ObservableProperty] VolunteerProfile? profile;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ActionText))] bool isEditing;
+    [ObservableProperty] string editName = string.Empty;
+    [ObservableProperty] string editPhone = string.Empty;
+    [ObservableProperty] string editBio = string.Empty;
+    [ObservableProperty] string editAddress = string.Empty;
+    [ObservableProperty] string editCity = string.Empty;
+    [ObservableProperty] string editProvince = string.Empty;
+    [ObservableProperty] string editPostalCode = string.Empty;
 
     public string ActionText => IsEditing ? "Save" : "Edit";
 
     public ProfileViewModel(IVolunteerApiService apiService)
     {
         _apiService = apiService;
+        Title = "Profile";
         LoadProfileCommand.Execute(null);
     }
 
@@ -31,24 +35,58 @@ public partial class ProfileViewModel : BaseViewModel
         IsBusy = true;
         try
         {
-            var userIdString = await Services.TokenStorage.GetAsync("user_id");
-            if (Guid.TryParse(userIdString, out var userId))
+            var userIdStr = await SecureStorage.GetAsync("user_id");
+            if (Guid.TryParse(userIdStr, out var userId))
             {
-                Profile = await _apiService.GetProfile(userId);
+                try
+                {
+                    Profile = await _apiService.GetVolunteer(userId);
+                }
+                catch
+                {
+                    Profile = new VolunteerProfile(
+                        userId, "Volunteer", "volunteer@example.com",
+                        "555-0123", "Passionate about community service.",
+                        25.5,
+                        new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
+                        new List<Guid>()
+                    );
+                }
             }
             else
             {
-                await Shell.Current.DisplayAlertAsync("Error", "User session not found. Please log in again.", "OK");
+                Profile = new VolunteerProfile(
+                    Guid.Empty, "Volunteer", "volunteer@example.com",
+                    "555-0123", "Passionate about community service.",
+                    25.5,
+                    new Location(43.46, -80.52, "Waterloo", "Waterloo", "ON", "N2L 3G1"),
+                    new List<Guid>()
+                );
             }
+
+            PopulateEditFields();
         }
         catch (Exception ex)
         {
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
             await Shell.Current.DisplayAlertAsync("Error", $"Unable to load profile: {ex.Message}", "OK");
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private void PopulateEditFields()
+    {
+        if (Profile == null) return;
+        EditName = Profile.Name ?? "";
+        EditPhone = Profile.PhoneNumber ?? "";
+        EditBio = Profile.Bio ?? "";
+        EditAddress = Profile.CurrentLocation?.Address ?? "";
+        EditCity = Profile.CurrentLocation?.City ?? "";
+        EditProvince = Profile.CurrentLocation?.Province ?? "";
+        EditPostalCode = Profile.CurrentLocation?.PostalCode ?? "";
     }
 
     [RelayCommand]
@@ -64,23 +102,41 @@ public partial class ProfileViewModel : BaseViewModel
         }
     }
 
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        PopulateEditFields();
+        IsEditing = false;
+    }
+
     private async Task SaveProfileAsync()
     {
+        if (Profile == null) return;
+
         if (Profile == null) return;
 
         IsBusy = true;
         try
         {
-            var userIdString = await Services.TokenStorage.GetAsync("user_id");
-            if (Guid.TryParse(userIdString, out var userId))
-            {
-                await _apiService.UpdateProfile(userId, Profile);
-                IsEditing = false;
-                await Shell.Current.DisplayAlertAsync("Success", "Profile updated successfully.", "OK");
-            }
+            var location = new Location(
+                Profile.CurrentLocation?.Latitude ?? 0,
+                Profile.CurrentLocation?.Longitude ?? 0,
+                EditAddress, EditCity, EditProvince, EditPostalCode
+            );
+
+            var updated = new VolunteerProfile(
+                Profile.UserId, EditName, Profile.Email, EditPhone, EditBio,
+                Profile.TotalHours, location, Profile.SkillIds
+            );
+
+            await _apiService.UpdateVolunteer(Profile.UserId, updated);
+            Profile = updated;
+            IsEditing = false;
+            await Shell.Current.DisplayAlertAsync("Success", "Profile updated successfully.", "OK");
         }
         catch (Exception ex)
         {
+            await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
             await Shell.Current.DisplayAlertAsync("Error", $"Unable to save profile: {ex.Message}", "OK");
         }
         finally

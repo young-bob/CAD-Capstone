@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VSMS.VolunteerApp.Models;
 using VSMS.VolunteerApp.Services;
 
 namespace VSMS.VolunteerApp.ViewModels;
@@ -26,38 +27,36 @@ public partial class LoginViewModel : BaseViewModel
         Console.WriteLine($"[LoginViewModel] LoginAsync invoked. IsBusy={IsBusy} Email={Email}");
         if (IsBusy) return;
 
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            await Shell.Current.DisplayAlertAsync("Validation", "Please enter both email and password.", "OK");
+            return;
+        }
+
+        if (!Email.Contains("@") || !Email.Contains("."))
+        {
+            await Shell.Current.DisplayAlertAsync("Validation", "Please enter a valid email address.", "OK");
+            return;
+        }
+
         try
         {
             IsBusy = true;
-            var response = await _apiService.Login(new { Email, Password });
+            var response = await _apiService.Login(new LoginRequest(Email, Password));
 
-            if (!string.IsNullOrEmpty(response.Token))
+            if (response?.Token != null)
             {
-                await Services.TokenStorage.SetAsync("auth_token", response.Token);
-                await Services.TokenStorage.SetAsync("user_id", response.UserId.ToString());
-                try
-                {
-                    await Shell.Current.GoToAsync("//MainTabs/DashboardTab/DashboardPage");
-                }
-                catch (Exception navEx)
-                {
-                    Console.WriteLine($"[LoginViewModel] Nav Error: {navEx}");
-                    if (Application.Current?.Windows.Count > 0)
-                        await Application.Current.Windows[0].Page!.DisplayAlert("Nav Error", $"Login Nav: {navEx}", "OK");
-                }
+                await SecureStorage.SetAsync("auth_token", response.Token);
+                await SecureStorage.SetAsync("user_id", response.UserId.ToString());
+                await SecureStorage.SetAsync("user_role", response.Role ?? "Volunteer");
+                await SecureStorage.SetAsync("user_name", response.Name ?? "User");
             }
-            else
-            {
-                Console.WriteLine("[LoginViewModel] Invalid Token");
-                if (Application.Current?.Windows.Count > 0)
-                    await Application.Current.Windows[0].Page!.DisplayAlert("Error", "Invalid authentication token received.", "OK");
-            }
+
+            await Shell.Current.GoToAsync("//DashboardPage");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LoginViewModel] Error: {ex}");
-            if (Application.Current?.Windows.Count > 0)
-                await Application.Current.Windows[0].Page!.DisplayAlert("Error", $"Login Failed: {ex}", "OK");
+            await Shell.Current.DisplayAlertAsync("Login Failed", ex.Message, "OK");
         }
         finally
         {
@@ -68,18 +67,12 @@ public partial class LoginViewModel : BaseViewModel
     [RelayCommand]
     async Task GoToRegisterAsync()
     {
-        Console.WriteLine("[LoginViewModel] GoToRegisterAsync executing!");
-        try
-        {
-            Console.WriteLine("[LoginViewModel] Executing GoToAsync(//RegisterPage)");
-            await Shell.Current.GoToAsync("//RegisterPage");
-            Console.WriteLine("[LoginViewModel] GoToAsync completed successfully");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[LoginViewModel] Navigation Error: {ex}");
-            if (Application.Current?.Windows.Count > 0)
-                await Application.Current.Windows[0].Page!.DisplayAlert("Navigation Error", $"GoToRegister: {ex}", "OK");
-        }
+        await Shell.Current.GoToAsync(nameof(Views.RegisterPage));
+    }
+
+    [RelayCommand]
+    async Task GoToResetPasswordAsync()
+    {
+        await Shell.Current.GoToAsync(nameof(Views.ResetPasswordPage));
     }
 }

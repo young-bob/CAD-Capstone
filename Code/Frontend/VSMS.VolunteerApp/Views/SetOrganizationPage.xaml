@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.SetOrganizationPage"
+             x:DataType="vm:SetOrganizationViewModel"
+             Title="Set Organization">
+
+    <ScrollView>
+        <VerticalStackLayout VerticalOptions="Center" Padding="24" Spacing="0" MaximumWidthRequest="480">
+
+            <!-- Icon Header -->
+            <VerticalStackLayout HorizontalOptions="Center" Spacing="8" Margin="0,0,0,24">
+                <Border BackgroundColor="{StaticResource PrimaryLight}" StrokeShape="RoundRectangle 16"
+                        Stroke="Transparent" HeightRequest="64" WidthRequest="64" Padding="0"
+                        HorizontalOptions="Center">
+                    <Label Text="🏢" FontSize="28" HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+                <Label Text="Set Organization" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" />
+                <Label Text="Link your coordinator account to an organization" Style="{StaticResource MutedText}" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Organization ID" FontAttributes="Bold" FontSize="13" />
+                        <Entry Text="{Binding OrganizationIdText}" Placeholder="Enter Organization UUID" />
+                    </VerticalStackLayout>
+
+                    <Button Text="Link Organization"
+                            Command="{Binding SetOrganizationCommand}"
+                            IsEnabled="{Binding IsNotBusy}"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="48"
+                            FontAttributes="Bold" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

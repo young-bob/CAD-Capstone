@@ -20,6 +20,11 @@ public class CoordinatorGrain : Grain, ICoordinatorGrain
         await _state.WriteStateAsync();
     }
 
+    public Task<string?> GetOrganizationId()
+    {
+        return Task.FromResult<string?>(_state.State.OrganizationId);
+    }
+
     public async Task CreateShift(Guid opportunityId)
     {
         if (string.IsNullOrEmpty(_state.State.OrganizationId))

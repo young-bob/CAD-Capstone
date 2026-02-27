@@ -10,7 +10,9 @@ public interface IOpportunityGrain : IGrainWithGuidKey
     Task<OpportunityDetails?> GetDetails();
 
     Task<Application> SubmitApplication(Guid volunteerId, string notes);
-    Task ProcessApplication(Guid applicationId, ApplicationStatus status);
+    Task ProcessApplication(Guid applicationId, ApplicationStatus status, string? rejectionReason = null);
 
     Task<List<Application>> GetApplications();
+    Task<List<Application>> GetEnrollments();
+    Task DeleteOpportunity();
 }

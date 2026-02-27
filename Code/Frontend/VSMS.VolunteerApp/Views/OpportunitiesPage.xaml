@@ -3,81 +3,88 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
              xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
-             xmlns:converters="clr-namespace:VSMS.VolunteerApp.Converters"
              x:Class="VSMS.VolunteerApp.Views.OpportunitiesPage"
              x:DataType="vm:OpportunitiesViewModel"
-             Title="Opportunities">
-
-    <ContentPage.Resources>
-        <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
-    </ContentPage.Resources>
+             Title="Browse Opportunities">
 
     <RefreshView Command="{Binding LoadOpportunitiesCommand}" IsRefreshing="{Binding IsRefreshing}">
-        <CollectionView ItemsSource="{Binding Opportunities}" SelectionMode="None" HorizontalScrollBarVisibility="Never">
-            <CollectionView.EmptyView>
-                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="15" Padding="40">
-                    <Label Text="🔍" FontSize="48" HorizontalOptions="Center" />
-                    <Label Text="No opportunities found"
-                           FontSize="18" FontAttributes="Bold"
-                           HorizontalOptions="Center" />
-                    <Label Text="Pull down to refresh or check back later"
-                           FontSize="14"
-                           TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}"
-                           HorizontalOptions="Center"
-                           HorizontalTextAlignment="Center" />
-                    <Button Text="Refresh"
-                            Command="{Binding LoadOpportunitiesCommand}"
-                            BackgroundColor="#0D9488"
-                            TextColor="White"
-                            CornerRadius="12"
-                            Margin="0,10,0,0"
-                            HorizontalOptions="Center" />
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="16">
+
+                <!-- Header -->
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Browse Opportunities" Style="{StaticResource PageHeader}" />
+                    <Label Text="Find meaningful volunteer work near you." Style="{StaticResource MutedText}" />
                 </VerticalStackLayout>
-            </CollectionView.EmptyView>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:OpportunityDetails">
-                    <Grid Padding="16,6">
-                        <Border StrokeShape="RoundRectangle 14"
-                                Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                                StrokeThickness="1"
-                                Padding="16"
-                                BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                            <Border.Shadow>
-                                <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.06" />
-                            </Border.Shadow>
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}"
-                                                      CommandParameter="{Binding .}" />
-                            </Border.GestureRecognizers>
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
-                                <!-- Color accent -->
-                                <BoxView Grid.Column="0"
-                                         WidthRequest="4"
-                                         CornerRadius="2"
-                                         Color="#0D9488"
-                                         VerticalOptions="Fill" />
-                                <VerticalStackLayout Grid.Column="1" Spacing="6">
-                                    <Label Text="{Binding Title}"
-                                           FontSize="17" FontAttributes="Bold"
-                                           LineBreakMode="TailTruncation" />
-                                    <HorizontalStackLayout Spacing="6">
-                                        <Label Text="📍" FontSize="13" />
-                                        <Label Text="{Binding VenueLocation.City}"
-                                               FontSize="13"
-                                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
-                                    </HorizontalStackLayout>
-                                    <HorizontalStackLayout Spacing="6">
-                                        <Label Text="🕐" FontSize="13" />
-                                        <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, HH:mm}'}"
-                                               FontSize="13"
-                                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
-                                    </HorizontalStackLayout>
-                                </VerticalStackLayout>
-                            </Grid>
+
+                <!-- Search Bar -->
+                <SearchBar Placeholder="Search opportunities..." Text="{Binding SearchText}" />
+
+                <!-- Results -->
+                <CollectionView ItemsSource="{Binding FilteredOpportunities}" SelectionMode="None">
+                    <CollectionView.EmptyView>
+                        <Border Style="{StaticResource CardStyle}" HorizontalOptions="Fill">
+                            <VerticalStackLayout Spacing="8" HorizontalOptions="Center" Padding="20">
+                                <Label Text="🔍" FontSize="40" HorizontalOptions="Center" />
+                                <Label Text="No opportunities found" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" />
+                                <Label Text="Try adjusting your search or check back later." Style="{StaticResource MutedText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
                         </Border>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:OpportunityDetails">
+                            <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:OpportunitiesViewModel}}, Path=GoToDetailsCommand}"
+                                                          CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="10">
+                                    <!-- Title row with status -->
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding Title}" FontSize="17" FontAttributes="Bold" Grid.Column="0" LineBreakMode="TailTruncation" />
+                                        <Border Style="{StaticResource BadgeStyle}" Grid.Column="1" VerticalOptions="Start">
+                                            <Label Text="{Binding Visibility}" FontSize="11" TextColor="{StaticResource Primary}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Description -->
+                                    <Label Text="{Binding Description}" Style="{StaticResource MutedText}" LineBreakMode="TailTruncation" MaxLines="2" />
+
+                                    <!-- Info row -->
+                                    <HorizontalStackLayout Spacing="16">
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="📅" FontSize="13" />
+                                            <Label Text="{Binding StartTime, StringFormat='{0:MMM dd, yyyy}'}" Style="{StaticResource MutedText}" FontSize="12" />
+                                        </HorizontalStackLayout>
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="📍" FontSize="13" />
+                                            <Label Text="{Binding VenueLocation.City}" Style="{StaticResource MutedText}" FontSize="12" />
+                                        </HorizontalStackLayout>
+                                        <HorizontalStackLayout Spacing="4">
+                                            <Label Text="👥" FontSize="13" />
+                                            <Label Style="{StaticResource MutedText}" FontSize="12">
+                                                <Label.FormattedText>
+                                                    <FormattedString>
+                                                        <Span Text="{Binding RegisteredCount}" />
+                                                        <Span Text="/" />
+                                                        <Span Text="{Binding MaxVolunteers}" />
+                                                    </FormattedString>
+                                                </Label.FormattedText>
+                                            </Label>
+                                        </HorizontalStackLayout>
+                                    </HorizontalStackLayout>
+
+                                    <!-- View Details -->
+                                    <Label Text="View Details ›" TextColor="{StaticResource Primary}" FontAttributes="Bold" FontSize="13" HorizontalOptions="End" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+            </VerticalStackLayout>
+        </ScrollView>
     </RefreshView>
 </ContentPage>

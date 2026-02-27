@@ -3,7 +3,7 @@ using Orleans;
 
 namespace VSMS.Grains.Interfaces;
 
-public interface IOrganizationGrain : IGrainWithStringKey
+public interface IOrganizationGrain : IGrainWithGuidKey
 {
     Task UpdateProfile(OrganizationProfile profile);
     Task<OrganizationProfile> GetProfile();

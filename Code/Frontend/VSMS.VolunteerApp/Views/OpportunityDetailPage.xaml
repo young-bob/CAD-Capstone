@@ -2,105 +2,118 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
-             xmlns:models="clr-namespace:VSMS.VolunteerApp.Models"
-             xmlns:converters="clr-namespace:VSMS.VolunteerApp.Converters"
              x:Class="VSMS.VolunteerApp.Views.OpportunityDetailPage"
              x:DataType="vm:OpportunityDetailViewModel"
-             Title="{Binding Title}">
-
-    <ContentPage.Resources>
-        <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
-    </ContentPage.Resources>
+             Title="Opportunity Details">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="16">
 
-            <!-- Title Section -->
-            <Border StrokeShape="RoundRectangle 16"
-                    StrokeThickness="0"
-                    Padding="24"
-                    BackgroundColor="#0D9488">
-                <Border.Shadow>
-                    <Shadow Brush="#0D9488" Offset="0,4" Radius="16" Opacity="0.3" />
-                </Border.Shadow>
-                <Label Text="{Binding Opportunity.Title}"
-                       FontSize="22" FontAttributes="Bold"
-                       TextColor="White" />
-            </Border>
+            <!-- Title + Status -->
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="{Binding Opportunity.Title}" Style="{StaticResource PageHeader}" Grid.Column="0" />
+                <Border Style="{StaticResource BadgeStyle}" Grid.Column="1" VerticalOptions="Start">
+                    <Label Text="{Binding Opportunity.Visibility}" FontSize="12" TextColor="{StaticResource Primary}" />
+                </Border>
+            </Grid>
 
-            <!-- Description Card -->
-            <Border StrokeShape="RoundRectangle 14"
-                    Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                    StrokeThickness="1"
-                    Padding="18"
-                    BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,2" Radius="8" Opacity="0.06" />
-                </Border.Shadow>
-                <VerticalStackLayout Spacing="8">
-                    <Label Text="Description" FontSize="13" FontAttributes="Bold"
-                           TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
-                    <Label Text="{Binding Opportunity.Description}" FontSize="15"
-                           LineBreakMode="WordWrap" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- Location & Time -->
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                <Border Grid.Column="0"
-                        StrokeShape="RoundRectangle 14"
-                        Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                        StrokeThickness="1"
-                        Padding="16"
-                        BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="📍 Location" FontSize="13" FontAttributes="Bold"
-                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
-                        <Label Text="{Binding Opportunity.VenueLocation.Address}"
-                               FontSize="14" LineBreakMode="WordWrap" />
-                        <Label Text="{Binding Opportunity.VenueLocation.City}"
-                               FontSize="13"
-                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
+            <!-- Info Cards Row -->
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                <!-- Dates -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Column="0">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="📅" FontSize="20" />
+                        <Label Text="Dates" Style="{StaticResource MutedText}" FontSize="11" />
+                        <Label Text="{Binding Opportunity.StartTime, StringFormat='{0:MMM dd}'}" FontSize="13" FontAttributes="Bold" />
+                        <Label Text="{Binding Opportunity.EndTime, StringFormat='to {0:MMM dd}'}" Style="{StaticResource MutedText}" FontSize="11" />
                     </VerticalStackLayout>
                 </Border>
 
-                <Border Grid.Column="1"
-                        StrokeShape="RoundRectangle 14"
-                        Stroke="{AppThemeBinding Light=#E2E8F0, Dark=#4A5568}"
-                        StrokeThickness="1"
-                        Padding="16"
-                        BackgroundColor="{AppThemeBinding Light=#F7FAFC, Dark=#2D3748}">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="🕐 Schedule" FontSize="13" FontAttributes="Bold"
-                               TextColor="{AppThemeBinding Light=#718096, Dark=#A0AEC0}" />
-                        <Label Text="{Binding Opportunity.StartTime, StringFormat='{0:MMM dd}'}"
-                               FontSize="14" />
-                        <HorizontalStackLayout Spacing="4">
-                            <Label Text="{Binding Opportunity.StartTime, StringFormat='{0:HH:mm}'}"
-                                   FontSize="13" TextColor="#0D9488" FontAttributes="Bold" />
-                            <Label Text="–" FontSize="13" />
-                            <Label Text="{Binding Opportunity.EndTime, StringFormat='{0:HH:mm}'}"
-                                   FontSize="13" TextColor="#0D9488" FontAttributes="Bold" />
-                        </HorizontalStackLayout>
+                <!-- Volunteers -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Column="1">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="👥" FontSize="20" />
+                        <Label Text="Volunteers" Style="{StaticResource MutedText}" FontSize="11" />
+                        <Label FontSize="13" FontAttributes="Bold">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Opportunity.RegisteredCount}" />
+                                    <Span Text=" / " />
+                                    <Span Text="{Binding Opportunity.MaxVolunteers}" />
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Location -->
+                <Border Style="{StaticResource StatCardStyle}" Grid.Column="2">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="📍" FontSize="20" />
+                        <Label Text="Location" Style="{StaticResource MutedText}" FontSize="11" />
+                        <Label Text="{Binding Opportunity.VenueLocation.City}" FontSize="13" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                        <Label Text="{Binding Opportunity.VenueLocation.Province}" Style="{StaticResource MutedText}" FontSize="11" />
                     </VerticalStackLayout>
                 </Border>
             </Grid>
 
-            <!-- Apply Button -->
-            <Button Text="Apply Now"
+            <!-- Description Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Description" Style="{StaticResource SectionTitle}" />
+                    <Label Text="{Binding Opportunity.Description}" Style="{StaticResource MutedText}" FontSize="14" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Location Details Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Venue Details" Style="{StaticResource SectionTitle}" />
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="📍" FontSize="14" />
+                        <Label Text="{Binding Opportunity.VenueLocation.Address}" FontSize="14" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="🏙" FontSize="14" />
+                        <Label FontSize="14">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Opportunity.VenueLocation.City}" />
+                                    <Span Text=", " />
+                                    <Span Text="{Binding Opportunity.VenueLocation.Province}" />
+                                    <Span Text=" " />
+                                    <Span Text="{Binding Opportunity.VenueLocation.PostalCode}" />
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="⏰" FontSize="14" />
+                        <Label FontSize="14">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding Opportunity.StartTime, StringFormat='{0:MMM dd, HH:mm}'}" />
+                                    <Span Text=" – " />
+                                    <Span Text="{Binding Opportunity.EndTime, StringFormat='{0:HH:mm}'}" />
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Sign Up Button -->
+            <Button Text="Sign Up for this Opportunity"
                     Command="{Binding ApplyCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="#0D9488"
+                    BackgroundColor="{StaticResource Primary}"
                     TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="48"
                     FontAttributes="Bold"
-                    FontSize="16"
-                    CornerRadius="12"
-                    HeightRequest="50"
-                    Margin="0,10,0,0"
-                    HorizontalOptions="Fill" />
+                    FontSize="16" />
 
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
-                               Color="#0D9488" HorizontalOptions="Center" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
 
         </VerticalStackLayout>
     </ScrollView>

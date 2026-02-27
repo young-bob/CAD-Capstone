@@ -1,3 +1,5 @@
+# Volunteer Service Management System (VSMS)
+
 ``` shell
 VSMS (Volunteer Service Management System)
 ├── Backend
@@ -351,8 +353,9 @@ flowchart LR
 ### Technology Stack
 
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
+| --- | --- | --- |
 | **Mobile** | .NET MAUI 10 | Cross-platform UI (iOS/Android/Windows) |
+| **Web** | React 18, Vite, Tailwind CSS | Web Frontend UI |
 | **API** | ASP.NET Core 10 | REST API, JWT Authentication |
 | **Business** | Orleans 10 | Distributed Actor Framework |
 | **Data** | PostgreSQL or CockroachDB | Relational Database or NoSQL |
@@ -363,7 +366,6 @@ flowchart LR
 - **Orleans Clustering**: ADO.NET provider for distributed coordination
 - **State Persistence**: Automatic grain state storage in PostgreSQL
 - **Authentication**: JWT-based security for API endpoints
-
 
 ## Getting Started
 
@@ -422,10 +424,10 @@ docker compose down
 Once the containers are running:
 
 | Service | URL | Description |
-|---------|-----|-------------|
-| **API** | http://localhost:8080 | REST API endpoints |
-| **Swagger UI** | http://localhost:8080/swagger | API documentation and testing |
-| **PostgreSQL** | localhost:5432 | Database (user: `root`, password: `root123`, db: `vsms`) |
+| --- | --- | --- |
+| **API** | <http://localhost:8080> | REST API endpoints |
+| **Swagger UI** | <http://localhost:8080/swagger> | API documentation and testing |
+| **PostgreSQL** | `localhost:5432` | Database (user: `root`, password: `root123`, db: `vsms`) |
 
 ### Troubleshooting
 

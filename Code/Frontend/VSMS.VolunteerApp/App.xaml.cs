@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace VSMS.VolunteerApp;
+﻿namespace VSMS.VolunteerApp;
 
 public partial class App : Application
 {

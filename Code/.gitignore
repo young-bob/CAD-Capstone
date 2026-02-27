@@ -118,3 +118,21 @@ nCrunchTemp_*
 *.pubxml
 *.publishsettings
 *.azurePubxml
+
+# Node/React/Vite Frontend
+node_modules/
+dist/
+dist-ssr/
+build/
+.next/
+out/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.vite/

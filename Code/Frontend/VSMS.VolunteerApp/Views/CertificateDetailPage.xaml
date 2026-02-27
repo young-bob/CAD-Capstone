@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:VSMS.VolunteerApp.ViewModels"
+             x:Class="VSMS.VolunteerApp.Views.CertificateDetailPage"
+             x:DataType="vm:CertificateDetailViewModel"
+             Title="Certificate Detail">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Header -->
+            <Label Text="Certificate Details" Style="{StaticResource PageHeader}" />
+
+            <!-- Certificate Info Card -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="🏆" FontSize="48" HorizontalOptions="Center" />
+                    <Label Text="Volunteer Certificate" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📋" FontSize="14" />
+                        <Label Text="Certificate ID" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.CertificateId}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="👤" FontSize="14" />
+                        <Label Text="Volunteer" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.VolunteerId}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📅" FontSize="14" />
+                        <Label Text="Issued" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.IssuedAt, StringFormat='{0:MMMM dd, yyyy}'}" Style="{StaticResource MutedText}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="📝" FontSize="14" />
+                        <Label Text="Template" FontAttributes="Bold" FontSize="13" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding Certificate.TemplateId}" Style="{StaticResource MutedText}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Actions -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Grid.Column="0" Text="Download" Command="{Binding DownloadCommand}"
+                        BackgroundColor="{StaticResource Primary}" TextColor="White"
+                        CornerRadius="8" HeightRequest="48" FontAttributes="Bold" />
+                <Button Grid.Column="1" Text="Sign" Command="{Binding SignCommand}"
+                        Style="{StaticResource OutlineButton}" HeightRequest="48" />
+            </Grid>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" Color="{StaticResource Primary}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
