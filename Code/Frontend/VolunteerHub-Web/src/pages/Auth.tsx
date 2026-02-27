@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Shield, Mail, Lock, User, Loader2, Eye, EyeOff, Users, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { fetchApi } from "@/lib/apiClient";
 
 const Auth = () => {
   const { signIn } = useAuth();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +34,7 @@ const Auth = () => {
         
         signIn(responseData.token, responseData);
         toast.success("Welcome back!");
+        navigate("/");
       } else {
         await fetchApi("/Auth/register", {
           method: "POST",
@@ -43,16 +46,17 @@ const Auth = () => {
           }),
           requireAuth: false
         });
-        
+
         // Auto login after registration
         const loginData = await fetchApi<{ token: string; userId: string; role: string; name: string }>("/Auth/login", {
           method: "POST",
           body: JSON.stringify({ email, password }),
           requireAuth: false
         });
-        
+
         signIn(loginData.token, loginData);
         toast.success("Account created successfully.");
+        navigate("/");
       }
     } catch (error: unknown) {
       const err = error as Error;
