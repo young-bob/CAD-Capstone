@@ -147,7 +147,7 @@ public class OpportunityController : ControllerBase
         }
 
         await grain.ProcessApplication(appId, request.Status, request.RejectionReason);
-        return Ok();
+        return NoContent();
     }
 
     [HttpGet("{id}/enrollments")]
