@@ -1,0 +1,4 @@
+#!/bin/bash
+cd /home/admin/vsms
+sudo podman compose -f podman-compose.api.yml down
+

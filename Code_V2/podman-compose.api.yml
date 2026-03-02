@@ -1,0 +1,51 @@
+# ============================================================
+# VSMS — API Server (应用服务器 - 集群模式)
+# ============================================================
+# Deploy on: 10.20.30.2 AND 10.20.30.3
+#
+# Prerequisites:
+#   - DB Server running on 10.20.30.4
+#   - Nginx LB running on 10.20.30.1
+#
+# Usage:
+#   podman-compose -f podman-compose.api.yml up -d
+# ============================================================
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vsms-api
+    image: vsms-api
+    network_mode: "host"
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # ---- Database ----
+      ConnectionStrings__PostgreSQL: "Host=${DB_HOST};Port=5432;Database=vsms;Username=vsms;Password=${POSTGRES_PASSWORD}"
+      # ---- JWT ----
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: VSMS.Api
+      Jwt__Audience: VSMS.Client
+      Jwt__ExpirationMinutes: 60
+      # ---- Orleans Clustering ----
+      Orleans__ClusterId: vsms-cluster
+      Orleans__ServiceId: vsms-service
+      Orleans__SiloPort: "11111"
+      Orleans__GatewayPort: "30000"
+      Orleans__AdvertisedIP: ${ADVERTISED_IP}
+      # ---- EventBus (Orleans Streams for multi-silo) ----
+      EventBus__Provider: OrleansStream
+      # ---- MinIO File Storage ----
+      Minio__Endpoint: ${MINIO_HOST}:9000
+      Minio__AccessKey: ${MINIO_ACCESS_KEY}
+      Minio__SecretKey: ${MINIO_SECRET_KEY}
+      Minio__BucketName: vsms
+      Minio__UseSsl: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/swagger/v1/swagger.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

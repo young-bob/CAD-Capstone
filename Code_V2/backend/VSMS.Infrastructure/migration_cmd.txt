@@ -1,0 +1,3 @@
+dotnet ef migrations add Init -o Data/EfCoreQuery/Migrations --startup-project ../VSMS.Api
+
+dotnet ef database update --startup-project ../VSMS.Api

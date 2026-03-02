@@ -1,0 +1,28 @@
+# ============================================================
+# VSMS — Database Server (数据库服务器)
+# ============================================================
+# Deploy on: DB Server (e.g. 192.168.1.10)
+#
+# Usage:
+#   podman-compose -f podman-compose.db.yml up -d
+#   podman-compose -f podman-compose.db.yml logs -f
+# ============================================================
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17
+    container_name: vsms-postgres
+    network_mode: "host"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vsms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: vsms
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./backend/VSMS.SQL:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vsms -d vsms"]
+      interval: 30s
+      timeout: 3s
+      retries: 10

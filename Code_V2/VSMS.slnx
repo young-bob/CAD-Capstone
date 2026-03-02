@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/VSMS.Abstractions/VSMS.Abstractions.csproj" />
+    <Project Path="backend/VSMS.Api/VSMS.Api.csproj" />
+    <Project Path="backend/VSMS.Grains/VSMS.Grains.csproj" />
+    <Project Path="backend/VSMS.Infrastructure/VSMS.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VSMS.Tests/VSMS.Tests.csproj" />
+  </Folder>
+</Solution>
