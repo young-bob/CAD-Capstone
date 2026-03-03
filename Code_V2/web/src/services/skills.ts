@@ -1,0 +1,26 @@
+import api from './api';
+import type { Skill } from '../types';
+
+export const skillService = {
+    getAll: async (): Promise<Skill[]> => {
+        const res = await api.get<Skill[]>('/api/skills');
+        return res.data;
+    },
+    createSkill: async (data: { name: string; category: string; description: string }): Promise<Skill> => {
+        const res = await api.post<Skill>('/api/skills', data);
+        return res.data;
+    },
+    deleteSkill: async (id: string): Promise<void> => {
+        await api.delete(`/api/skills/${id}`);
+    },
+    getVolunteerSkills: async (userId: string): Promise<Skill[]> => {
+        const res = await api.get<Skill[]>(`/api/volunteers/${userId}/skills`);
+        return res.data;
+    },
+    addSkill: async (userId: string, skillId: string): Promise<void> => {
+        await api.post(`/api/volunteers/${userId}/skills/${skillId}`);
+    },
+    removeSkill: async (userId: string, skillId: string): Promise<void> => {
+        await api.delete(`/api/volunteers/${userId}/skills/${skillId}`);
+    },
+};

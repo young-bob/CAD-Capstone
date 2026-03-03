@@ -12,3 +12,7 @@ mobile/node_modules/
 tests/
 *.md
 .gitignore
+web/node_modules
+web/dist
+web/.git
+web/*.md

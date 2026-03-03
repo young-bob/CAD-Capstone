@@ -1,0 +1,26 @@
+# ============================================================
+# VSMS — Web Frontend (10.20.30.1)
+# ============================================================
+# Deploy on: 10.20.30.1
+#
+# Prerequisites:
+#   - Nginx LB running on 10.20.30.1
+#
+# Usage:
+#   podman-compose -f podman-compose.web.yml up -d
+# ============================================================
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile_Web
+    container_name: vsms-web
+    image: vsms-web
+    network_mode: "host"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

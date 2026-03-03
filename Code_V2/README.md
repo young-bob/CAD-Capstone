@@ -28,6 +28,14 @@ VSMS is a modern, high-performance platform designed to connect volunteers with 
 - **Hardware Integration**: Expo Image Picker (for proof of attendance & credential uploads)
 - **Push Notifications**: Expo Push Notifications Service
 
+### Web Application
+- **Framework**: React 19 + Vite 6
+- **Language**: TypeScript
+- **Styling**: TailwindCSS v4
+- **Icons**: Lucide React
+- **Network / API Integration**: Axios
+- **Deployment**: Nginx (static file serving via Podman)
+
 ---
 
 ## 📱 How to Run the Mobile App (Android Emulator)
@@ -84,12 +92,61 @@ Expo will automatically connect to your running Android emulator, install the "E
 
 ---
 
+## 🌐 How to Run the Web App (Development)
+
+### Prerequisites
+1. **Node.js** (v18 or newer recommended).
+2. Backend services running (see Step 1 in the Mobile section above).
+
+### Step 1: Install Dependencies
+```bash
+cd web
+npm install
+```
+
+### Step 2: Configure the API URL
+The API URL is configured via environment variable. For development, create or edit `web/.env.development`:
+```env
+VITE_API_URL=http://10.20.30.1
+```
+- **Local Docker**: `VITE_API_URL=http://localhost:8080`
+- **Production/Cluster API**: `VITE_API_URL=http://10.20.30.1`
+
+### Step 3: Start the Dev Server
+```bash
+npm run dev
+```
+*The web app will be available at `http://localhost:5173` with hot-reload.*
+
+### Step 4: Build for Production
+```bash
+npm run build
+```
+*The output is in `web/dist/` — static HTML/CSS/JS files served by Nginx in production.*
+
+---
+
 ## 🏗 Deployment Guide Overview
 
 For production deployments, VSMS provides tailored `podman-compose` configurations:
-- **`podman-compose.yml`**: Designed for single-machine deployment (PostgreSQL, MinIO, API in one stack).
-- **`podman-compose.api.yml`**: Designed for multi-silo Orleans cluster deployment (runs only the API container in `host` network mode, expects external DB and MinIO).
-- **`podman-compose.file.yml`**: Dedicated MinIO storage server deployment.
-- **`podman-compose.db.yml`**: Dedicated PostgreSQL server deployment.
+
+### Single-Node (All-in-One)
+- **`podman-compose.yml`**: PostgreSQL + MinIO + API + Web in one stack.
+
+### Multi-Node (Cluster)
+| File | Server | Description |
+|------|--------|-------------|
+| `podman-compose.db.yml` | DB Server | Dedicated PostgreSQL |
+| `podman-compose.file.yml` | File Server | Dedicated MinIO storage |
+| `podman-compose.api.yml` | App Server(s) | API + Orleans Silo (multi-silo cluster) |
+| `podman-compose.web.yml` | LB Server | Web frontend (SPA build → Nginx serve) |
+| `podman-compose.nginx.yml` | LB Server | Nginx reverse proxy + load balancer |
+
+### Web Deployment
+```bash
+# Build & deploy web on the LB server (10.20.30.1)
+podman-compose -f podman-compose.web.yml up -d
+podman-compose -f podman-compose.nginx.yml up -d
+```
 
 Refer to the `.env.example` file for required environment variables.
