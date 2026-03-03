@@ -6,6 +6,7 @@
 .DS_Store
 .AppleDouble
 .LSOverride
+*.sh
 
 # Windows image databases
 Thumbs.db
