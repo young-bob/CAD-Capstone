@@ -1,6 +1,6 @@
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
-    Building, AlertTriangle, FileCheck, LogOut
+    Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus
 } from 'lucide-react';
 import type { ViewName } from '../types';
 
@@ -33,7 +33,8 @@ export default function Sidebar({ userRole, currentView, sidebarOpen, onNavigate
                         <button onClick={() => onNavigate('attendance')} className={btnClass('attendance')}><MapPin className="w-5 h-5" /> Geo Check-in</button>
                         <p className="px-4 text-xs font-bold text-stone-400 uppercase tracking-wider mb-3 mt-8">Personal & Assets</p>
                         <button onClick={() => onNavigate('certificates')} className={btnClass('certificates')}><Award className="w-5 h-5" /> Certificates</button>
-                        <button onClick={() => onNavigate('profile')} className={btnClass('profile')}><User className="w-5 h-5" /> Profile & Skills</button>
+                        <button onClick={() => onNavigate('profile')} className={btnClass('profile')}><User className="w-5 h-5" /> Profile</button>
+                        <button onClick={() => onNavigate('skills')} className={btnClass('skills')}><Star className="w-5 h-5" /> My Skills</button>
                     </>
                 )}
                 {userRole === 'coordinator' && (
@@ -42,6 +43,7 @@ export default function Sidebar({ userRole, currentView, sidebarOpen, onNavigate
                         <button onClick={() => onNavigate('dashboard')} className={btnClass('dashboard')}><Activity className="w-5 h-5" /> Overview</button>
                         <button onClick={() => onNavigate('manage_events')} className={btnClass('manage_events')}><Briefcase className="w-5 h-5" /> Manage Events</button>
                         <button onClick={() => onNavigate('org_applications')} className={btnClass('org_applications')}><Users className="w-5 h-5" /> Applications</button>
+                        <button onClick={() => onNavigate('org_members')} className={btnClass('org_members')}><UserPlus className="w-5 h-5" /> Members</button>
                         <button onClick={() => onNavigate('manage_templates')} className={btnClass('manage_templates')}><FileCheck className="w-5 h-5" /> Cert Templates</button>
                     </>
                 )}
@@ -52,6 +54,7 @@ export default function Sidebar({ userRole, currentView, sidebarOpen, onNavigate
                         <button onClick={() => onNavigate('admin_orgs')} className={btnClass('admin_orgs')}><Building className="w-5 h-5" /> Organizations</button>
                         <button onClick={() => onNavigate('admin_disputes')} className={btnClass('admin_disputes')}><AlertTriangle className="w-5 h-5" /> Disputes</button>
                         <button onClick={() => onNavigate('admin_users')} className={btnClass('admin_users')}><User className="w-5 h-5" /> User Control</button>
+                        <button onClick={() => onNavigate('admin_skills')} className={btnClass('admin_skills')}><Star className="w-5 h-5" /> Skills</button>
                     </>
                 )}
             </div>

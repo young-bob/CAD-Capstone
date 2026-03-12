@@ -2,9 +2,10 @@ import { Heart, Sun, ChevronRight, CheckCircle2, Award, ShieldCheck, MapPin, Clo
 
 interface Props {
     onGoLogin: () => void;
+    onGoRegister: () => void;
 }
 
-export default function LandingPage({ onGoLogin }: Props) {
+export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
     return (
         <div className="min-h-screen bg-orange-50/30 flex flex-col font-sans">
             <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
@@ -15,7 +16,7 @@ export default function LandingPage({ onGoLogin }: Props) {
                     </div>
                     <div className="flex items-center gap-4">
                         <button onClick={onGoLogin} className="text-stone-600 hover:text-orange-500 font-medium transition-colors">Log In</button>
-                        <button onClick={onGoLogin} className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-full font-medium transition-colors shadow-sm">Join Now</button>
+                        <button onClick={onGoRegister} className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-full font-medium transition-colors shadow-sm">Join Now</button>
                     </div>
                 </div>
             </header>
@@ -35,7 +36,7 @@ export default function LandingPage({ onGoLogin }: Props) {
                             An all-in-one volunteer service management platform. From publishing opportunities and smart matching to real-time geo-attendance and automated certificate generation.
                         </p>
                         <div className="flex gap-4">
-                            <button onClick={onGoLogin} className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full text-lg font-semibold transition-all shadow-lg hover:shadow-orange-500/40 flex items-center gap-2">
+                            <button onClick={onGoRegister} className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full text-lg font-semibold transition-all shadow-lg hover:shadow-orange-500/40 flex items-center gap-2">
                                 Get Started <ChevronRight className="w-5 h-5" />
                             </button>
                             <button className="bg-white hover:bg-orange-50 text-stone-700 border border-stone-200 px-8 py-3 rounded-full text-lg font-semibold transition-all shadow-sm">
@@ -191,7 +192,7 @@ export default function LandingPage({ onGoLogin }: Props) {
                         <h2 className="text-3xl lg:text-4xl font-extrabold text-stone-900 mb-4">Ready to Make a Difference?</h2>
                         <p className="text-lg text-stone-500 mb-8 max-w-2xl mx-auto">Join thousands of volunteers and organizations on VSMS and start creating positive change in your community today.</p>
                         <div className="flex justify-center gap-4">
-                            <button onClick={onGoLogin} className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-4 rounded-full text-lg font-bold transition-all shadow-lg hover:shadow-orange-500/40 flex items-center gap-2">
+                            <button onClick={onGoRegister} className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-4 rounded-full text-lg font-bold transition-all shadow-lg hover:shadow-orange-500/40 flex items-center gap-2">
                                 Start Volunteering <ChevronRight className="w-5 h-5" />
                             </button>
                         </div>

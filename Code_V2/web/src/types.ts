@@ -1,9 +1,9 @@
-// ─── View routing ─────────────────────────────────────────────
 export type ViewName =
-    | 'landing' | 'login'
-    | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile'
-    | 'manage_events' | 'org_applications' | 'manage_templates'
-    | 'admin_orgs' | 'admin_disputes' | 'admin_users';
+    | 'landing' | 'login' | 'register'
+    | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills'
+    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members'
+    | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills';
+
 
 // ─── Enums (mirrors backend VSMS.Abstractions.Models.Enums) ──
 export type UserRole = 'Volunteer' | 'Coordinator' | 'SystemAdmin';

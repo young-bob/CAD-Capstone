@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
-import type { OrganizationSummary, UserRecord, DisputeSummary } from '../../types';
+import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import type { OrganizationSummary, UserRecord, DisputeSummary, Skill } from '../../types';
 import { adminService } from '../../services/admin';
 import { attendanceService } from '../../services/attendance';
+import { skillService } from '../../services/skills';
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
 function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
@@ -137,6 +138,127 @@ export function AdminOrgs() {
     );
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ADMIN SKILLS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export function AdminSkills() {
+    const [skills, setSkills] = useState<Skill[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [form, setForm] = useState({ name: '', category: '', description: '' });
+    const [submitting, setSubmitting] = useState(false);
+    const [toast, setToast] = useState('');
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+    const load = useCallback(async () => {
+        setLoading(true); setError('');
+        try {
+            const data = await skillService.getAll();
+            setSkills(data);
+        } catch (err: any) {
+            setError(err.response?.data || 'Failed to load skills');
+        } finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!form.name.trim() || !form.category.trim() || !form.description.trim()) {
+            showToast('All fields are required');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await skillService.createSkill({ name: form.name.trim(), category: form.category.trim(), description: form.description.trim() });
+            setForm({ name: '', category: '', description: '' });
+            showToast('Skill created');
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.Error || 'Failed to create skill');
+        } finally { setSubmitting(false); }
+    };
+
+    const handleDelete = async (skill: Skill) => {
+        try {
+            await skillService.deleteSkill(skill.id);
+            setDeleteConfirm(null);
+            showToast(`Deleted: ${skill.name}`);
+            load();
+        } catch { showToast('Failed to delete skill'); }
+    };
+
+    const byCategory = skills.reduce<Record<string, Skill[]>>((acc, s) => {
+        (acc[s.category || 'General'] ??= []).push(s);
+        return acc;
+    }, {});
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-8">
+            <div><h1 className="text-3xl font-extrabold text-stone-800">Skills Management</h1><p className="text-stone-500 mt-2 text-lg">Manage the platform skill catalog.</p></div>
+
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                <h2 className="text-lg font-bold text-stone-800 mb-5 flex items-center gap-2"><Plus className="w-5 h-5 text-orange-500" /> Add New Skill</h2>
+                <form onSubmit={handleCreate} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-stone-600 mb-1">Category</label>
+                            <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Medical, IT" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-stone-600 mb-1">Skill Name</label>
+                            <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. First Aid" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-stone-600 mb-1">Description</label>
+                        <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" rows={2} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" required />
+                    </div>
+                    <button type="submit" disabled={submitting} className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
+                        {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {submitting ? 'Creating...' : 'Create Skill'}
+                    </button>
+                </form>
+            </div>
+
+            {error && <ErrorBox msg={error} onRetry={load} />}
+            {loading ? <Spinner /> : Object.keys(byCategory).length === 0 ? <Empty msg="No skills yet." /> : (
+                <div className="space-y-6">
+                    {Object.entries(byCategory).map(([category, catSkills]) => (
+                        <div key={category} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-sm font-bold text-orange-500 uppercase tracking-wider mb-4">{category}</h3>
+                            <div className="space-y-3">
+                                {catSkills.map(skill => (
+                                    <div key={skill.id} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
+                                        <div>
+                                            <p className="font-bold text-stone-800">{skill.name}</p>
+                                            {skill.description && <p className="text-sm text-stone-400 mt-0.5">{skill.description}</p>}
+                                        </div>
+                                        {deleteConfirm === skill.id ? (
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-sm text-rose-600 font-medium">Delete?</span>
+                                                <button onClick={() => handleDelete(skill)} className="px-3 py-1.5 bg-rose-500 text-white font-bold rounded-lg text-sm hover:bg-rose-600">Yes</button>
+                                                <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1.5 bg-stone-100 text-stone-600 font-bold rounded-lg text-sm hover:bg-stone-200">No</button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setDeleteConfirm(skill.id)} className="p-2 text-stone-300 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-50 shrink-0">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ADMIN DISPUTES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

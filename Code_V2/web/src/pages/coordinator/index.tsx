@@ -240,6 +240,165 @@ export function CoordApplications() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COORDINATOR MEMBERS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export function CoordMembers() {
+    const auth = useAuth();
+    const [org, setOrg] = useState<OrgState | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [tab, setTab] = useState<'members' | 'blocked'>('members');
+    const [showInvite, setShowInvite] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteRole, setInviteRole] = useState<'Admin' | 'Coordinator' | 'Member'>('Member');
+    const [inviting, setInviting] = useState(false);
+    const [toast, setToast] = useState('');
+
+    const load = useCallback(async () => {
+        if (!auth.linkedGrainId) return;
+        setLoading(true); setError('');
+        try {
+            const data = await organizationService.getById(auth.linkedGrainId);
+            setOrg(data);
+        } catch (err: any) {
+            setError(err.response?.data || 'Failed to load organization');
+        } finally { setLoading(false); }
+    }, [auth.linkedGrainId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inviteEmail || !auth.linkedGrainId) return;
+        setInviting(true);
+        try {
+            await organizationService.inviteMember(auth.linkedGrainId, { email: inviteEmail, role: inviteRole as any });
+            setShowInvite(false);
+            setInviteEmail('');
+            showToast('Member invited!');
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.toString() || 'Failed to invite member');
+        } finally { setInviting(false); }
+    };
+
+    const handleBlock = async (userId: string) => {
+        if (!auth.linkedGrainId) return;
+        try {
+            await organizationService.blockVolunteer(auth.linkedGrainId, userId);
+            showToast('Volunteer blocked');
+            load();
+        } catch { showToast('Failed to block volunteer'); }
+    };
+
+    const handleUnblock = async (userId: string) => {
+        if (!auth.linkedGrainId) return;
+        try {
+            await organizationService.unblockVolunteer(auth.linkedGrainId, userId);
+            showToast('Volunteer unblocked');
+            load();
+        } catch { showToast('Failed to unblock volunteer'); }
+    };
+
+    const roleColors: Record<string, string> = {
+        Admin: 'bg-violet-100 text-violet-700',
+        Coordinator: 'bg-blue-100 text-blue-700',
+        Member: 'bg-stone-100 text-stone-600',
+    };
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-8">
+            <div className="flex justify-between items-center">
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Members</h1><p className="text-stone-500 mt-2 text-lg">Manage your organization's members.</p></div>
+                <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
+                    <Plus className="w-5 h-5" /> Invite Member
+                </button>
+            </div>
+
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
+            {showInvite && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
+                    <h3 className="text-lg font-bold text-stone-800">Invite Member</h3>
+                    <form onSubmit={handleInvite} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-stone-600 mb-1">Email Address</label>
+                            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="volunteer@email.com" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-stone-600 mb-2">Role</label>
+                            <div className="flex gap-3">
+                                {(['Member', 'Coordinator', 'Admin'] as const).map(r => (
+                                    <button key={r} type="button" onClick={() => setInviteRole(r)}
+                                        className={`px-4 py-2 rounded-full font-bold text-sm border transition-all ${inviteRole === r ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}>
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button type="button" onClick={() => setShowInvite(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button type="submit" disabled={inviting} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
+                                {inviting && <Loader2 className="w-4 h-4 animate-spin" />}Invite
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {error && <ErrorBox msg={error} onRetry={load} />}
+
+            {/* Tabs */}
+            <div className="flex gap-1 bg-stone-100 p-1 rounded-2xl w-fit">
+                {(['members', 'blocked'] as const).map(t => (
+                    <button key={t} onClick={() => setTab(t)}
+                        className={`px-5 py-2 rounded-xl font-bold text-sm transition-all capitalize ${tab === t ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                        {t === 'members' ? `Members (${org?.members?.length ?? 0})` : `Blocked (${org?.blockedVolunteerIds?.length ?? 0})`}
+                    </button>
+                ))}
+            </div>
+
+            {loading ? <Spinner /> : tab === 'members' ? (
+                org?.members?.length ? (
+                    <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
+                                <tr><th className="p-5 font-bold">Email</th><th className="p-5 font-bold">Role</th><th className="p-5 font-bold">Joined</th><th className="p-5 font-bold text-right">Actions</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-100">
+                                {org.members.map(m => (
+                                    <tr key={m.userId} className="hover:bg-orange-50/30">
+                                        <td className="p-5 text-stone-800 font-bold">{m.email}</td>
+                                        <td className="p-5"><span className={`px-2 py-0.5 rounded text-xs font-bold ${roleColors[m.role] || 'bg-stone-100 text-stone-600'}`}>{m.role}</span></td>
+                                        <td className="p-5 text-stone-400 text-sm">{new Date(m.joinedAt).toLocaleDateString()}</td>
+                                        <td className="p-5 text-right"><button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : <Empty msg="No members yet. Use the Invite button to add some." />
+            ) : (
+                org?.blockedVolunteerIds?.length ? (
+                    <div className="space-y-3">
+                        {org.blockedVolunteerIds.map(id => (
+                            <div key={id} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-stone-700">Volunteer {id.substring(0, 8)}…</p>
+                                    <p className="text-sm text-stone-400">Blocked from applying to your events</p>
+                                </div>
+                                <button onClick={() => handleUnblock(id)} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 text-sm">Unblock</button>
+                            </div>
+                        ))}
+                    </div>
+                ) : <Empty msg="No blocked volunteers." />
+            )}
+        </div>
+    );
+}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR CERT TEMPLATES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function CoordCertTemplates() {

@@ -416,3 +416,103 @@ export function VolProfile() {
         </div>
     );
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VOLUNTEER SKILLS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export function VolSkills() {
+    const auth = useAuth();
+    const [allSkills, setAllSkills] = useState<Skill[]>([]);
+    const [mySkillIds, setMySkillIds] = useState<Set<string>>(new Set());
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+
+    const load = useCallback(async () => {
+        if (!auth.userId) return;
+        setLoading(true); setError('');
+        try {
+            const [all, mine] = await Promise.all([
+                skillService.getAll(),
+                skillService.getVolunteerSkills(auth.userId),
+            ]);
+            setAllSkills(all);
+            setMySkillIds(new Set(mine.map(s => s.id)));
+        } catch (err: any) {
+            setError(err.response?.data || 'Failed to load skills');
+        } finally { setLoading(false); }
+    }, [auth.userId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const toggle = async (skill: Skill) => {
+        if (!auth.userId) return;
+        try {
+            if (mySkillIds.has(skill.id)) {
+                await skillService.removeSkill(auth.userId, skill.id);
+                setMySkillIds(prev => { const s = new Set(prev); s.delete(skill.id); return s; });
+                setToast(`Removed: ${skill.name}`);
+            } else {
+                await skillService.addSkill(auth.userId, skill.id);
+                setMySkillIds(prev => new Set([...prev, skill.id]));
+                setToast(`Added: ${skill.name}`);
+            }
+        } catch {
+            setToast('Failed to update skill. Please try again.');
+        }
+        setTimeout(() => setToast(''), 2500);
+    };
+
+    // Group by category
+    const byCategory = allSkills.reduce<Record<string, Skill[]>>((acc, s) => {
+        (acc[s.category || 'General'] ??= []).push(s);
+        return acc;
+    }, {});
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            <div>
+                <h1 className="text-3xl font-extrabold text-stone-800">My Skills</h1>
+                <p className="text-stone-500 mt-2 text-lg">Click to add or remove skills from your profile.</p>
+            </div>
+
+            {toast && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50 transition-all">
+                    {toast}
+                </div>
+            )}
+
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : (
+                <div className="space-y-6">
+                    {Object.entries(byCategory).map(([category, skills]) => (
+                        <div key={category} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-sm font-bold text-orange-500 uppercase tracking-wider mb-4">{category}</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {skills.map(skill => {
+                                    const selected = mySkillIds.has(skill.id);
+                                    return (
+                                        <button
+                                            key={skill.id}
+                                            onClick={() => toggle(skill)}
+                                            title={skill.description}
+                                            className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${
+                                                selected
+                                                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/30'
+                                                    : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600'
+                                            }`}
+                                        >
+                                            {selected && <span className="mr-1">✓</span>}
+                                            {skill.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                    {Object.keys(byCategory).length === 0 && <Empty msg="No skills available. Ask your admin to add some." />}
+                </div>
+            )}
+        </div>
+    );
+}
+

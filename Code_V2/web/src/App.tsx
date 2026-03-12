@@ -6,10 +6,11 @@ import AppHeader from './components/AppHeader';
 import Sidebar from './components/Sidebar';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 
-import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile } from './pages/volunteer';
-import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates } from './pages/coordinator';
-import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers } from './pages/admin';
+import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills } from './pages/volunteer';
+import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers } from './pages/coordinator';
+import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills } from './pages/admin';
 
 function AppInner() {
     const auth = useAuth();
@@ -22,10 +23,12 @@ function AppInner() {
     // Auto-navigate based on auth state
     useEffect(() => {
         if (auth.loading) return;
-        if (auth.token && (currentView === 'landing' || currentView === 'login')) {
+        const isPublicView = currentView === 'landing' || currentView === 'login' || currentView === 'register';
+        
+        if (auth.token && isPublicView) {
             setCurrentView('dashboard');
         }
-        if (!auth.token && currentView !== 'landing' && currentView !== 'login') {
+        if (!auth.token && !isPublicView) {
             setCurrentView('landing');
         }
     }, [auth.token, auth.loading, currentView]);
@@ -55,6 +58,7 @@ function AppInner() {
                 case 'attendance': return <VolAttendance />;
                 case 'certificates': return <VolCertificates />;
                 case 'profile': return <VolProfile />;
+                case 'skills': return <VolSkills />;
                 default: return <VolDashboard onNavigate={setCurrentView} />;
             }
         }
@@ -64,6 +68,7 @@ function AppInner() {
                 case 'manage_events': return <CoordManageEvents />;
                 case 'org_applications': return <CoordApplications />;
                 case 'manage_templates': return <CoordCertTemplates />;
+                case 'org_members': return <CoordMembers />;
                 default: return <CoordDashboard />;
             }
         }
@@ -73,6 +78,7 @@ function AppInner() {
                 case 'admin_orgs': return <AdminOrgs />;
                 case 'admin_disputes': return <AdminDisputes />;
                 case 'admin_users': return <AdminUsers />;
+                case 'admin_skills': return <AdminSkills />;
                 default: return <AdminDashboard />;
             }
         }
@@ -81,11 +87,14 @@ function AppInner() {
 
     return (
         <div className="min-h-screen bg-[#fffdfa] selection:bg-orange-200 selection:text-orange-900">
-            {currentView === 'landing' && <LandingPage onGoLogin={() => setCurrentView('login')} />}
+            {currentView === 'landing' && <LandingPage onGoLogin={() => setCurrentView('login')} onGoRegister={() => setCurrentView('register')} />}
             {currentView === 'login' && (
                 <LoginPage onBack={() => setCurrentView('landing')} />
             )}
-            {auth.token && currentView !== 'landing' && currentView !== 'login' && (
+            {currentView === 'register' && (
+                <RegisterPage onBack={() => setCurrentView('landing')} onGoLogin={() => setCurrentView('login')} />
+            )}
+            {auth.token && currentView !== 'landing' && currentView !== 'login' && currentView !== 'register' && (
                 <div className="flex h-screen overflow-hidden">
                     <AppHeader
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
