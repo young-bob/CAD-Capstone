@@ -52,7 +52,9 @@ The backend has cross-service dependencies (PostgreSQL, MinIO, etc.). It is high
 
 To start the full environment locally:
 ```bash
-podman-compose -f podman-compose.yml up -d
+podman compose -f podman-compose.yml up -d
+# or
+docker compose -f podman-compose.yml up -d
 ```
 *The API will be available at `http://localhost:8080`.*
 
@@ -145,8 +147,11 @@ For production deployments, VSMS provides tailored `podman-compose` configuratio
 ### Web Deployment
 ```bash
 # Build & deploy web on the LB server (10.20.30.1)
-podman-compose -f podman-compose.web.yml up -d
-podman-compose -f podman-compose.nginx.yml up -d
+podman compose -f podman-compose.web.yml up -d
+podman compose -f podman-compose.nginx.yml up -d
+# or
+docker compose -f podman-compose.web.yml up -d
+docker compose -f podman-compose.nginx.yml up -d
 ```
 
 Refer to the `.env.example` file for required environment variables.
