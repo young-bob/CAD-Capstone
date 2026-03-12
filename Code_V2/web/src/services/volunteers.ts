@@ -17,4 +17,10 @@ export const volunteerService = {
         const res = await api.get<AttendanceSummary[]>(`/api/volunteers/${id}/attendance`);
         return res.data;
     },
+    uploadCredential: async (id: string, fileKey: string): Promise<void> => {
+        await api.post(`/api/volunteers/${id}/credentials`, { fileKey });
+    },
+    submitFeedback: async (id: string, data: { opportunityId: string; rating: number; comment: string }): Promise<void> => {
+        await api.post(`/api/volunteers/${id}/feedback`, data);
+    },
 };

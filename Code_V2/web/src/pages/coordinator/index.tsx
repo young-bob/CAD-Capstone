@@ -22,55 +22,183 @@ function Empty({ msg }: { msg: string }) { return <div className="text-center py
 export function CoordDashboard() {
     const auth = useAuth();
     const [org, setOrg] = useState<OrgState | null>(null);
+    const [orgNotFound, setOrgNotFound] = useState(false);
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+
+    // Create org form
+    const [showCreate, setShowCreate] = useState(false);
+    const [orgName, setOrgName] = useState('');
+    const [orgDesc, setOrgDesc] = useState('');
+    const [creating, setCreating] = useState(false);
+
+    // Edit org form
+    const [showEdit, setShowEdit] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editDesc, setEditDesc] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
-        setLoading(true); setError('');
+        setLoading(true);
         try {
-            const [o, ops, ap] = await Promise.all([
-                organizationService.getById(auth.linkedGrainId),
+            const o = await organizationService.getById(auth.linkedGrainId);
+            setOrg(o); setOrgNotFound(false);
+            const [ops, ap] = await Promise.all([
                 organizationService.getOpportunities(auth.linkedGrainId),
                 organizationService.getApplications(auth.linkedGrainId),
             ]);
-            setOrg(o);
-            setOpps(ops);
-            setApps(ap);
-        } catch (err: any) {
-            setError(err.response?.data || 'Failed to load organization data');
+            setOpps(ops); setApps(ap);
+        } catch {
+            setOrg(null); setOrgNotFound(true);
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
 
-    if (loading) return <Spinner />;
-    if (error) return <ErrorBox msg={error} onRetry={load} />;
+    const handleCreateOrg = async () => {
+        if (!orgName || !auth.linkedGrainId || !auth.userId) return;
+        setCreating(true);
+        try {
+            await organizationService.create({ name: orgName, description: orgDesc, creatorUserId: auth.userId, creatorEmail: auth.email || '' });
+            setShowCreate(false); setOrgName(''); setOrgDesc('');
+            showToast('Organization created! Awaiting admin approval.');
+            load();
+        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to create organization'); }
+        finally { setCreating(false); }
+    };
 
+    const handleSaveOrg = async () => {
+        if (!editName.trim() || !auth.linkedGrainId) return;
+        setSaving(true);
+        try {
+            await organizationService.updateInfo(auth.linkedGrainId, { name: editName, description: editDesc });
+            setShowEdit(false); showToast('Organization updated!'); load();
+        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to update'); }
+        finally { setSaving(false); }
+    };
+
+    const statusConfig: Record<string, { color: string; bg: string; icon: string; msg: string }> = {
+        PendingApproval: { color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '⏳', msg: 'Your organization is pending admin approval. You cannot create events until approved.' },
+        Approved: { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '✅', msg: 'Your organization is approved and active.' },
+        Rejected: { color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', icon: '❌', msg: 'Your organization registration was rejected. Contact support or re-apply.' },
+        Suspended: { color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', icon: '🚫', msg: 'Your organization has been suspended.' },
+    };
+
+    if (loading) return <Spinner />;
+
+    // ─── No Org yet ──────────────────────────────────────────────
+    if (orgNotFound || !org?.isInitialized) {
+        return (
+            <div className="max-w-2xl mx-auto">
+                {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+                {!showCreate ? (
+                    <div className="bg-white rounded-3xl p-12 shadow-sm border border-stone-100 text-center space-y-6">
+                        <div className="text-6xl">🏢</div>
+                        <h1 className="text-2xl font-extrabold text-stone-800">No Organization Found</h1>
+                        <p className="text-stone-500 leading-relaxed">You don't have an organization yet. Create one to start managing events and volunteers. It will be reviewed by an administrator.</p>
+                        <button onClick={() => setShowCreate(true)} className="px-8 py-3 bg-orange-500 text-white font-bold rounded-2xl hover:bg-orange-600 shadow-sm shadow-orange-500/20">
+                            Create Organization
+                        </button>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100 space-y-5">
+                        <h1 className="text-2xl font-extrabold text-stone-800">Register Your Organization</h1>
+                        <div className="space-y-3">
+                            <input value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="Organization name *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                            <textarea value={orgDesc} onChange={e => setOrgDesc(e.target.value)} placeholder="Description (what your organization does)" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowCreate(false)} className="px-5 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleCreateOrg} disabled={!orgName || creating} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">
+                                {creating && <Loader2 className="w-4 h-4 animate-spin" />} Submit
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ─── Has Org ──────────────────────────────────────────────────
+    const status = statusConfig[org.status] || statusConfig['PendingApproval'];
+    const isApproved = org.status === 'Approved';
     const pendingApps = apps.filter(a => a.status === 'Pending').length;
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Organization Overview</h1><p className="text-stone-500 mt-2 text-lg">{org?.name || 'Your Organization'}</p></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {[
-                    { label: 'Active Opportunities', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50' },
-                    { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50' },
-                    { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                    { label: 'Members', val: String(org?.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50' },
-                ].map((s, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-shadow">
-                        <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
-                        <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
-                        <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
-                    </div>
-                ))}
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-stone-800">{org.name}</h1>
+                    {org.description && <p className="text-stone-500 mt-1 text-lg">{org.description}</p>}
+                </div>
+                {isApproved && (
+                    <button onClick={() => { setEditName(org.name); setEditDesc(org.description || ''); setShowEdit(true); }}
+                        className="px-4 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200 text-sm">
+                        ✏️ Edit Organization
+                    </button>
+                )}
             </div>
+
+            {/* Status Banner */}
+            <div className={`flex items-start gap-4 p-5 rounded-2xl border ${status.bg}`}>
+                <span className="text-2xl">{status.icon}</span>
+                <div>
+                    <p className={`font-bold ${status.color}`}>{org.status}</p>
+                    <p className="text-stone-500 text-sm mt-0.5">{status.msg}</p>
+                </div>
+            </div>
+
+            {/* Restricted notice */}
+            {!isApproved && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+                    <span className="text-amber-500 text-xl">🔒</span>
+                    <p className="text-amber-700 text-sm font-medium">Creating events, inviting members, and other actions require admin approval first.</p>
+                </div>
+            )}
+
+            {/* Stats */}
+            {isApproved && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {[
+                        { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50' },
+                        { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50' },
+                        { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                        { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50' },
+                    ].map((s, i) => (
+                        <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
+                            <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
+                            <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Edit Modal */}
+            {showEdit && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md w-full space-y-4">
+                        <div className="flex justify-between items-center"><h3 className="text-xl font-bold text-stone-800">Edit Organization</h3><button onClick={() => setShowEdit(false)}><X className="w-5 h-5 text-stone-400" /></button></div>
+                        <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Organization name *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                        <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Description" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleSaveOrg} disabled={!editName.trim() || saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{saving && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MANAGE EVENTS

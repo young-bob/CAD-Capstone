@@ -261,11 +261,19 @@ export function VolApplications() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER ATTENDANCE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const DISPUTABLE = ['NoShow', 'CheckedOut', 'Confirmed'];
 export function VolAttendance() {
     const auth = useAuth();
     const [records, setRecords] = useState<AttendanceSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+
+    // Dispute modal
+    const [disputeId, setDisputeId] = useState<string | null>(null);
+    const [disputeReason, setDisputeReason] = useState('');
+    const [disputeEvidence, setDisputeEvidence] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -273,43 +281,85 @@ export function VolAttendance() {
         try {
             const data = await attendanceService.getByVolunteer(auth.linkedGrainId);
             setRecords(data);
-        } catch (err: any) {
-            setError(err.response?.data || 'Failed to load attendance');
-        } finally { setLoading(false); }
+        } catch (err: any) { setError(err.response?.data || 'Failed to load attendance'); }
+        finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
 
-    const statusColors: Record<string, string> = {
-        Pending: 'bg-amber-100 text-amber-700',
-        CheckedIn: 'bg-blue-100 text-blue-700',
-        CheckedOut: 'bg-emerald-100 text-emerald-700',
-        Confirmed: 'bg-emerald-100 text-emerald-700',
-        Disputed: 'bg-rose-100 text-rose-700',
-        Resolved: 'bg-stone-100 text-stone-600',
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const openDispute = (id: string) => { setDisputeId(id); setDisputeReason(''); setDisputeEvidence(''); };
+
+    const handleSubmitDispute = async () => {
+        if (!disputeId || !disputeReason.trim()) return;
+        setSubmitting(true);
+        try {
+            await attendanceService.dispute(disputeId, { reason: disputeReason, evidenceUrl: disputeEvidence });
+            setDisputeId(null); showToast('Dispute submitted for review ✅'); load();
+        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to submit dispute'); }
+        finally { setSubmitting(false); }
     };
+
+    const statusColors: Record<string, string> = {
+        Pending: 'bg-amber-100 text-amber-700', CheckedIn: 'bg-blue-100 text-blue-700',
+        CheckedOut: 'bg-emerald-100 text-emerald-700', Confirmed: 'bg-emerald-100 text-emerald-700',
+        Disputed: 'bg-rose-100 text-rose-700', Resolved: 'bg-stone-100 text-stone-600', NoShow: 'bg-rose-100 text-rose-700',
+    };
+
+    const totalHours = records.reduce((sum, r) => sum + (r.totalHours ?? 0), 0);
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
-            <div><h1 className="text-3xl font-extrabold text-stone-800">My Attendance</h1><p className="text-stone-500 mt-2 text-lg">Your attendance history.</p></div>
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+            <div><h1 className="text-3xl font-extrabold text-stone-800">My Attendance</h1><p className="text-stone-500 mt-2 text-lg">Your volunteer hour history.</p></div>
+
+            {/* Summary */}
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 text-white flex items-center gap-6 shadow-lg shadow-orange-500/20">
+                <Clock className="w-12 h-12 opacity-80" />
+                <div><p className="text-4xl font-extrabold">{totalHours.toFixed(1)} hrs</p><p className="text-orange-100 font-medium mt-1">{records.length} session{records.length !== 1 ? 's' : ''}</p></div>
+            </div>
+
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.length === 0 ? <Empty msg="No attendance records yet." /> : (
-                <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
-                            <tr><th className="p-5 font-bold">Event</th><th className="p-5 font-bold">Status</th><th className="p-5 font-bold">Check In</th><th className="p-5 font-bold">Check Out</th><th className="p-5 font-bold">Hours</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                            {records.map(r => (
-                                <tr key={r.attendanceId} className="hover:bg-orange-50/30">
-                                    <td className="p-5 text-stone-800 font-bold">{r.opportunityTitle}</td>
-                                    <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[r.status] || 'bg-stone-100 text-stone-600'}`}>{r.status}</span></td>
-                                    <td className="p-5 text-stone-500 text-sm">{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '—'}</td>
-                                    <td className="p-5 text-stone-500 text-sm">{r.checkOutTime ? new Date(r.checkOutTime).toLocaleString() : '—'}</td>
-                                    <td className="p-5 text-stone-800 font-bold">{r.totalHours.toFixed(1)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="space-y-4">
+                    {records.map(r => (
+                        <div key={r.attendanceId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100">
+                            <div className="flex justify-between items-start mb-3">
+                                <p className="font-bold text-stone-800">{r.opportunityTitle}</p>
+                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColors[r.status] || 'bg-stone-100 text-stone-600'}`}>{r.status}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-sm text-stone-400 mb-3">
+                                {r.checkInTime && <span>✅ In: {new Date(r.checkInTime).toLocaleString()}</span>}
+                                {r.checkOutTime && <span>🔚 Out: {new Date(r.checkOutTime).toLocaleString()}</span>}
+                                {r.totalHours > 0 && <span className="text-orange-600 font-bold">⏱ {r.totalHours.toFixed(1)} hrs</span>}
+                            </div>
+                            {DISPUTABLE.includes(r.status) && r.status !== 'Disputed' && (
+                                <button onClick={() => openDispute(r.attendanceId)}
+                                    className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 border border-amber-200">
+                                    ⚠️ Raise Dispute
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Dispute Modal */}
+            {disputeId && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md w-full space-y-4">
+                        <h3 className="text-xl font-bold text-stone-800">Raise Dispute</h3>
+                        <p className="text-stone-500 text-sm">If your attendance record is incorrect (wrong hours, or marked No-Show incorrectly), describe the issue below.</p>
+                        <textarea value={disputeReason} onChange={e => setDisputeReason(e.target.value)} placeholder="What's wrong? *" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-amber-400 outline-none resize-none" />
+                        <input value={disputeEvidence} onChange={e => setDisputeEvidence(e.target.value)} placeholder="Evidence URL (optional)" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-amber-400 outline-none" />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setDisputeId(null)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleSubmitDispute} disabled={!disputeReason.trim() || submitting}
+                                className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 disabled:opacity-50 flex items-center gap-2">
+                                {submitting && <Loader2 className="w-4 h-4 animate-spin" />} Submit Dispute
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -320,44 +370,86 @@ export function VolAttendance() {
 // VOLUNTEER CERTIFICATES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function VolCertificates() {
-    const [certs, setCerts] = useState<CertificateTemplate[]>([]);
+    const auth = useAuth();
+    const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+
+    // Generate modal
+    const [showGenerate, setShowGenerate] = useState(false);
+    const [selTemplate, setSelTemplate] = useState<string | null>(null);
+    const [generating, setGenerating] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
-        try {
-            const data = await certificateService.getTemplates();
-            setCerts(data);
-        } catch (err: any) {
-            setError(err.response?.data || 'Failed to load certificates');
-        } finally { setLoading(false); }
+        try { const data = await certificateService.getTemplates(); setTemplates(data); }
+        catch (err: any) { setError(err.response?.data || 'Failed to load certificates'); }
+        finally { setLoading(false); }
     }, []);
 
     useEffect(() => { load(); }, [load]);
 
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+    const openGenerate = (templateId: string) => { setSelTemplate(templateId); setShowGenerate(true); };
+
+    const handleGenerate = async () => {
+        if (!auth.linkedGrainId || !selTemplate) return;
+        setGenerating(true);
+        try {
+            const result = await certificateService.generate(auth.linkedGrainId, selTemplate);
+            setShowGenerate(false);
+            showToast(`Certificate ready: ${result.fileName}`);
+            window.open(result.downloadUrl, '_blank');
+        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to generate certificate'); }
+        finally { setGenerating(false); }
+    };
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Certificates</h1><p className="text-stone-500 mt-2 text-lg">Available certificate templates.</p></div>
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : certs.length === 0 ? <Empty msg="No certificates available." /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {certs.map(c => (
-                        <div key={c.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-lg transition-shadow group">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 rounded-2xl" style={{ backgroundColor: c.primaryColor + '20' }}>
-                                    <BadgeCheck className="w-8 h-8" style={{ color: c.primaryColor }} />
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+            <div><h1 className="text-3xl font-extrabold text-stone-800">Certificates</h1><p className="text-stone-500 mt-2 text-lg">Generate your volunteer participation certificates.</p></div>
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : templates.length === 0
+                ? <Empty msg="No certificate templates available yet." />
+                : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {templates.map(c => (
+                            <div key={c.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-lg transition-shadow flex flex-col">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 rounded-2xl" style={{ backgroundColor: c.primaryColor + '20' }}>
+                                        <BadgeCheck className="w-8 h-8" style={{ color: c.primaryColor }} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-stone-800">{c.name}</h3>
+                                        <p className="text-sm text-stone-400">{c.organizationName || 'System Preset'}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-stone-800">{c.name}</h3>
-                                    <p className="text-sm text-stone-400">{c.organizationName || 'System Preset'}</p>
-                                </div>
+                                <p className="text-sm text-stone-500 mb-5 flex-1">{c.description}</p>
+                                <button onClick={() => openGenerate(c.id)}
+                                    className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 text-sm flex items-center justify-center gap-2 shadow-sm shadow-orange-500/20">
+                                    <Download className="w-4 h-4" /> Generate Certificate
+                                </button>
                             </div>
-                            <p className="text-sm text-stone-500 mb-4">{c.description}</p>
-                            <div className="flex justify-end">
-                                <button className="flex items-center gap-1 text-orange-500 font-bold hover:underline text-sm"><ChevronRight className="w-4 h-4" /> View</button>
-                            </div>
+                        ))}
+                    </div>
+                )}
+
+            {/* Confirm Generate Modal */}
+            {showGenerate && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full space-y-4 text-center">
+                        <div className="text-5xl">🏅</div>
+                        <h3 className="text-xl font-bold text-stone-800">Generate Certificate</h3>
+                        <p className="text-stone-500 text-sm">A PDF certificate will be generated for your volunteer work and opened for download.</p>
+                        <div className="flex gap-3 justify-center">
+                            <button onClick={() => setShowGenerate(false)} className="px-5 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleGenerate} disabled={generating}
+                                className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">
+                                {generating && <Loader2 className="w-4 h-4 animate-spin" />} Generate
+                            </button>
                         </div>
-                    ))}
+                    </div>
                 </div>
             )}
         </div>
@@ -404,6 +496,19 @@ export function VolProfile() {
         } catch (err: any) {
             setError(err.response?.data || 'Failed to save profile');
         } finally { setSaving(false); }
+    };
+
+    // Upload Credential
+    const [credUrl, setCredUrl] = useState('');
+    const [uploadingCred, setUploadingCred] = useState(false);
+    const handleUploadCredential = async () => {
+        if (!auth.linkedGrainId || !credUrl.trim()) return;
+        setUploadingCred(true);
+        try {
+            await volunteerService.uploadCredential(auth.linkedGrainId, credUrl.trim());
+            setCredUrl(''); setSuccess('Credential uploaded! ✅');
+        } catch (err: any) { setError(err.response?.data || 'Failed to upload credential'); }
+        finally { setUploadingCred(false); }
     };
 
     const handleRemoveSkill = async (skillId: string) => {
@@ -456,6 +561,26 @@ export function VolProfile() {
                     ))}
                     {skills.length === 0 && <span className="text-stone-400 text-sm">No skills added yet.</span>}
                 </div>
+            </div>
+            {/* Upload Credential */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                <h3 className="text-xl font-bold text-stone-800 mb-2">Credentials</h3>
+                <p className="text-stone-500 text-sm mb-4">Paste the URL of a credential document (e.g. first-aid certificate, background check) hosted in cloud storage.</p>
+                <div className="flex gap-3">
+                    <input value={credUrl} onChange={e => setCredUrl(e.target.value)} placeholder="https://..." className="flex-1 px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                    <button onClick={handleUploadCredential} disabled={!credUrl.trim() || uploadingCred}
+                        className="px-5 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2 text-sm">
+                        {uploadingCred ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} Submit
+                    </button>
+                </div>
+                {profile?.credentials && profile.credentials.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Uploaded ({profile.credentials.length})</p>
+                        {profile.credentials.map((key: string, i: number) => (
+                            <a key={i} href={key} target="_blank" rel="noopener noreferrer" className="block text-sm text-orange-600 hover:underline truncate">{key}</a>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
