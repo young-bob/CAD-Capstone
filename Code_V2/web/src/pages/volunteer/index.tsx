@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
-import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate } from '../../types';
+import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
 import { opportunityService } from '../../services/opportunities';
@@ -88,7 +88,8 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER OPPORTUNITIES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function VolOpportunities() {
+interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
+export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -145,8 +146,11 @@ export function VolOpportunities() {
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
                             </div>
-                            <button disabled={opp.availableSpots === 0} className={`w-full py-3.5 rounded-2xl font-bold transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
-                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details'}
+                            <button
+                                disabled={opp.availableSpots === 0}
+                                onClick={() => onViewDetail?.(opp.opportunityId)}
+                                className={`w-full py-3.5 rounded-2xl font-bold transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
+                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details →'}
                             </button>
                         </div>
                     ))}
@@ -164,6 +168,8 @@ export function VolApplications() {
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+    const [actionId, setActionId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -178,36 +184,74 @@ export function VolApplications() {
 
     useEffect(() => { load(); }, [load]);
 
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const handleWithdraw = async (app: ApplicationSummary) => {
+        if (!window.confirm(`Withdraw application for "${app.opportunityTitle}"?`)) return;
+        setActionId(app.applicationId);
+        try {
+            await opportunityService.withdrawApplication(app.opportunityId, app.applicationId);
+            showToast('Application withdrawn');
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.toString() || 'Failed to withdraw');
+        } finally { setActionId(null); }
+    };
+
+    const handleAccept = async (app: ApplicationSummary) => {
+        setActionId(app.applicationId);
+        try {
+            await applicationService.accept(app.applicationId);
+            showToast('Invitation accepted! 🎉');
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.toString() || 'Failed to accept');
+        } finally { setActionId(null); }
+    };
+
     const statusColors: Record<string, string> = {
         Approved: 'bg-emerald-100 text-emerald-700',
         Pending: 'bg-amber-100 text-amber-700',
         Waitlisted: 'bg-blue-100 text-blue-700',
+        Promoted: 'bg-violet-100 text-violet-700',
         Rejected: 'bg-rose-100 text-rose-700',
         Withdrawn: 'bg-stone-100 text-stone-600',
         Completed: 'bg-emerald-100 text-emerald-700',
         NoShow: 'bg-rose-100 text-rose-700',
     };
 
+    const canWithdraw = (status: string) => ['Pending', 'Waitlisted', 'Approved', 'Promoted'].includes(status);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             <div><h1 className="text-3xl font-extrabold text-stone-800">My Applications</h1><p className="text-stone-500 mt-2 text-lg">Track the status of your applications.</p></div>
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? <Empty msg="No applications yet." /> : (
-                <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
-                            <tr><th className="p-5 font-bold">Event</th><th className="p-5 font-bold">Shift</th><th className="p-5 font-bold">Status</th><th className="p-5 font-bold">Applied</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                            {apps.map(a => (
-                                <tr key={a.applicationId} className="hover:bg-orange-50/30">
-                                    <td className="p-5 text-stone-800 font-bold">{a.opportunityTitle}</td>
-                                    <td className="p-5 text-stone-500 font-medium">{a.shiftName}</td>
-                                    <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span></td>
-                                    <td className="p-5 text-stone-500 text-sm">{new Date(a.appliedAt).toLocaleDateString()}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="space-y-4">
+                    {apps.map(a => (
+                        <div key={a.applicationId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-stone-800 truncate">{a.opportunityTitle}</p>
+                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftName} · {a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
+                                <p className="text-xs text-stone-400 mt-1">Applied: {new Date(a.appliedAt).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
+                                {a.status === 'Promoted' && (
+                                    <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
+                                        className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
+                                        {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Accept Invitation
+                                    </button>
+                                )}
+                                {canWithdraw(a.status) && (
+                                    <button onClick={() => handleWithdraw(a)} disabled={actionId === a.applicationId}
+                                        className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
+                                        {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>
@@ -516,3 +560,133 @@ export function VolSkills() {
     );
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VOLUNTEER OPPORTUNITY DETAIL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface VolOppDetailProps { oppId: string; onBack: () => void; }
+export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
+    const auth = useAuth();
+    const [opp, setOpp] = useState<OpportunityState | null>(null);
+    const [myApps, setMyApps] = useState<ApplicationSummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [applying, setApplying] = useState<string | null>(null);
+    const [toast, setToast] = useState('');
+
+    const load = useCallback(async () => {
+        setLoading(true); setError('');
+        try {
+            const [oppData, appData] = await Promise.all([
+                opportunityService.getById(oppId),
+                auth.linkedGrainId ? applicationService.getForVolunteer(auth.linkedGrainId) : Promise.resolve([]),
+            ]);
+            setOpp(oppData);
+            setMyApps((appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId));
+        } catch (err: any) {
+            setError(err.response?.data || 'Failed to load opportunity');
+        } finally { setLoading(false); }
+    }, [oppId, auth.linkedGrainId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const handleApply = async (shift: Shift) => {
+        if (!auth.linkedGrainId) return;
+        setApplying(shift.shiftId);
+        try {
+            const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            await opportunityService.apply(oppId, {
+                volunteerId: auth.linkedGrainId,
+                shiftId: shift.shiftId,
+                idempotencyKey: key,
+            });
+            showToast(`Applied to "${shift.name}" ✅`);
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.toString() || 'Failed to apply');
+        } finally { setApplying(null); }
+    };
+
+    const appliedShiftIds = new Set(myApps.map((a: ApplicationSummary) => a.shiftId));
+
+    const statusColors: Record<string, string> = {
+        Published: 'bg-emerald-100 text-emerald-700',
+        Draft: 'bg-stone-100 text-stone-500',
+        InProgress: 'bg-blue-100 text-blue-700',
+        Completed: 'bg-emerald-100 text-emerald-700',
+        Cancelled: 'bg-rose-100 text-rose-700',
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+            <button onClick={onBack} className="flex items-center gap-2 text-stone-500 hover:text-orange-600 font-bold transition-colors">
+                ← Back to Opportunities
+            </button>
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : opp && (
+                <>
+                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-xs font-bold text-orange-600 bg-orange-50 px-3 py-1 rounded-full">{opp.info.category}</span>
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColors[opp.status] || 'bg-stone-100 text-stone-500'}`}>{opp.status}</span>
+                        </div>
+                        <h1 className="text-3xl font-extrabold text-stone-800 mb-3">{opp.info.title}</h1>
+                        <p className="text-stone-500 text-lg leading-relaxed mb-6">{opp.info.description}</p>
+                        <div className="flex flex-wrap gap-6 text-sm font-medium text-stone-500">
+                            <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-orange-500" />{opp.shifts.length} shift{opp.shifts.length !== 1 ? 's' : ''}</span>
+                            <span className="flex items-center gap-2"><User className="w-4 h-4 text-orange-500" />{opp.confirmedVolunteerIds.length} confirmed</span>
+                            <span className="flex items-center gap-2"><Clock className="w-4 h-4 text-orange-500" />{opp.waitlistQueue.length} on waitlist</span>
+                        </div>
+                        {opp.info.tags?.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {opp.info.tags.map((tag: string) => <span key={tag} className="text-xs font-bold bg-stone-100 text-stone-500 px-3 py-1 rounded-full">{tag}</span>)}
+                            </div>
+                        )}
+                    </div>
+
+                    {myApps.length > 0 && (
+                        <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100">
+                            <p className="font-bold text-orange-700 mb-2">Your Applications</p>
+                            {myApps.map((a: ApplicationSummary) => (
+                                <div key={a.applicationId} className="flex items-center justify-between py-1.5">
+                                    <span className="text-sm text-stone-700 font-medium">{a.shiftName}</span>
+                                    <span className="text-xs font-bold bg-white text-orange-600 px-2 py-0.5 rounded-full border border-orange-200">{a.status}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-bold text-stone-800">Available Shifts</h2>
+                        {opp.shifts.length === 0 ? <Empty msg="No shifts added yet." /> : opp.shifts.map((shift: Shift) => {
+                            const isApplied = appliedShiftIds.has(shift.shiftId);
+                            const isFull = shift.currentCount >= shift.maxCapacity;
+                            return (
+                                <div key={shift.shiftId} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                        <p className="font-bold text-stone-800 text-lg">{shift.name}</p>
+                                        <p className="text-sm text-stone-500 mt-1">📅 {new Date(shift.startTime).toLocaleString()} — {new Date(shift.endTime).toLocaleString()}</p>
+                                        <p className="text-sm text-stone-400 mt-0.5">👥 {shift.currentCount} / {shift.maxCapacity} volunteers</p>
+                                    </div>
+                                    <div className="shrink-0">
+                                        {isApplied
+                                            ? <span className="px-5 py-2.5 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm border border-emerald-200">✓ Applied</span>
+                                            : isFull
+                                                ? <span className="px-5 py-2.5 bg-stone-100 text-stone-400 font-bold rounded-xl text-sm">Full</span>
+                                                : <button onClick={() => handleApply(shift)} disabled={applying === shift.shiftId}
+                                                    className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 shadow-sm disabled:bg-orange-300 flex items-center gap-2">
+                                                    {applying === shift.shiftId && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                    Apply for this Shift
+                                                </button>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}

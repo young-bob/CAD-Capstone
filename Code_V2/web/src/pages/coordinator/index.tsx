@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle } from 'lucide-react';
-import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState } from '../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle } from 'lucide-react';
+import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
 import { opportunityService } from '../../services/opportunities';
 import { applicationService } from '../../services/applications';
 import { certificateService } from '../../services/certificates';
+import { skillService } from '../../services/skills';
+import { attendanceService } from '../../services/attendance';
+
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
 function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
@@ -72,7 +75,8 @@ export function CoordDashboard() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MANAGE EVENTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function CoordManageEvents() {
+interface CoordManageEventsProps { onViewDetail?: (id: string) => void; }
+export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {}) {
     const auth = useAuth();
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -153,8 +157,8 @@ export function CoordManageEvents() {
                         </thead>
                         <tbody className="divide-y divide-stone-100">
                             {opps.map(o => (
-                                <tr key={o.opportunityId} className="hover:bg-orange-50/30">
-                                    <td className="p-5 text-stone-800 font-bold">{o.title}</td>
+                                <tr key={o.opportunityId} className="hover:bg-orange-50/30 cursor-pointer" onClick={() => onViewDetail?.(o.opportunityId)}>
+                                    <td className="p-5 text-stone-800 font-bold text-orange-700 hover:underline">{o.title} →</td>
                                     <td className="p-5 text-stone-500 font-medium">{o.category}</td>
                                     <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[o.status] || 'bg-stone-100 text-stone-600'}`}>{o.status}</span></td>
                                     <td className="p-5 text-stone-800 font-bold">{o.availableSpots} / {o.totalSpots}</td>
@@ -475,6 +479,246 @@ export function CoordCertTemplates() {
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COORDINATOR OPPORTUNITY DETAIL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+interface CoordOppDetailProps { oppId: string; onBack: () => void; }
+export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
+    const [opp, setOpp] = useState<OpportunityState | null>(null);
+    const [apps, setApps] = useState<ApplicationSummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [toast, setToast] = useState('');
+    const [actionId, setActionId] = useState<string | null>(null);
+
+    // Add Shift
+    const [showAddShift, setShowAddShift] = useState(false);
+    const [shiftName, setShiftName] = useState('');
+    const [shiftStart, setShiftStart] = useState('');
+    const [shiftEnd, setShiftEnd] = useState('');
+    const [shiftCap, setShiftCap] = useState('10');
+    const [addingShift, setAddingShift] = useState(false);
+
+    // Cancel
+    const [showCancel, setShowCancel] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelling, setCancelling] = useState(false);
+
+    // Skills
+    const [showSkills, setShowSkills] = useState(false);
+    const [allSkills, setAllSkills] = useState<Skill[]>([]);
+    const [selSkillIds, setSelSkillIds] = useState<Set<string>>(new Set());
+    const [savingSkills, setSavingSkills] = useState(false);
+
+    // Certificate
+    const [showCert, setShowCert] = useState(false);
+    const [certTemplates, setCertTemplates] = useState<CertificateTemplate[]>([]);
+    const [certTargetId, setCertTargetId] = useState<string | null>(null);
+    const [certTargetName, setCertTargetName] = useState('');
+    const [selTemplate, setSelTemplate] = useState<string | null>(null);
+    const [issuingCert, setIssuingCert] = useState(false);
+
+    const load = useCallback(async () => {
+        setLoading(true); setError('');
+        try {
+            const [d, a] = await Promise.all([opportunityService.getById(oppId), applicationService.getForOpportunity(oppId)]);
+            setOpp(d); setApps(a);
+        } catch (err: any) { setError(err.response?.data || 'Failed to load'); }
+        finally { setLoading(false); }
+    }, [oppId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const doPublish = async () => {
+        setActionId('pub');
+        try { await opportunityService.publish(oppId); showToast('Published ✅'); load(); }
+        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to publish'); }
+        finally { setActionId(null); }
+    };
+
+    const doCancelSubmit = async () => {
+        if (!cancelReason) return; setCancelling(true);
+        try { await opportunityService.cancel(oppId, cancelReason); setShowCancel(false); showToast('Cancelled'); load(); }
+        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        finally { setCancelling(false); }
+    };
+
+    const doAddShift = async () => {
+        if (!shiftName || !shiftStart || !shiftEnd) return; setAddingShift(true);
+        try {
+            await opportunityService.addShift(oppId, { name: shiftName, startTime: new Date(shiftStart).toISOString(), endTime: new Date(shiftEnd).toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
+            setShowAddShift(false); setShiftName(''); setShiftStart(''); setShiftEnd(''); setShiftCap('10');
+            showToast('Shift added!'); load();
+        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        finally { setAddingShift(false); }
+    };
+
+    const openSkills = async () => {
+        try { const l = await skillService.getAll(); setAllSkills(l); setSelSkillIds(new Set(opp?.requiredSkillIds || [])); setShowSkills(true); }
+        catch { showToast('Failed to load skills'); }
+    };
+
+    const doSaveSkills = async () => {
+        setSavingSkills(true);
+        try { await skillService.setRequiredSkills(oppId, Array.from(selSkillIds)); setShowSkills(false); showToast('Skills updated'); load(); }
+        catch { showToast('Failed'); }
+        finally { setSavingSkills(false); }
+    };
+
+    const doApprove = async (id: string) => { setActionId(id); try { await applicationService.approve(id); showToast('Approved ✅'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doReject = async (id: string) => { setActionId(id); try { await applicationService.reject(id, 'Rejected'); showToast('Rejected'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doNoShow = async (appId: string) => { setActionId(appId + '_ns'); try { await applicationService.markNoShow(appId); showToast('No-show marked'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doConfirm = async (vid: string) => { setActionId(vid + '_a'); try { await attendanceService.confirm(vid, { supervisorId: oppId, rating: 5 }); showToast('Attendance confirmed'); } catch { showToast('Failed'); } finally { setActionId(null); } };
+
+    const openCert = async (vid: string, name: string) => {
+        try { const l = await certificateService.getTemplates(); setCertTemplates(l); setSelTemplate(l.length > 0 ? l[0].id : null); setCertTargetId(vid); setCertTargetName(name); setShowCert(true); }
+        catch { showToast('Failed to load templates'); }
+    };
+
+    const doIssueCert = async () => {
+        if (!certTargetId || !selTemplate) return; setIssuingCert(true);
+        try { const r = await certificateService.generate(certTargetId, selTemplate); setShowCert(false); showToast(`Certificate issued: ${r.fileName}`); window.open(r.downloadUrl, '_blank'); }
+        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        finally { setIssuingCert(false); }
+    };
+
+    const pendingApps = apps.filter(a => a.status === 'Pending');
+    const confirmedApps = apps.filter(a => a.status === 'Approved' || a.status === 'Promoted');
+    const statusColors: Record<string, string> = { Published: 'bg-emerald-100 text-emerald-700', Draft: 'bg-stone-100 text-stone-500', InProgress: 'bg-blue-100 text-blue-700', Completed: 'bg-emerald-100 text-emerald-700', Cancelled: 'bg-rose-100 text-rose-700' };
+
+    const Modal = ({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) =>
+        !show ? null : (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-lg w-full space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-stone-800">{title}</h3>
+                        <button onClick={onClose}><X className="w-5 h-5 text-stone-400 hover:text-stone-700" /></button>
+                    </div>
+                    {children}
+                </div>
+            </div>
+        );
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-8">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+            <button onClick={onBack} className="flex items-center gap-2 text-stone-500 hover:text-orange-600 font-bold transition-colors"><ChevronLeft className="w-5 h-5" /> Back to Events</button>
+
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : opp && (<>
+                {/* Header */}
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                    <div className="flex justify-between items-start mb-2">
+                        <h1 className="text-3xl font-extrabold text-stone-800 flex-1 mr-4">{opp.info.title}</h1>
+                        <span className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full ${statusColors[opp.status] || 'bg-stone-100 text-stone-500'}`}>{opp.status}</span>
+                    </div>
+                    <p className="text-orange-500 text-sm font-bold mb-4">{opp.info.category}</p>
+                    <p className="text-stone-600 leading-relaxed mb-6">{opp.info.description}</p>
+                    <div className="flex flex-wrap gap-3">
+                        {opp.status === 'Draft' && <button onClick={doPublish} disabled={actionId === 'pub'} className="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-60 flex items-center gap-2">{actionId === 'pub' && <Loader2 className="w-4 h-4 animate-spin" />} Publish</button>}
+                        {(opp.status === 'Draft' || opp.status === 'Published') && <button onClick={() => setShowCancel(true)} className="px-5 py-2.5 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 border border-rose-200">Cancel Event</button>}
+                        <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Skills ({opp.requiredSkillIds?.length || 0})</button>
+                    </div>
+                </div>
+
+                {/* Shifts */}
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex justify-between items-center mb-5">
+                        <h2 className="text-xl font-bold text-stone-800">Shifts</h2>
+                        <button onClick={() => setShowAddShift(!showAddShift)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Shift</button>
+                    </div>
+                    {showAddShift && (
+                        <div className="bg-stone-50 rounded-2xl p-5 mb-5 border border-stone-200 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input value={shiftName} onChange={e => setShiftName(e.target.value)} placeholder="Shift name" className="px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm col-span-2 md:col-span-1" />
+                                <input value={shiftCap} onChange={e => setShiftCap(e.target.value)} type="number" placeholder="Capacity" className="px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                                <div><label className="text-xs font-medium text-stone-500 mb-1 block">Start</label><input type="datetime-local" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                <div><label className="text-xs font-medium text-stone-500 mb-1 block">End</label><input type="datetime-local" value={shiftEnd} onChange={e => setShiftEnd(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setShowAddShift(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
+                                <button onClick={doAddShift} disabled={addingShift || !shiftName || !shiftStart || !shiftEnd} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">{addingShift && <Loader2 className="w-3 h-3 animate-spin" />} Add</button>
+                            </div>
+                        </div>
+                    )}
+                    {opp.shifts.length === 0 ? <Empty msg="No shifts yet. Add shifts before publishing." /> : (
+                        <div className="space-y-3">
+                            {opp.shifts.map((s: Shift) => (
+                                <div key={s.shiftId} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
+                                    <div><p className="font-bold text-stone-800">{s.name}</p><p className="text-sm text-stone-400 mt-0.5">📅 {new Date(s.startTime).toLocaleString()} — {new Date(s.endTime).toLocaleString()}</p><p className="text-sm text-stone-400">👥 {s.currentCount}/{s.maxCapacity}</p></div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Pending Apps */}
+                {pendingApps.length > 0 && (
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                        <h2 className="text-xl font-bold text-stone-800 mb-4">Pending Applications ({pendingApps.length})</h2>
+                        {pendingApps.map(app => (
+                            <div key={app.applicationId} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
+                                <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => doApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm hover:bg-emerald-100 disabled:opacity-50">Approve</button>
+                                    <button onClick={() => doReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 disabled:opacity-50">Reject</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Confirmed Volunteers */}
+                {confirmedApps.length > 0 && (
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                        <h2 className="text-xl font-bold text-stone-800 mb-4">Confirmed Volunteers ({confirmedApps.length})</h2>
+                        {confirmedApps.map(app => (
+                            <div key={app.applicationId} className="flex items-start justify-between py-3 border-b border-stone-50 last:border-0">
+                                <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
+                                <div className="flex flex-wrap gap-2 justify-end">
+                                    <button onClick={() => doConfirm(app.volunteerId)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
+                                    <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
+                                    <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>)}
+
+            {/* Modals */}
+            <Modal show={showCancel} onClose={() => setShowCancel(false)} title="Cancel Event">
+                <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Reason (required)" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-rose-500 outline-none resize-none" />
+                <div className="flex gap-3 justify-end"><button onClick={() => setShowCancel(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Back</button><button onClick={doCancelSubmit} disabled={!cancelReason || cancelling} className="px-4 py-2 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 disabled:opacity-50 flex items-center gap-2">{cancelling && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button></div>
+            </Modal>
+
+            <Modal show={showSkills} onClose={() => setShowSkills(false)} title="Required Skills">
+                <div className="max-h-56 overflow-y-auto flex flex-wrap gap-2">
+                    {allSkills.map((s: Skill) => { const sel = selSkillIds.has(s.id); return <button key={s.id} onClick={() => setSelSkillIds(p => { const n = new Set(p); sel ? n.delete(s.id) : n.add(s.id); return n; })} className={`px-4 py-2 rounded-full font-bold text-sm border transition-all ${sel ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}>{sel && '✓ '}{s.name}</button>; })}
+                    {allSkills.length === 0 && <p className="text-stone-400 text-sm">No skills in system.</p>}
+                </div>
+                <div className="flex gap-3 justify-end"><button onClick={() => setShowSkills(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doSaveSkills} disabled={savingSkills} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{savingSkills && <Loader2 className="w-4 h-4 animate-spin" />} Save</button></div>
+            </Modal>
+
+            <Modal show={showCert} onClose={() => setShowCert(false)} title="Issue Certificate">
+                <p className="text-stone-500 text-sm">To: <span className="font-bold text-stone-700">{certTargetName}</span></p>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                    {certTemplates.map((t: CertificateTemplate) => (
+                        <button key={t.id} onClick={() => setSelTemplate(t.id)} className={`w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center gap-3 ${selTemplate === t.id ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-stone-300'}`}>
+                            <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.primaryColor }} />
+                            <div className="flex-1"><p className="font-bold text-stone-800 text-sm">{t.name}</p><p className="text-xs text-stone-400">{t.description}</p></div>
+                            {selTemplate === t.id && <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />}
+                        </button>
+                    ))}
+                    {certTemplates.length === 0 && <p className="text-stone-400 text-sm">No templates. Create one in Cert Templates.</p>}
+                </div>
+                <div className="flex gap-3 justify-end"><button onClick={() => setShowCert(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doIssueCert} disabled={!selTemplate || issuingCert || certTemplates.length === 0} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{issuingCert && <Loader2 className="w-4 h-4 animate-spin" />} Issue</button></div>
+            </Modal>
         </div>
     );
 }

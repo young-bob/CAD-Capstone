@@ -8,14 +8,15 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
-import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills } from './pages/volunteer';
-import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers } from './pages/coordinator';
+import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail } from './pages/volunteer';
+import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail } from './pages/coordinator';
 import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills } from './pages/admin';
 
 function AppInner() {
     const auth = useAuth();
     const [currentView, setCurrentView] = useState<ViewName>('landing');
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
 
     // Map backend role string to display role for sidebar/header
     const displayRole = auth.role === 'SystemAdmin' ? 'admin' : auth.role === 'Coordinator' ? 'coordinator' : 'volunteer';
@@ -49,23 +50,29 @@ function AppInner() {
         );
     }
 
+    const navigateTo = (view: ViewName) => { setSelectedOppId(null); setCurrentView(view); };
+
     const renderContent = () => {
         if (displayRole === 'volunteer') {
             switch (currentView) {
-                case 'dashboard': return <VolDashboard onNavigate={setCurrentView} />;
-                case 'opportunities': return <VolOpportunities />;
+                case 'dashboard': return <VolDashboard onNavigate={navigateTo} />;
+                case 'opportunities': return selectedOppId
+                    ? <VolOpportunityDetail oppId={selectedOppId} onBack={() => setSelectedOppId(null)} />
+                    : <VolOpportunities onViewDetail={(id) => setSelectedOppId(id)} />;
                 case 'applications': return <VolApplications />;
                 case 'attendance': return <VolAttendance />;
                 case 'certificates': return <VolCertificates />;
                 case 'profile': return <VolProfile />;
                 case 'skills': return <VolSkills />;
-                default: return <VolDashboard onNavigate={setCurrentView} />;
+                default: return <VolDashboard onNavigate={navigateTo} />;
             }
         }
         if (displayRole === 'coordinator') {
             switch (currentView) {
                 case 'dashboard': return <CoordDashboard />;
-                case 'manage_events': return <CoordManageEvents />;
+                case 'manage_events': return selectedOppId
+                    ? <CoordOpportunityDetail oppId={selectedOppId} onBack={() => setSelectedOppId(null)} />
+                    : <CoordManageEvents onViewDetail={(id) => setSelectedOppId(id)} />;
                 case 'org_applications': return <CoordApplications />;
                 case 'manage_templates': return <CoordCertTemplates />;
                 case 'org_members': return <CoordMembers />;
@@ -105,7 +112,7 @@ function AppInner() {
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
                         currentView={currentView}
                         sidebarOpen={sidebarOpen}
-                        onNavigate={setCurrentView}
+                        onNavigate={navigateTo}
                         onLogout={handleLogout}
                     />
                     <main className={`flex-1 overflow-y-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 transition-all ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>

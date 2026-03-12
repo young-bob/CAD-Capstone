@@ -23,4 +23,8 @@ export const skillService = {
     removeSkill: async (userId: string, skillId: string): Promise<void> => {
         await api.delete(`/api/volunteers/${userId}/skills/${skillId}`);
     },
+    setRequiredSkills: async (opportunityId: string, skillIds: string[]): Promise<void> => {
+        await api.put(`/api/opportunities/${opportunityId}/skills`, { skillIds });
+    },
 };
+
