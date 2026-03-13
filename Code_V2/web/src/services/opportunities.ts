@@ -42,4 +42,7 @@ export const opportunityService = {
         const res = await api.post<{ isValid: boolean }>(`/api/opportunities/${id}/validate-geo`, { lat, lon });
         return res.data.isValid;
     },
+    updateInfo: async (id: string, data: { title: string; description: string; category: string; lat: number; lon: number; radiusMeters: number }): Promise<void> => {
+        await api.put(`/api/opportunities/${id}/info`, data);
+    },
 };

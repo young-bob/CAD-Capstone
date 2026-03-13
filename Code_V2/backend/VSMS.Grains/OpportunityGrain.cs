@@ -48,6 +48,18 @@ public class OpportunityGrain(
         logger.LogInformation("Opportunity {Id} published: {Title}", this.GetPrimaryKey(), state.State.Info.Title);
     }
 
+    public async Task UpdateInfo(string title, string description, string category, double lat, double lon, double radiusMeters)
+    {
+        if (state.State.Status != OpportunityStatus.Draft)
+            throw new InvalidOperationException("Opportunity can only be edited while in Draft status.");
+
+        state.State.Info = state.State.Info with { Title = title, Description = description, Category = category };
+        state.State.GeoFence = new GeoFenceSettings { Latitude = lat, Longitude = lon, RadiusMeters = radiusMeters };
+        await state.WriteStateAsync();
+
+        logger.LogInformation("Opportunity {Id} info updated: {Title}", this.GetPrimaryKey(), title);
+    }
+
     public async Task Cancel(string reason)
     {
         if (state.State.Status is OpportunityStatus.Cancelled or OpportunityStatus.Completed)

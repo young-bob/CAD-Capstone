@@ -804,6 +804,39 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [selSkillIds, setSelSkillIds] = useState<Set<string>>(new Set());
     const [savingSkills, setSavingSkills] = useState(false);
 
+    // Edit Info (Draft only)
+    const [showEdit, setShowEdit] = useState(false);
+    const [editForm, setEditForm] = useState({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
+    const [saving, setSaving] = useState(false);
+
+    const openEdit = () => {
+        if (!opp) return;
+        setEditForm({
+            title: opp.info.title,
+            description: opp.info.description,
+            category: opp.info.category,
+            lat: opp.geoFence?.latitude ?? 43.6532,
+            lon: opp.geoFence?.longitude ?? -79.3832,
+            radius: opp.geoFence?.radiusMeters ?? 200,
+        });
+        setShowEdit(true);
+    };
+
+    const doSaveEdit = async () => {
+        if (!opp) return;
+        setSaving(true);
+        try {
+            await opportunityService.updateInfo(oppId, {
+                title: editForm.title, description: editForm.description, category: editForm.category,
+                lat: editForm.lat, lon: editForm.lon, radiusMeters: editForm.radius,
+            });
+            setShowEdit(false);
+            showToast('Opportunity updated ✅');
+            load();
+        } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
+        finally { setSaving(false); }
+    };
+
     // Certificate
     const [showCert, setShowCert] = useState(false);
     const [certTemplates, setCertTemplates] = useState<CertificateTemplate[]>([]);
@@ -923,6 +956,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     <p className="text-stone-600 leading-relaxed mb-6">{opp.info.description}</p>
                     <div className="flex flex-wrap gap-3">
                         {opp.status === 'Draft' && <button onClick={doPublish} disabled={actionId === 'pub'} className="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-60 flex items-center gap-2">{actionId === 'pub' && <Loader2 className="w-4 h-4 animate-spin" />} Publish</button>}
+                        {opp.status === 'Draft' && <button onClick={openEdit} className="px-5 py-2.5 bg-blue-50 text-blue-600 font-bold rounded-xl hover:bg-blue-100 border border-blue-200 flex items-center gap-2"><Pencil className="w-4 h-4" /> Edit</button>}
                         {(opp.status === 'Draft' || opp.status === 'Published') && <button onClick={() => setShowCancel(true)} className="px-5 py-2.5 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 border border-rose-200">Cancel Event</button>}
                         <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Skills ({opp.requiredSkillIds?.length || 0})</button>
                     </div>
@@ -999,7 +1033,24 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                 )}
             </>)}
 
-            {/* Modals */}
+            {/* Edit Info Modal */}
+            <Modal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Opportunity">
+                <div className="space-y-3">
+                    <input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} placeholder="Title *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="Category" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <textarea value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Description" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                    <div className="grid grid-cols-3 gap-2">
+                        <div><label className="text-xs font-bold text-stone-500 ml-1">Latitude</label><input type="number" step="any" value={editForm.lat} onChange={e => setEditForm(p => ({ ...p, lat: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                        <div><label className="text-xs font-bold text-stone-500 ml-1">Longitude</label><input type="number" step="any" value={editForm.lon} onChange={e => setEditForm(p => ({ ...p, lon: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                        <div><label className="text-xs font-bold text-stone-500 ml-1">Radius (m)</label><input type="number" value={editForm.radius} onChange={e => setEditForm(p => ({ ...p, radius: parseInt(e.target.value) || 200 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                    </div>
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                    <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                    <button onClick={doSaveEdit} disabled={!editForm.title || saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{saving && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
+                </div>
+            </Modal>
+
             <Modal show={showCancel} onClose={() => setShowCancel(false)} title="Cancel Event">
                 <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Reason (required)" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-rose-500 outline-none resize-none" />
                 <div className="flex gap-3 justify-end"><button onClick={() => setShowCancel(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Back</button><button onClick={doCancelSubmit} disabled={!cancelReason || cancelling} className="px-4 py-2 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 disabled:opacity-50 flex items-center gap-2">{cancelling && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button></div>

@@ -81,6 +81,12 @@ public static class OpportunityEndpoints
             await grain.SetRequiredSkills(req.SkillIds);
             return Results.NoContent();
         });
+        group.MapPut("/{id:guid}/info", async (Guid id, UpdateInfoRequest req, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.UpdateInfo(req.Title, req.Description, req.Category, req.Lat, req.Lon, req.RadiusMeters);
+            return Results.NoContent();
+        });
     }
 
 }

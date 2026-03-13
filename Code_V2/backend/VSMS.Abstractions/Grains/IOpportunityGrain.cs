@@ -9,6 +9,7 @@ public interface IOpportunityGrain : IGrainWithGuidKey
     Task Initialize(Guid organizationId, string title, string description, string category);
     Task Publish();
     Task Cancel(string reason);
+    Task UpdateInfo(string title, string description, string category, double lat, double lon, double radiusMeters);
 
     // Applications
     Task<Guid> SubmitApplication(Guid volunteerId, Guid shiftId, string idempotencyKey);
