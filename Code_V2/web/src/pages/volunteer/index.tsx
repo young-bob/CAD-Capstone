@@ -125,8 +125,11 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
                 {coords && <MapView lat={coords.lat} lon={coords.lon} radius={50} height={200} />}
             </Suspense>
             {errMsg && <p className="text-xs text-rose-500">⚠️ {errMsg}</p>}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 <button onClick={() => setGpsState('idle')} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">Cancel</button>
+                <button onClick={locate} disabled={loading} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 flex items-center gap-1">
+                    {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <MapPin className="w-3 h-3" />} Get Current Location
+                </button>
                 <button onClick={doCheckIn} disabled={loading} className="text-xs font-bold text-white bg-blue-500 px-4 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-1">
                     {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : '✅'} Confirm Check-In
                 </button>
