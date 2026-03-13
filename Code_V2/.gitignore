@@ -86,6 +86,8 @@ android/*.iml
 data/
 # Environment files
 .env
+.env.local
+.env.*.local
 !.env.example
 # Local dev secrets — never commit these
 appsettings.Development.json
