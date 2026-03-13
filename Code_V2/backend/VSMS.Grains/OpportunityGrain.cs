@@ -93,10 +93,18 @@ public class OpportunityGrain(
         var shift = state.State.Shifts.FirstOrDefault(s => s.ShiftId == shiftId)
             ?? throw new ArgumentException($"Shift {shiftId} not found.");
 
+        // Idempotency check: return existing applicationId if same key already processed
+        if (!string.IsNullOrEmpty(idempotencyKey) && state.State.IdempotencyKeys.TryGetValue(idempotencyKey, out var existingAppId))
+            return existingAppId;
+
         // Create application
         var applicationId = Guid.NewGuid();
         var appGrain = grainFactory.GetGrain<IApplicationGrain>(applicationId);
         await appGrain.Initialize(volunteerId, this.GetPrimaryKey(), shiftId, idempotencyKey);
+
+        // Track idempotency key
+        if (!string.IsNullOrEmpty(idempotencyKey))
+            state.State.IdempotencyKeys[idempotencyKey] = applicationId;
 
         // Check capacity and apply policy
         if (shift.CurrentCount < shift.MaxCapacity)

@@ -872,13 +872,17 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
         if (!auth.linkedGrainId) return;
         setApplying(shift.shiftId);
         try {
-            const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            // Deterministic key: same volunteer + shift always produces the same key
+            // This lets the backend reject true duplicates even across separate clicks
+            const key = `${auth.linkedGrainId}-${shift.shiftId}`;
             await opportunityService.apply(oppId, {
                 volunteerId: auth.linkedGrainId,
                 shiftId: shift.shiftId,
                 idempotencyKey: key,
             });
             showToast(`Applied to "${shift.name}" ✅`);
+            // Immediately mark shift as applied so button is disabled before load() completes
+            setMyApps(prev => [...prev, { shiftId: shift.shiftId, opportunityId: oppId, status: 'Pending' } as ApplicationSummary]);
             load();
         } catch (err: any) {
             showToast(err.response?.data?.toString() || 'Failed to apply');
@@ -886,6 +890,7 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     };
 
     const appliedShiftIds = new Set(myApps.map((a: ApplicationSummary) => a.shiftId));
+
 
     const statusColors: Record<string, string> = {
         Published: 'bg-emerald-100 text-emerald-700',

@@ -21,4 +21,5 @@ public sealed class OpportunityState
     [Id(8)] public OpportunityStatus Status { get; set; } = OpportunityStatus.Draft;
     [Id(9)] public Guid OrganizationId { get; set; }
     [Id(10)] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Id(11)] public Dictionary<string, Guid> IdempotencyKeys { get; set; } = new();
 }
