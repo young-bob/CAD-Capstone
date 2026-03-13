@@ -3,20 +3,17 @@ using Orleans;
 namespace VSMS.Grains.Interfaces.Models;
 
 [GenerateSerializer]
+[Alias("VSMS.Grains.Interfaces.Models.OrganizationProfile")]
 public record OrganizationProfile(
-    Guid OrganizationId,
-    string Name,
-    string ContactEmail,
-    string Description,
-    string? LogoUrl,
-    string? Website,
-    Location? Location,
-    string? VerificationProof,
-    bool IsVerified,
-<<<<<<< HEAD
-    string? CalendarSyncUrl
-=======
-    string CalendarSyncUrl,
-    bool IsActive = true
->>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
+    [property: Id(0)] Guid OrganizationId,
+    [property: Id(1)] string Name,
+    [property: Id(2)] string ContactEmail,
+    [property: Id(3)] string Description,
+    [property: Id(4)] string? LogoUrl,
+    [property: Id(5)] string? Website,
+    [property: Id(6)] Location? Location,
+    [property: Id(7)] string? VerificationProof,
+    [property: Id(8)] bool IsVerified,
+    [property: Id(9)] string? CalendarSyncUrl,
+    [property: Id(10)] bool IsActive = true
 );

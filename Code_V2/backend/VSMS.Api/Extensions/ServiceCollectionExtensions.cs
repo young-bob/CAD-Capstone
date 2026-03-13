@@ -61,7 +61,7 @@ public static class ServiceCollectionExtensions
         builder.Services.Configure<VSMS.Infrastructure.Storage.MinioSettings>(
             builder.Configuration.GetSection("Minio"));
         builder.Services.AddSingleton<IFileStorageService, VSMS.Infrastructure.Storage.MinioFileStorageService>();
-        builder.Services.AddSingleton<ISearchService, VSMS.Infrastructure.Data.NullSearchService>();
+        builder.Services.AddSingleton<ISearchService, VSMS.Infrastructure.Notifications.NullSearchService>();
         builder.Services.AddSingleton<IEmailService, NullEmailService>();
         builder.Services.AddSingleton<IRealTimePushService, ExpoPushService>();
 

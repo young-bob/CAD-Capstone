@@ -29,7 +29,7 @@ public class AdminController : ControllerBase
     {
         // For admin to create an org directly.
         var newOrgId = Guid.NewGuid();
-        var orgGrain = _client.GetGrain<IOrganizationGrain>(newOrgId.ToString());
+        var orgGrain = _client.GetGrain<IOrganizationGrain>(newOrgId);
 
         var profile = new OrganizationProfile(
             newOrgId,
@@ -67,7 +67,7 @@ public class AdminController : ControllerBase
             IsActive = request.IsActive ?? existingOrg.IsActive
         };
 
-        var orgGrain = _client.GetGrain<IOrganizationGrain>(id.ToString());
+        var orgGrain = _client.GetGrain<IOrganizationGrain>(id);
         await orgGrain.UpdateProfile(updatedProfile);
 
         return Ok(updatedProfile);
@@ -133,6 +133,37 @@ public class AdminController : ControllerBase
 
         await userGrain.ForceResetPassword(request.NewPassword);
         return Ok(new { Message = "Password reset successfully." });
+    }
+
+    [HttpPost("users/{id}/change-role")]
+    public async Task<IActionResult> ChangeUserRole(Guid id, [FromBody] ChangeRoleRequest request)
+    {
+        if (string.IsNullOrEmpty(request.NewRole) || !new[] { "Volunteer", "Coordinator" }.Contains(request.NewRole))
+            return BadRequest("Invalid role.");
+
+        var userGrain = _client.GetGrain<IUserGrain>(id);
+        var profile = await userGrain.GetProfile();
+
+        if (profile == null)
+            return NotFound("User not found.");
+
+        // Update global user role
+        await userGrain.UpdateRole(request.NewRole);
+
+        // Update coordinator/volunteer specific grain if needed
+        if (request.NewRole == "Coordinator")
+        {
+            var coordGrain = _client.GetGrain<ICoordinatorGrain>(id);
+            // No organization to assign at role-change time; org must be assigned separately.
+            await coordGrain.SetOrganization(string.Empty);
+        }
+        else if (request.NewRole == "Volunteer")
+        {
+            // Volunteer grain starts with an empty skill list by default.
+            _ = _client.GetGrain<IVolunteerGrain>(id);
+        }
+
+        return Ok(new { Message = "Role changed successfully." });
     }
 
     [HttpDelete("users/{id}")]
@@ -315,6 +346,10 @@ public record AssignCoordinatorRequest(
 
 public record ResetUserPasswordRequest(
     string NewPassword
+);
+
+public record ChangeRoleRequest(
+    string NewRole
 );
 
 public record CreateOrganizationAccountRequest(

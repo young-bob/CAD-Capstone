@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound } from 'lucide-react';
-import { OrgRole } from '../../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw } from 'lucide-react';
 import type { OrganizationSummary, UserRecord, DisputeSummary, Skill } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { adminService } from '../../services/admin';
@@ -95,6 +94,54 @@ function OrgStatusBadge({ status }: { status: string }) {
     return <span className={`px-2 py-0.5 text-xs font-bold rounded ${styles[status] ?? 'bg-stone-100 text-stone-600'}`}>{status}</span>;
 }
 
+// ─── Searchable coordinator picker (returns coordinator ID) ───
+function CoordCombobox({ coordinators, selectedId, onSelectId, placeholder }: {
+    coordinators: UserRecord[]; selectedId: string; onSelectId: (id: string) => void; placeholder: string;
+}) {
+    const [query, setQuery] = useState('');
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, []);
+    const selected = coordinators.find(c => c.id === selectedId);
+    const displayValue = selected && !open
+        ? `${selected.email}${selected.organizationName ? ` (${selected.organizationName})` : ''}`
+        : query;
+    const filtered = coordinators.filter(c =>
+        c.email.toLowerCase().includes(query.toLowerCase()) ||
+        (c.organizationName ?? '').toLowerCase().includes(query.toLowerCase())
+    );
+    return (
+        <div ref={ref} className="relative flex-1">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-300 pointer-events-none" />
+                <input
+                    value={displayValue}
+                    onChange={e => { setQuery(e.target.value); onSelectId(''); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    placeholder={placeholder}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm"
+                />
+            </div>
+            {open && filtered.length > 0 && (
+                <ul className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-stone-200 rounded-xl shadow-lg">
+                    {filtered.map(c => (
+                        <li key={c.id} onMouseDown={() => { onSelectId(c.id); setQuery(''); setOpen(false); }}
+                            className="px-4 py-2.5 text-sm hover:bg-orange-50 cursor-pointer flex justify-between items-center gap-2">
+                            <span className="font-medium text-stone-700">{c.email}</span>
+                            {c.organizationName && <span className="text-xs text-stone-400 shrink-0">{c.organizationName}</span>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ADMIN ORGS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -111,7 +158,7 @@ export function AdminOrgs() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [toast, setToast] = useState('');
     const [reassignCoordId, setReassignCoordId] = useState('');
-    const [inviteEmail, setInviteEmail] = useState('');
+    const [addCoordId, setAddCoordId] = useState('');
     const [coordAction, setCoordAction] = useState(false);
     const [orgFilter, setOrgFilter] = useState({ search: '', status: '', dateFrom: '', dateTo: '' });
 
@@ -200,15 +247,16 @@ export function AdminOrgs() {
         } finally { setCoordAction(false); }
     };
 
-    const handleInviteCoord = async () => {
-        if (!editingOrg || !inviteEmail.trim()) return;
+    const handleAddCoord = async () => {
+        if (!editingOrg || !addCoordId) return;
         setCoordAction(true);
         try {
-            await organizationService.inviteMember(editingOrg.id, { email: inviteEmail.trim(), role: OrgRole.Coordinator });
-            showToast('Coordinator invited');
-            setInviteEmail('');
+            await adminService.addCoordinatorToOrg(editingOrg.id, addCoordId);
+            showToast('Coordinator added');
+            setAddCoordId('');
+            load();
         } catch (err: any) {
-            showToast(getErr(err, 'Failed to invite coordinator'));
+            showToast(getErr(err, 'Failed to add coordinator'));
         } finally { setCoordAction(false); }
     };
 
@@ -296,27 +344,36 @@ export function AdminOrgs() {
                                         )}
                                     </label>
                                     <div className="flex gap-2">
-                                        <select value={reassignCoordId} onChange={e => setReassignCoordId(e.target.value)} className="flex-1 px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm">
-                                            <option value="">— Select coordinator —</option>
-                                            {coordinators.map(c => <option key={c.id} value={c.id}>{c.email}{c.organizationName && c.organizationId !== editingOrg.id ? ` (${c.organizationName})` : c.organizationId === editingOrg.id ? ' ★ current' : ''}</option>)}
-                                        </select>
+                                        <CoordCombobox
+                                            coordinators={coordinators}
+                                            selectedId={reassignCoordId}
+                                            onSelectId={setReassignCoordId}
+                                            placeholder="Search by email or org…"
+                                        />
                                         <button onClick={handleReassignCoord} disabled={!reassignCoordId || coordAction} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 text-sm flex items-center gap-1">
                                             {coordAction && <Loader2 className="w-3 h-3 animate-spin" />}Reassign
                                         </button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-500 mb-1">Invite Additional Coordinator (by email)</label>
+                                    <label className="block text-xs font-medium text-stone-500 mb-1">Add Additional Coordinator</label>
                                     <div className="flex gap-2">
-                                        <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="coordinator@example.com" className="flex-1 px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
-                                        <button onClick={handleInviteCoord} disabled={!inviteEmail.trim() || coordAction} className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl hover:bg-stone-200 disabled:opacity-50 text-sm">Invite</button>
+                                        <CoordCombobox
+                                            coordinators={coordinators}
+                                            selectedId={addCoordId}
+                                            onSelectId={setAddCoordId}
+                                            placeholder="Search by email or org…"
+                                        />
+                                        <button onClick={handleAddCoord} disabled={!addCoordId || coordAction} className="px-4 py-2 bg-stone-100 text-stone-700 font-bold rounded-xl hover:bg-stone-200 disabled:opacity-50 text-sm flex items-center gap-1">
+                                            {coordAction && <Loader2 className="w-3 h-3 animate-spin" />}Add
+                                        </button>
                                     </div>
                                     <p className="text-xs text-stone-400 mt-1">The coordinator must already have an account.</p>
                                 </div>
                             </div>
                         </div>
                         <div className="flex gap-3 justify-end">
-                            <button onClick={() => { setEditingOrg(null); setReassignCoordId(''); setInviteEmail(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={() => { setEditingOrg(null); setReassignCoordId(''); setAddCoordId(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                             <button onClick={handleSaveEdit} disabled={saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
                                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}Save
                             </button>
@@ -440,6 +497,9 @@ export function AdminSkills() {
     const [importFile, setImportFile] = useState<File | null>(null);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState<{ name: string; status: string; reason?: string }[] | null>(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [skillSearch, setSkillSearch] = useState('');
+    const [skillCategoryFilter, setSkillCategoryFilter] = useState('');
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
@@ -533,19 +593,41 @@ export function AdminSkills() {
         return acc;
     }, {});
 
+    const allCategories = Object.keys(byCategory).sort();
+    const filteredByCategory = skills
+        .filter(s => {
+            const matchSearch = !skillSearch || s.name.toLowerCase().includes(skillSearch.toLowerCase()) || (s.description ?? '').toLowerCase().includes(skillSearch.toLowerCase());
+            const matchCat = !skillCategoryFilter || (s.category || 'General') === skillCategoryFilter;
+            return matchSearch && matchCat;
+        })
+        .reduce<Record<string, Skill[]>>((acc, s) => {
+            (acc[s.category || 'General'] ??= []).push(s);
+            return acc;
+        }, {});
+
     return (
         <div className="max-w-5xl mx-auto space-y-8">
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Skills Management</h1><p className="text-stone-500 mt-2 text-lg">Manage the platform skill catalog.</p></div>
+            <div className="flex items-center justify-between">
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Skills Management</h1><p className="text-stone-500 mt-2 text-lg">Manage the platform skill catalog.</p></div>
+                <button onClick={() => setShowAddForm(v => !v)} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow transition-all ${showAddForm ? 'bg-stone-100 text-stone-600 hover:bg-stone-200' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-500/20'}`}>
+                    {showAddForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    {showAddForm ? 'Cancel' : 'Add New Skill'}
+                </button>
+            </div>
 
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
 
+            {showAddForm && (<>
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h2 className="text-lg font-bold text-stone-800 mb-5 flex items-center gap-2"><Plus className="w-5 h-5 text-orange-500" /> Add New Skill</h2>
                 <form onSubmit={handleCreate} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Category</label>
-                            <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Medical, IT" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                            <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} list="skill-categories" placeholder="e.g. Medical, IT" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                            <datalist id="skill-categories">
+                                {allCategories.map(cat => <option key={cat} value={cat} />)}
+                            </datalist>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Skill Name</label>
@@ -604,6 +686,7 @@ export function AdminSkills() {
                     </div>
                 )}
             </div>
+            </>)}
 
             {editingSkill && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200">
@@ -614,7 +697,7 @@ export function AdminSkills() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Category</label>
-                            <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                            <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} list="skill-categories" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Skill Name</label>
@@ -634,10 +717,19 @@ export function AdminSkills() {
                 </div>
             )}
 
+            {/* Search & Filter */}
+            <div className="flex flex-wrap gap-3">
+                <input value={skillSearch} onChange={e => setSkillSearch(e.target.value)} placeholder="Search skills..." className="flex-1 min-w-48 px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                <select value={skillCategoryFilter} onChange={e => setSkillCategoryFilter(e.target.value)} className="px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm text-stone-600">
+                    <option value="">All Categories</option>
+                    {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+            </div>
+
             {error && <ErrorBox msg={error} onRetry={load} />}
-            {loading ? <Spinner /> : Object.keys(byCategory).length === 0 ? <Empty msg="No skills yet." /> : (
+            {loading ? <Spinner /> : Object.keys(filteredByCategory).length === 0 ? <Empty msg={skills.length === 0 ? 'No skills yet.' : 'No skills match your search.'} /> : (
                 <div className="space-y-6">
-                    {Object.entries(byCategory).map(([category, catSkills]) => (
+                    {Object.entries(filteredByCategory).map(([category, catSkills]) => (
                         <div key={category} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                             <h3 className="text-sm font-bold text-orange-500 uppercase tracking-wider mb-4">{category}</h3>
                             <div className="space-y-3">
@@ -744,6 +836,12 @@ export function AdminUsers() {
     const [resetPwdUserId, setResetPwdUserId] = useState<string | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [resetting, setResetting] = useState(false);
+    const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+    const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [changeRoleUserId, setChangeRoleUserId] = useState<string | null>(null);
+    const [pendingRole, setPendingRole] = useState('');
+    const [changingRole, setChangingRole] = useState(false);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -794,6 +892,38 @@ export function AdminUsers() {
         } catch (err: any) {
             showToast(getErrWithStatus(err, 'Failed to reset password'));
         } finally { setResetting(false); }
+    };
+
+    const handleDelete = async (userId: string, email: string) => {
+        setDeleting(true);
+        try {
+            await adminService.deleteUser(userId, deleteConfirmEmail);
+            showToast(`Deleted ${email}`);
+            setDeleteUserId(null);
+            setDeleteConfirmEmail('');
+            load();
+        } catch (err: any) {
+            showToast(getErrWithStatus(err, 'Failed to delete user'));
+        } finally { setDeleting(false); }
+    };
+
+    const handleChangeRole = async (userId: string) => {
+        setChangingRole(true);
+        try {
+            await adminService.changeRole(userId, pendingRole);
+            showToast('Role updated');
+            setChangeRoleUserId(null);
+            setPendingRole('');
+            load();
+        } catch (err: any) {
+            showToast(getErrWithStatus(err, 'Failed to change role'));
+        } finally { setChangingRole(false); }
+    };
+
+    const closeInlineAction = () => {
+        setResetPwdUserId(null); setNewPassword('');
+        setDeleteUserId(null); setDeleteConfirmEmail('');
+        setChangeRoleUserId(null); setPendingRole('');
     };
 
     const nonAdminUsers = users.filter(u => u.role !== 'SystemAdmin');
@@ -889,7 +1019,33 @@ export function AdminUsers() {
                                     </td>
                                     <td className="p-5 text-stone-400 text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
                                     <td className="p-5">
-                                        {resetPwdUserId === u.id ? (
+                                        {deleteUserId === u.id ? (
+                                            <div className="flex items-center gap-2 justify-end flex-wrap">
+                                                <input
+                                                    value={deleteConfirmEmail}
+                                                    onChange={e => setDeleteConfirmEmail(e.target.value)}
+                                                    placeholder={`Type ${u.email} to confirm`}
+                                                    className="px-3 py-1.5 text-sm rounded-lg border border-rose-200 bg-rose-50 focus:ring-2 focus:ring-rose-400 outline-none w-52"
+                                                    autoFocus
+                                                />
+                                                <button onClick={() => handleDelete(u.id, u.email)} disabled={deleting || deleteConfirmEmail !== u.email} className="px-3 py-1.5 bg-rose-500 text-white text-xs font-bold rounded-lg hover:bg-rose-600 disabled:bg-rose-300 flex items-center gap-1">
+                                                    {deleting && <Loader2 className="w-3 h-3 animate-spin" />}Delete
+                                                </button>
+                                                <button onClick={closeInlineAction} className="px-3 py-1.5 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">Cancel</button>
+                                            </div>
+                                        ) : changeRoleUserId === u.id ? (
+                                            <div className="flex items-center gap-2 justify-end">
+                                                <select value={pendingRole} onChange={e => setPendingRole(e.target.value)} className="px-2 py-1.5 text-sm rounded-lg border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none">
+                                                    <option value="">— select role —</option>
+                                                    {u.role !== 'Volunteer' && <option value="Volunteer">Volunteer</option>}
+                                                    {u.role !== 'Coordinator' && <option value="Coordinator">Coordinator</option>}
+                                                </select>
+                                                <button onClick={() => handleChangeRole(u.id)} disabled={changingRole || !pendingRole} className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-1">
+                                                    {changingRole && <Loader2 className="w-3 h-3 animate-spin" />}Save
+                                                </button>
+                                                <button onClick={closeInlineAction} className="px-3 py-1.5 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">Cancel</button>
+                                            </div>
+                                        ) : resetPwdUserId === u.id ? (
                                             <div className="flex items-center gap-2 justify-end flex-wrap">
                                                 <input
                                                     type="password"
@@ -903,7 +1059,7 @@ export function AdminUsers() {
                                                 <button onClick={() => handleResetPassword(u.id)} disabled={resetting || newPassword.length < 6} className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-1">
                                                     {resetting && <Loader2 className="w-3 h-3 animate-spin" />}Set
                                                 </button>
-                                                <button onClick={() => { setResetPwdUserId(null); setNewPassword(''); }} className="px-3 py-1.5 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">Cancel</button>
+                                                <button onClick={closeInlineAction} className="px-3 py-1.5 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">Cancel</button>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2 justify-end">
@@ -916,11 +1072,17 @@ export function AdminUsers() {
                                                 ) : (
                                                     <button onClick={() => handleBan(u.id)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-xs hover:bg-rose-100">Ban</button>
                                                 )}
-                                                {u.id !== auth.userId && (
-                                                    <button onClick={() => { setResetPwdUserId(u.id); setNewPassword(''); }} className="p-1.5 text-stone-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Reset password">
+                                                {u.id !== auth.userId && (<>
+                                                    <button onClick={() => { closeInlineAction(); setChangeRoleUserId(u.id); }} className="p-1.5 text-stone-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Change role">
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => { closeInlineAction(); setResetPwdUserId(u.id); }} className="p-1.5 text-stone-300 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Reset password">
                                                         <KeyRound className="w-4 h-4" />
                                                     </button>
-                                                )}
+                                                    <button onClick={() => { closeInlineAction(); setDeleteUserId(u.id); setDeleteConfirmEmail(''); }} className="p-1.5 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Delete user">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </>)}
                                             </div>
                                         )}
                                     </td>

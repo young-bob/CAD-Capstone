@@ -1,16 +1,28 @@
-import { useState, useRef, useEffect } from 'react';
-import { Heart, Menu, Bell } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Heart, Menu, Bell, CheckCheck } from 'lucide-react';
+import { adminService } from '../services/admin';
+import { attendanceService } from '../services/attendance';
 
 type DisplayRole = 'volunteer' | 'coordinator' | 'admin';
+
+interface Notification {
+    id: string;
+    title: string;
+    subtitle: string;
+    view: string;
+}
 
 interface Props {
     userRole: DisplayRole;
     sidebarOpen: boolean;
     onToggleSidebar: () => void;
+    onNavigate: (view: string) => void;
 }
 
-export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar }: Props) {
+export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar, onNavigate }: Props) {
     const [showNotif, setShowNotif] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [readIds, setReadIds] = useState<Set<string>>(new Set());
     const notifRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -22,6 +34,54 @@ export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar }: Pr
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    const fetchNotifications = useCallback(async () => {
+        if (userRole !== 'admin') return;
+        try {
+            const [orgs, disputes] = await Promise.all([
+                adminService.getPendingOrganizations(),
+                attendanceService.getPendingDisputes(),
+            ]);
+            const notifs: Notification[] = [
+                ...(Array.isArray(orgs) ? orgs : []).map(o => ({
+                    id: `org-${o.orgId}`,
+                    title: 'New Organization Application',
+                    subtitle: o.name,
+                    view: 'admin_orgs',
+                })),
+                ...(Array.isArray(disputes) ? disputes : []).map(d => ({
+                    id: `dispute-${d.attendanceId}`,
+                    title: 'Attendance Dispute',
+                    subtitle: `${d.volunteerName} — ${d.opportunityTitle}`,
+                    view: 'admin_disputes',
+                })),
+            ];
+            setNotifications(notifs);
+            // Prune stale read IDs that no longer exist
+            setReadIds(prev => {
+                const existing = new Set(notifs.map(n => n.id));
+                return new Set([...prev].filter(id => existing.has(id)));
+            });
+        } catch { /* silent */ }
+    }, [userRole]);
+
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, [fetchNotifications]);
+
+    const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
+
+    const handleClickNotif = (notif: Notification) => {
+        setReadIds(prev => new Set([...prev, notif.id]));
+        setShowNotif(false);
+        onNavigate(notif.view);
+    };
+
+    const handleMarkAllRead = () => {
+        setReadIds(new Set(notifications.map(n => n.id)));
+    };
 
     return (
         <header className="bg-white border-b border-stone-100 h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 sm:px-6">
@@ -44,18 +104,47 @@ export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar }: Pr
                         className="p-2 text-stone-400 hover:text-orange-500 transition-colors relative"
                     >
                         <Bell className="w-6 h-6" />
-                        {userRole !== 'volunteer' && (
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+                        {unreadCount > 0 && (
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
                         )}
                     </button>
                     {showNotif && (
-                        <div className="absolute right-0 top-12 w-72 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden z-50">
-                            <div className="px-5 py-4 border-b border-stone-100">
-                                <h3 className="font-bold text-stone-800 text-sm">Notifications</h3>
+                        <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden z-50">
+                            <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
+                                <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2">
+                                    Notifications
+                                    {unreadCount > 0 && (
+                                        <span className="bg-rose-100 text-rose-600 text-xs font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                                    )}
+                                </h3>
+                                {unreadCount > 0 && (
+                                    <button onClick={handleMarkAllRead} className="text-xs text-orange-500 font-bold hover:text-orange-600 flex items-center gap-1">
+                                        <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                                    </button>
+                                )}
                             </div>
-                            <div className="px-5 py-8 text-center text-stone-400 text-sm font-medium">
-                                No new notifications
-                            </div>
+                            {notifications.length === 0 ? (
+                                <div className="px-5 py-8 text-center text-stone-400 text-sm font-medium">No notifications</div>
+                            ) : (
+                                <ul className="max-h-72 overflow-y-auto divide-y divide-stone-50">
+                                    {notifications.map(n => {
+                                        const isUnread = !readIds.has(n.id);
+                                        return (
+                                            <li
+                                                key={n.id}
+                                                onClick={() => handleClickNotif(n)}
+                                                className={`px-5 py-3.5 cursor-pointer hover:bg-orange-50 flex gap-3 items-start transition-colors ${isUnread ? 'bg-orange-50/40' : ''}`}
+                                            >
+                                                <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? 'bg-rose-500' : 'bg-transparent'}`} />
+                                                <div className="min-w-0">
+                                                    <p className={`text-sm ${isUnread ? 'font-bold text-stone-800' : 'font-medium text-stone-500'}`}>{n.title}</p>
+                                                    <p className="text-xs text-stone-400 truncate mt-0.5">{n.subtitle}</p>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
                         </div>
                     )}
                 </div>

@@ -38,4 +38,13 @@ export const adminService = {
     reassignCoordinator: async (orgId: string, coordinatorUserId: string): Promise<void> => {
         await api.post(`/api/admin/organizations/${orgId}/reassign-coordinator`, { coordinatorUserId });
     },
+    deleteUser: async (userId: string, confirmEmail: string): Promise<void> => {
+        await api.delete(`/api/admin/users/${userId}`, { data: { confirmEmail } });
+    },
+    changeRole: async (userId: string, newRole: string): Promise<void> => {
+        await api.post(`/api/admin/users/${userId}/change-role`, { newRole });
+    },
+    addCoordinatorToOrg: async (orgId: string, coordinatorUserId: string): Promise<void> => {
+        await api.post(`/api/admin/organizations/${orgId}/add-coordinator`, { coordinatorUserId });
+    },
 };

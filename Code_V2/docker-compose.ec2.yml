@@ -1,16 +1,16 @@
 # ============================================================
-# VSMS — 本地开发：前后端 Docker + EC2 远程数据库
+# VSMS — 本地开发：后端 Docker + EC2 远程数据库 + 前端本地运行
 # ============================================================
-# 前提：EC2 安全组已开放 5432 端口给本机 IP
-#
 # 使用方法：
 #   docker compose -f docker-compose.ec2.yml up -d --build
-#   docker compose -f docker-compose.ec2.yml logs -f
+#   docker compose -f docker-compose.ec2.yml logs -f api
 #   docker compose -f docker-compose.ec2.yml down
+#
+# 前端本地运行（不在 Docker 里）：
+#   cd web && npm run dev   →  http://localhost:3000
 # ============================================================
 
 services:
-
   # ==================== MinIO 文件存储（本地）====================
   minio:
     image: docker.io/minio/minio:latest
@@ -50,14 +50,11 @@ services:
       - vsms-net
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      # 连接 EC2 数据库
       ConnectionStrings__PostgreSQL: "Host=${DB_HOST};Port=5432;Database=vsms;Username=vsms;Password=${POSTGRES_PASSWORD}"
-      # JWT
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: VSMS.Api
       Jwt__Audience: VSMS.Client
       Jwt__ExpirationMinutes: 60
-      # MinIO（通过 docker 网络连接本地容器）
       Minio__Endpoint: minio:9000
       Minio__AccessKey: ${MINIO_ACCESS_KEY}
       Minio__SecretKey: ${MINIO_SECRET_KEY}
@@ -69,26 +66,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  # ==================== VSMS Web 前端 ====================
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile_Web
-    container_name: vsms-web
-    restart: unless-stopped
-    depends_on:
-      api:
-        condition: service_healthy
-    ports:
-      - "8081:8081"
-    networks:
-      - vsms-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
 
 networks:
   vsms-net:

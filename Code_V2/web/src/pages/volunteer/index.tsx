@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
 import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -10,7 +10,6 @@ import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
 const MapView = lazy(() => import('../../components/MapView'));
-import { lazy, Suspense } from 'react';
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {

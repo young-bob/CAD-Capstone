@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
@@ -126,6 +127,65 @@ public static class AdminEndpoints
         // Convenience: list pending organizations
         group.MapGet("/pending-organizations", async (IOrganizationQueryService queryService) =>
             Results.Ok(await queryService.GetPendingOrganizationsAsync()));
+
+        // Delete a user (cannot delete SystemAdmin or self; requires email confirmation)
+        group.MapDelete("/users/{userId:guid}", async (Guid userId, [FromBody] DeleteUserRequest req, HttpContext http, AppDbContext db) =>
+        {
+            var callerId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? http.User.FindFirst("sub")?.Value;
+            if (callerId != null && Guid.TryParse(callerId, out var callerGuid) && callerGuid == userId)
+                return Results.BadRequest(new { Error = "You cannot delete yourself." });
+
+            var user = await db.Users
+                .Include(u => u.VolunteerProfile)
+                .Include(u => u.CoordinatorProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+            if (user is null) return Results.NotFound(new { Error = "User not found." });
+            if (user.Role == "SystemAdmin") return Results.BadRequest(new { Error = "Cannot delete a SystemAdmin." });
+            if (!string.Equals(user.Email, req.ConfirmEmail, StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new { Error = "Email confirmation does not match." });
+
+            if (user.VolunteerProfile != null) db.Volunteers.Remove(user.VolunteerProfile);
+            if (user.CoordinatorProfile != null) db.Coordinators.Remove(user.CoordinatorProfile);
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // Change a user's role to Volunteer or Coordinator
+        group.MapPost("/users/{userId:guid}/change-role", async (Guid userId, ChangeRoleRequest req, AppDbContext db) =>
+        {
+            if (req.NewRole != "Volunteer" && req.NewRole != "Coordinator")
+                return Results.BadRequest(new { Error = "Role must be 'Volunteer' or 'Coordinator'." });
+
+            var user = await db.Users
+                .Include(u => u.VolunteerProfile)
+                .Include(u => u.CoordinatorProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+            if (user is null) return Results.NotFound(new { Error = "User not found." });
+            if (user.Role == "SystemAdmin") return Results.BadRequest(new { Error = "Cannot change SystemAdmin role." });
+            if (user.Role == req.NewRole) return Results.NoContent();
+
+            user.Role = req.NewRole;
+            if (req.NewRole == "Coordinator" && user.CoordinatorProfile is null)
+                db.Coordinators.Add(new VSMS.Infrastructure.Data.EfCoreQuery.Entities.CoordinatorEntity { UserId = userId, GrainId = Guid.NewGuid() });
+            else if (req.NewRole == "Volunteer" && user.VolunteerProfile is null)
+                db.Volunteers.Add(new VSMS.Infrastructure.Data.EfCoreQuery.Entities.VolunteerEntity { UserId = userId, GrainId = Guid.NewGuid() });
+
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        // Add a coordinator to an org directly (does not clear existing coordinator)
+        group.MapPost("/organizations/{orgId:guid}/add-coordinator", async (Guid orgId, ReassignCoordinatorRequest req, AppDbContext db) =>
+        {
+            var coord = await db.Coordinators.FirstOrDefaultAsync(c => c.UserId == req.CoordinatorUserId);
+            if (coord is null)
+                return Results.BadRequest(new { Error = "Coordinator profile not found." });
+            coord.OrganizationId = orgId;
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
 
 }

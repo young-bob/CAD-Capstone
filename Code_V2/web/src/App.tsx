@@ -131,6 +131,7 @@ function AppInner() {
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
                         sidebarOpen={sidebarOpen}
                         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                        onNavigate={navigateTo}
                     />
                     <Sidebar
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
