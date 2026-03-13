@@ -15,18 +15,30 @@ public class AttendanceEventHandlers(AppDbContext dbContext) :
 {
     public async Task HandleAsync(AttendanceRecordedEvent domainEvent)
     {
-        dbContext.AttendanceReadModels.Add(new AttendanceReadModel
+        var existing = await dbContext.AttendanceReadModels.FindAsync(domainEvent.AttendanceId);
+        if (existing != null)
         {
-            AttendanceId = domainEvent.AttendanceId,
-            OpportunityId = domainEvent.OpportunityId,
-            VolunteerId = domainEvent.VolunteerId,
-            VolunteerName = domainEvent.VolunteerName,
-            OpportunityTitle = domainEvent.OpportunityTitle,
-            Status = domainEvent.Status,
-            CheckInTime = domainEvent.CheckInTime,
-            CheckOutTime = domainEvent.CheckOutTime,
-            TotalHours = domainEvent.TotalHours
-        });
+            // Update existing record (e.g., Pending → CheckedIn)
+            existing.Status = domainEvent.Status;
+            existing.CheckInTime = domainEvent.CheckInTime;
+            existing.CheckOutTime = domainEvent.CheckOutTime;
+            existing.TotalHours = domainEvent.TotalHours;
+        }
+        else
+        {
+            dbContext.AttendanceReadModels.Add(new AttendanceReadModel
+            {
+                AttendanceId = domainEvent.AttendanceId,
+                OpportunityId = domainEvent.OpportunityId,
+                VolunteerId = domainEvent.VolunteerId,
+                VolunteerName = domainEvent.VolunteerName,
+                OpportunityTitle = domainEvent.OpportunityTitle,
+                Status = domainEvent.Status,
+                CheckInTime = domainEvent.CheckInTime,
+                CheckOutTime = domainEvent.CheckOutTime,
+                TotalHours = domainEvent.TotalHours
+            });
+        }
         await dbContext.SaveChangesAsync();
     }
 

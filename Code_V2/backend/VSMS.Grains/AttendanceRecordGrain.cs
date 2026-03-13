@@ -18,11 +18,31 @@ public class AttendanceRecordGrain(
 {
     public async Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId)
     {
+        // Idempotent: skip if already initialized
+        if (state.State.Status != AttendanceStatus.Pending && state.State.VolunteerId != Guid.Empty)
+            return;
+
         state.State.VolunteerId = volunteerId;
         state.State.ApplicationId = applicationId;
         state.State.OpportunityId = opportunityId;
         state.State.Status = AttendanceStatus.Pending;
         await state.WriteStateAsync();
+
+        // Fetch metadata needed for the Read Model
+        var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(volunteerId).GetProfile();
+        var oppState = await grainFactory.GetGrain<IOpportunityGrain>(opportunityId).GetState();
+        var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName)
+            ? "Unknown Volunteer"
+            : $"{volProfile.FirstName} {volProfile.LastName}".Trim();
+
+        // Publish event so EF Core Read Model (AttendanceReadModels table) gets written
+        // This makes the record visible in Volunteer's "My Attendance" with Pending status
+        await eventBus.PublishAsync(new AttendanceRecordedEvent(
+            this.GetPrimaryKey(), opportunityId, volunteerId,
+            volunteerName, oppState.Info.Title,
+            AttendanceStatus.Pending, null, null, 0));
+
+        logger.LogInformation("AttendanceRecord {Id} initialized for volunteer {VolId}", this.GetPrimaryKey(), volunteerId);
     }
 
     public async Task CheckIn(double lat, double lon, string proofPhotoUrl)
