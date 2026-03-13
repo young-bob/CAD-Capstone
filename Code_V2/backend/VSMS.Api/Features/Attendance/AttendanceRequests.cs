@@ -7,4 +7,5 @@ public record InitAttendanceRequest(Guid VolunteerId, Guid ApplicationId, Guid O
 public record CheckInRequest(double Lat, double Lon, string ProofPhotoUrl);
 public record DisputeRequest(string Reason, string EvidenceUrl);
 public record ConfirmRequest(Guid SupervisorId, int Rating);
+public record ForceConfirmRequest(Guid VolunteerId, Guid ApplicationId, Guid OpportunityId, Guid SupervisorId, int Rating, double DefaultHours);
 public record ManualAdjustRequest(Guid CoordinatorId, DateTime NewCheckIn, DateTime NewCheckOut, string Reason);

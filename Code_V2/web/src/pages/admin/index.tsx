@@ -132,14 +132,13 @@ export function AdminOrgs() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
-
     const handleApprove = async (orgId: string) => {
-        try { await adminService.approveOrg(orgId); showToast('Organization approved'); load(); }
+        try { await adminService.approveOrg(orgId); showToast('Organization approved'); setTimeout(() => load(), 600); }
         catch (err: any) { showToast(getErr(err, 'Failed to approve')); }
     };
 
     const handleReject = async (orgId: string) => {
-        try { await adminService.rejectOrg(orgId, 'Rejected by administrator.'); showToast('Organization rejected'); load(); }
+        try { await adminService.rejectOrg(orgId, 'Rejected by administrator.'); showToast('Organization rejected'); setTimeout(() => load(), 600); }
         catch (err: any) { showToast(getErr(err, 'Failed to reject')); }
     };
 

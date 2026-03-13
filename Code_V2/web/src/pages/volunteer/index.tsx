@@ -8,6 +8,7 @@ import { applicationService } from '../../services/applications';
 import { attendanceService } from '../../services/attendance';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
+import { MiniCalendar } from '../../components/MiniCalendar';
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {
@@ -35,6 +36,7 @@ interface DashboardProps { onNavigate: (view: ViewName) => void; }
 export function VolDashboard({ onNavigate }: DashboardProps) {
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
+    const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -42,8 +44,12 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const p = await volunteerService.getProfile(auth.linkedGrainId);
+            const [p, a] = await Promise.all([
+                volunteerService.getProfile(auth.linkedGrainId),
+                applicationService.getForVolunteer(auth.linkedGrainId)
+            ]);
             setProfile(p);
+            setApps(a);
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
@@ -55,32 +61,54 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     if (error) return <ErrorBox msg={error} onRetry={load} />;
 
     const name = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || auth.email : auth.email;
+    const approvedShiftDates = apps.filter(a => a.status === 'Approved' && a.shiftStartTime).map(a => new Date(a.shiftStartTime));
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
-            <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 sm:p-10 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden">
-                <div className="relative z-10">
-                    <h1 className="text-3xl font-extrabold mb-3 flex items-center gap-3">Welcome, {name}! <Sun className="w-8 h-8 text-yellow-200" /></h1>
-                    <p className="text-orange-50 text-lg max-w-xl font-medium">Ready to start today's volunteer service? Check your upcoming events.</p>
-                    <button onClick={() => onNavigate('attendance')} className="mt-8 bg-white text-orange-600 px-8 py-3.5 rounded-full font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">Check-in (Validate Geo)</button>
+            <div className="flex flex-col lg:flex-row gap-8">
+                {/* Left: Welcome & Stats */}
+                <div className="flex-1 space-y-8">
+                    <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 sm:p-10 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden">
+                        <div className="relative z-10">
+                            <h1 className="text-3xl font-extrabold mb-3 flex items-center gap-3">Welcome, {name}! <Sun className="w-8 h-8 text-yellow-200" /></h1>
+                            <p className="text-orange-50 text-lg max-w-xl font-medium">Ready to start today's volunteer service? Check your upcoming events.</p>
+                            <button onClick={() => onNavigate('attendance')} className="mt-8 bg-white text-orange-600 px-8 py-3.5 rounded-full font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">Check-in</button>
+                        </div>
+                        <div className="absolute -right-20 -top-20 w-80 h-80 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
+                        <Heart className="absolute -right-4 -bottom-4 w-56 h-56 text-white opacity-10" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[
+                            { label: 'Total Hours', val: String(profile?.totalHours ?? 0), unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
+                            { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50' },
+                        ].map((s, i) => (
+                            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 group-hover:bg-${s.color.split('-')[1]}-500 group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
+                                <div>
+                                    <h3 className="text-2xl font-extrabold text-stone-800">{s.val} <span className="text-sm font-medium text-stone-400">{s.unit}</span></h3>
+                                    <p className="text-xs font-semibold text-stone-400 tracking-wide uppercase mt-1">{s.label}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-                <div className="absolute -right-20 -top-20 w-80 h-80 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
-                <Heart className="absolute -right-4 -bottom-4 w-56 h-56 text-white opacity-10" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                    { label: 'Total Hours', val: String(profile?.totalHours ?? 0), unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-                    { label: 'Completed Events', val: String(profile?.completedOpportunities ?? 0), unit: 'times', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                    { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50' },
-                ].map((s, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex items-center gap-5 hover:shadow-md transition-shadow group">
-                        <div className={`${s.bg} p-4 rounded-2xl ${s.color} group-hover:bg-${s.color.split('-')[1]}-500 group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
-                        <div>
-                            <p className="text-sm font-semibold text-stone-400 uppercase tracking-wide">{s.label}</p>
-                            <h3 className="text-3xl font-extrabold text-stone-800">{s.val} <span className="text-base font-medium text-stone-400">{s.unit}</span></h3>
+
+                {/* Right: Calendar */}
+                <div className="w-full lg:w-80 shrink-0">
+                    <MiniCalendar eventDates={approvedShiftDates} />
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 mt-6 relative overflow-hidden group">
+                        <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+                        <div className="relative z-10 flex items-start gap-4">
+                            <div className="bg-rose-100 p-3 rounded-2xl text-rose-500"><Heart className="w-6 h-6 fill-current" /></div>
+                            <div>
+                                <h3 className="font-extrabold text-stone-800 mb-1">Impact Goal</h3>
+                                <p className="text-sm font-medium text-stone-500 leading-relaxed">You've completed {profile?.completedOpportunities ?? 0} events. Just {(5 - ((profile?.completedOpportunities ?? 0) % 5)) || 5} more to reach your next milestone!</p>
+                            </div>
                         </div>
                     </div>
-                ))}
+                </div>
             </div>
         </div>
     );
@@ -336,8 +364,30 @@ export function VolAttendance() {
                             </div>
                             {DISPUTABLE.includes(r.status) && r.status !== 'Disputed' && (
                                 <button onClick={() => openDispute(r.attendanceId)}
-                                    className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 border border-amber-200">
+                                    className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 border border-amber-200 mt-2">
                                     ⚠️ Raise Dispute
+                                </button>
+                            )}
+                            {r.status === 'Pending' && (
+                                <button onClick={async () => {
+                                    try {
+                                        await attendanceService.webCheckIn(r.attendanceId);
+                                        showToast('Checked in successfully ✅');
+                                        load();
+                                    } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to check in'); }
+                                }} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 mt-2">
+                                    📍 Check In Now
+                                </button>
+                            )}
+                            {r.status === 'CheckedIn' && (
+                                <button onClick={async () => {
+                                    try {
+                                        await attendanceService.checkOut(r.attendanceId);
+                                        showToast('Checked out successfully 🔚');
+                                        load();
+                                    } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to check out'); }
+                                }} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 mt-2">
+                                    🔚 Check Out
                                 </button>
                             )}
                         </div>

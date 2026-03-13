@@ -8,6 +8,7 @@ import { applicationService } from '../../services/applications';
 import { certificateService } from '../../services/certificates';
 import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
+import { MiniCalendar } from '../../components/MiniCalendar';
 
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
@@ -166,20 +167,36 @@ export function CoordDashboard() {
 
             {/* Stats */}
             {isApproved && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    {[
-                        { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50' },
-                        { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50' },
-                        { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                        { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50' },
-                    ].map((s, i) => (
-                        <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                            <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
-                            <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
-                            <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        {[
+                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50' },
+                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50' },
+                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50' },
+                        ].map((s, i) => (
+                            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                                <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
+                                <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
+                                <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Calendar & Activities */}
+                    <div className="flex flex-col lg:flex-row gap-6 mt-8">
+                        <div className="flex-1 bg-white rounded-3xl p-8 shadow-sm border border-stone-100 flex flex-col justify-center items-center text-center space-y-4">
+                            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 mb-2">
+                                <Star className="w-10 h-10 fill-current" />
+                            </div>
+                            <h2 className="text-2xl font-extrabold text-stone-800">Your Impact Hub</h2>
+                            <p className="text-stone-500 max-w-md mx-auto">Track your organization's ongoing events, review new volunteer applications, and confirm attendance all in one place. Use the calendar to see days with active shifts.</p>
                         </div>
-                    ))}
-                </div>
+                        <div className="w-full lg:w-80 shrink-0">
+                            <MiniCalendar eventDates={apps.map(a => new Date(a.shiftStartTime))} />
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* Edit Modal */}
@@ -205,13 +222,13 @@ export function CoordDashboard() {
 // MANAGE EVENTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 interface CoordManageEventsProps { onViewDetail?: (id: string) => void; }
-export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {}) {
+export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const auth = useAuth();
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ title: '', description: '', category: '' });
+    const [createForm, setCreateForm] = useState({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
     const [creating, setCreating] = useState(false);
 
     const load = useCallback(async () => {
@@ -236,13 +253,31 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
         if (!createForm.title) { setError('Title is required.'); return; }
         setCreating(true); setError('');
         try {
-            await organizationService.createOpportunity(auth.linkedGrainId, createForm);
+            const res = await organizationService.createOpportunity(auth.linkedGrainId, {
+                title: createForm.title,
+                description: createForm.description,
+                category: createForm.category
+            });
+            
+            // Set geofence immediately after creation
+            await opportunityService.setGeoFence(res.opportunityId, {
+                lat: createForm.lat,
+                lon: createForm.lon,
+                radiusMeters: createForm.radius
+            });
+
             setShowCreate(false);
-            setCreateForm({ title: '', description: '', category: '' });
-            await load();
+            setCreateForm({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
+            
+            // Add a slight delay for Orleans CQRS read-model to sync
+            setTimeout(() => {
+                load();
+                setCreating(false);
+            }, 600);
         } catch (err: any) {
             setError(getErr(err, 'Failed to create opportunity'));
-        } finally { setCreating(false); }
+            setCreating(false);
+        }
     };
 
     const handlePublish = async (id: string) => {
@@ -251,6 +286,15 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
             load();
         } catch (err: any) {
             setError(getErr(err, 'Failed to publish'));
+        }
+    };
+
+    const handleGetLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setCreateForm(p => ({ ...p, lat: pos.coords.latitude, lon: pos.coords.longitude })),
+                () => alert('Please enable location access in your browser.')
+            );
         }
     };
 
@@ -274,7 +318,19 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
                     <input placeholder="Title *" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Category (e.g. Environment)" value={createForm.category} onChange={e => setCreateForm(p => ({ ...p, category: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <textarea placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" rows={3} />
-                    <div className="flex gap-3 justify-end">
+                    <div className="pt-4 border-t border-stone-100">
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-bold text-stone-700">Check-In Location (Geofence)</h4>
+                            <button onClick={handleGetLocation} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 flex items-center gap-1">📍 Use My Location</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div><label className="text-xs font-bold text-stone-500 ml-1">Latitude</label><input type="number" step="any" value={createForm.lat} onChange={e => setCreateForm(p => ({ ...p, lat: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                            <div><label className="text-xs font-bold text-stone-500 ml-1">Longitude</label><input type="number" step="any" value={createForm.lon} onChange={e => setCreateForm(p => ({ ...p, lon: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                            <div><label className="text-xs font-bold text-stone-500 ml-1">Radius (meters)</label><input type="number" value={createForm.radius} onChange={e => setCreateForm(p => ({ ...p, radius: parseInt(e.target.value) || 200 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 justify-end mt-4">
                         <button onClick={() => { setShowCreate(false); setError(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                         <button onClick={handleCreate} disabled={creating} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
                             {creating && <Loader2 className="w-4 h-4 animate-spin" />}Create
@@ -801,10 +857,27 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setSavingSkills(false); }
     };
 
-    const doApprove = async (id: string) => { setActionId(id); try { await applicationService.approve(id); showToast('Approved ✅'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
-    const doReject = async (id: string) => { setActionId(id); try { await applicationService.reject(id, 'Rejected'); showToast('Rejected'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
-    const doNoShow = async (appId: string) => { setActionId(appId + '_ns'); try { await applicationService.markNoShow(appId); showToast('No-show marked'); load(); } catch { showToast('Failed'); } finally { setActionId(null); } };
-    const doConfirm = async (vid: string) => { setActionId(vid + '_a'); try { await attendanceService.confirm(vid, { supervisorId: oppId, rating: 5 }); showToast('Attendance confirmed'); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doApprove = async (id: string) => { setActionId(id); try { await applicationService.approve(id); showToast('Approved ✅'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doReject = async (id: string) => { setActionId(id); try { await applicationService.reject(id, 'Rejected'); showToast('Rejected'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doNoShow = async (appId: string) => { setActionId(appId + '_ns'); try { await applicationService.markNoShow(appId); showToast('No-show marked'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doConfirm = async (app: ApplicationSummary) => {
+        setActionId(app.volunteerId + '_a');
+        try {
+            const ms = new Date(app.shiftEndTime).getTime() - new Date(app.shiftStartTime).getTime();
+            const defaultHours = ms > 0 ? ms / 3600000 : 2;
+            await attendanceService.forceConfirm({
+                volunteerId: app.volunteerId,
+                applicationId: app.applicationId,
+                opportunityId: app.opportunityId,
+                supervisorId: oppId,
+                rating: 5,
+                defaultHours
+            });
+            showToast('Attendance confirmed');
+            setTimeout(() => load(), 600);
+        } catch { showToast('Failed'); }
+        finally { setActionId(null); }
+    };
 
     const openCert = async (vid: string, name: string) => {
         try { const l = await certificateService.getTemplates(); setCertTemplates(l); setSelTemplate(l.length > 0 ? l[0].id : null); setCertTargetId(vid); setCertTargetName(name); setShowCert(true); }
@@ -911,7 +984,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                             <div key={app.applicationId} className="flex items-start justify-between py-3 border-b border-stone-50 last:border-0">
                                 <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
                                 <div className="flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => doConfirm(app.volunteerId)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
+                                    <button onClick={() => doConfirm(app)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
                                     <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
                                     <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
                                 </div>

@@ -172,6 +172,19 @@ public class OpportunityGrain(
         return Task.FromResult(distance <= state.State.GeoFence.RadiusMeters);
     }
 
+    public async Task SetGeoFence(double lat, double lon, double radiusMeters)
+    {
+        state.State.GeoFence = new GeoFenceSettings
+        {
+            Latitude = lat,
+            Longitude = lon,
+            RadiusMeters = radiusMeters
+        };
+        await state.WriteStateAsync();
+        logger.LogInformation("Opportunity {Id} geofence updated: Lat {Lat}, Lon {Lon}, Radius {Radius}m",
+            this.GetPrimaryKey(), lat, lon, radiusMeters);
+    }
+
     public async Task AddShift(string name, DateTime startTime, DateTime endTime, int maxCapacity)
     {
         state.State.Shifts.Add(new Shift

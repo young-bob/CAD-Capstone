@@ -20,6 +20,9 @@ export const attendanceService = {
     checkIn: async (id: string, data: { lat: number; lon: number; proofPhotoUrl: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/checkin`, data);
     },
+    webCheckIn: async (id: string): Promise<void> => {
+        await api.post(`/api/attendance/${id}/web-checkin`);
+    },
     checkOut: async (id: string): Promise<void> => {
         await api.post(`/api/attendance/${id}/checkout`);
     },
@@ -28,6 +31,9 @@ export const attendanceService = {
     },
     confirm: async (id: string, data: { supervisorId: string; rating: number }): Promise<void> => {
         await api.post(`/api/attendance/${id}/confirm`, data);
+    },
+    forceConfirm: async (data: { volunteerId: string; applicationId: string; opportunityId: string; supervisorId: string; rating: number; defaultHours: number }): Promise<void> => {
+        await api.post('/api/attendance/force-confirm', data);
     },
     getPendingDisputes: async (): Promise<DisputeSummary[]> => {
         const res = await api.get<DisputeSummary[]>('/api/attendance/disputes/pending');

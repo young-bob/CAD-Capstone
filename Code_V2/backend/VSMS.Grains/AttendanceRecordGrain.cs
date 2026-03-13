@@ -30,6 +30,16 @@ public class AttendanceRecordGrain(
         if (state.State.Status != AttendanceStatus.Pending)
             throw new InvalidOperationException($"Cannot check in with status: {state.State.Status}");
 
+        // Retrieve shift start time
+        var oppState = await grainFactory.GetGrain<IOpportunityGrain>(state.State.OpportunityId).GetState();
+        var appState = await grainFactory.GetGrain<IApplicationGrain>(state.State.ApplicationId).GetState();
+        var shift = oppState.Shifts.FirstOrDefault(s => s.ShiftId == appState.ShiftId);
+        
+        if (shift != null && DateTime.UtcNow < shift.StartTime.AddMinutes(-30))
+        {
+            throw new InvalidOperationException($"Too early to check in. You can check in 30 minutes before the shift starts ({shift.StartTime.ToLocalTime():g}).");
+        }
+
         // Validate geolocation
         var oppGrain = grainFactory.GetGrain<IOpportunityGrain>(state.State.OpportunityId);
         var isValid = await oppGrain.ValidateGeoLocation(lat, lon);
@@ -43,7 +53,6 @@ public class AttendanceRecordGrain(
         await state.WriteStateAsync();
 
         var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId).GetProfile();
-        var oppState = await grainFactory.GetGrain<IOpportunityGrain>(state.State.OpportunityId).GetState();
 
         var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName) ? "Unknown Volunteer" : $"{volProfile.FirstName} {volProfile.LastName}".Trim();
 
@@ -57,6 +66,44 @@ public class AttendanceRecordGrain(
         await this.RegisterOrUpdateReminder("AutoCheckout", TimeSpan.FromHours(8), TimeSpan.FromHours(8));
 
         logger.LogInformation("Volunteer {VolunteerId} checked in to {OpportunityId}",
+            state.State.VolunteerId, state.State.OpportunityId);
+    }
+
+    public async Task WebCheckIn()
+    {
+        if (state.State.Status != AttendanceStatus.Pending)
+            throw new InvalidOperationException($"Cannot check in with status: {state.State.Status}");
+
+        // Retrieve shift start time
+        var oppState = await grainFactory.GetGrain<IOpportunityGrain>(state.State.OpportunityId).GetState();
+        var appState = await grainFactory.GetGrain<IApplicationGrain>(state.State.ApplicationId).GetState();
+        var shift = oppState.Shifts.FirstOrDefault(s => s.ShiftId == appState.ShiftId);
+        
+        if (shift != null && DateTime.UtcNow < shift.StartTime.AddMinutes(-30))
+        {
+            throw new InvalidOperationException($"Too early to check in. You can check in 30 minutes before the shift starts ({shift.StartTime.ToLocalTime():g}).");
+        }
+
+        state.State.VerifiedTime = new TimeRecord { CheckInTime = DateTime.UtcNow };
+        state.State.CheckInSnapshot = new GeoFenceSettings { Latitude = 0, Longitude = 0 }; // Web bypass
+        state.State.ProofPhotoUrl = "web-check-in";
+        state.State.Status = AttendanceStatus.CheckedIn;
+        await state.WriteStateAsync();
+
+        var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId).GetProfile();
+
+        var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName) ? "Unknown Volunteer" : $"{volProfile.FirstName} {volProfile.LastName}".Trim();
+
+        await eventBus.PublishAsync(new AttendanceRecordedEvent(
+            this.GetPrimaryKey(), state.State.OpportunityId, state.State.VolunteerId,
+            volunteerName, oppState.Info.Title,
+            AttendanceStatus.CheckedIn, state.State.VerifiedTime.CheckInTime, null, 0
+        ));
+
+        // Set auto-checkout reminder (8 hours)
+        await this.RegisterOrUpdateReminder("AutoCheckout", TimeSpan.FromHours(8), TimeSpan.FromHours(8));
+
+        logger.LogInformation("Volunteer {VolunteerId} Web-checked in to {OpportunityId}",
             state.State.VolunteerId, state.State.OpportunityId);
     }
 
@@ -179,6 +226,42 @@ public class AttendanceRecordGrain(
 
         logger.LogInformation("Attendance {Id} confirmed by supervisor {SupervisorId}, {Hours:F1}h",
             this.GetPrimaryKey(), supervisorId, hours);
+    }
+
+    public async Task ForceConfirm(double defaultHours, Guid supervisorId, int rating)
+    {
+        // If they never checked in/out, simulate a check in/out with default hours
+        if (state.State.Status is AttendanceStatus.Pending or AttendanceStatus.CheckedIn)
+        {
+            state.State.VerifiedTime = new TimeRecord 
+            {
+                CheckInTime = DateTime.UtcNow.AddHours(-defaultHours),
+                CheckOutTime = DateTime.UtcNow
+            };
+        }
+        
+        state.State.SupervisorRating = rating;
+        state.State.Status = AttendanceStatus.Confirmed;
+        state.State.Modifications.Add(new AuditLog
+        {
+            OperatorId = supervisorId,
+            Action = "ForceConfirm",
+            Reason = "Coordinator bypassed check-in"
+        });
+        await state.WriteStateAsync();
+
+        var finalHours = state.State.DisputeLog?.AdjustedHours ?? state.State.VerifiedTime?.TotalHours ?? defaultHours;
+
+        await eventBus.PublishAsync(new AttendanceStatusChangedEvent(
+            this.GetPrimaryKey(), AttendanceStatus.Confirmed, state.State.VerifiedTime?.CheckOutTime, finalHours));
+
+        // Update volunteer impact score
+        var volunteerGrain = grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId);
+        await volunteerGrain.AddCompletedHours(finalHours);
+        await volunteerGrain.IncrementCompletedOpportunities();
+
+        logger.LogInformation("Attendance {Id} force-confirmed by supervisor {SupervisorId}, {Hours:F1}h",
+            this.GetPrimaryKey(), supervisorId, finalHours);
     }
 
     public Task<AttendanceRecordState> GetState() => Task.FromResult(state.State);

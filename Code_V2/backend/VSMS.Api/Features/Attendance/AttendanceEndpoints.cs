@@ -38,6 +38,13 @@ public static class AttendanceEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/{id:guid}/web-checkin", async (Guid id, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            await grain.WebCheckIn();
+            return Results.NoContent();
+        });
+
         group.MapPost("/{id:guid}/checkout", async (Guid id, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
@@ -56,6 +63,19 @@ public static class AttendanceEndpoints
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             await grain.Confirm(req.SupervisorId, req.Rating);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/force-confirm", async (ForceConfirmRequest req, IGrainFactory grains) =>
+        {
+            // We generate a deterministic ID matching the mobile app assumption (a new guid, but we can't reliably know what it is if not stored)
+            // Wait, actually, if a volunteer never checked in, we just create a new Attendance record.
+            var attendanceId = Guid.NewGuid();
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+            
+            await grain.Initialize(req.VolunteerId, req.ApplicationId, req.OpportunityId);
+            await grain.ForceConfirm(req.DefaultHours, req.SupervisorId, req.Rating);
+            
             return Results.NoContent();
         });
 

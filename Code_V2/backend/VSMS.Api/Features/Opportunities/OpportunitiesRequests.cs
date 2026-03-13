@@ -7,3 +7,5 @@ public record CancelRequest(string Reason);
 public record AddShiftRequest(string Name, DateTime StartTime, DateTime EndTime, int MaxCapacity);
 public record ApplyRequest(Guid VolunteerId, Guid ShiftId, string IdempotencyKey);
 public record ValidateGeoRequest(double Lat, double Lon);
+public record SetGeoFenceRequest(double Lat, double Lon, double RadiusMeters);
+public record SetRequiredSkillsRequest(List<Guid> SkillIds);

@@ -22,6 +22,9 @@ export const opportunityService = {
     publish: async (id: string): Promise<void> => {
         await api.post(`/api/opportunities/${id}/publish`);
     },
+    setGeoFence: async (id: string, data: { lat: number; lon: number; radiusMeters: number }): Promise<void> => {
+        await api.post(`/api/opportunities/${id}/geofence`, data);
+    },
     cancel: async (id: string, reason: string): Promise<void> => {
         await api.post(`/api/opportunities/${id}/cancel`, { reason });
     },

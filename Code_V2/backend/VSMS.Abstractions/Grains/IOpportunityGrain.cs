@@ -17,6 +17,7 @@ public interface IOpportunityGrain : IGrainWithGuidKey
 
     // GeoFence
     Task<bool> ValidateGeoLocation(double lat, double lon);
+    Task SetGeoFence(double lat, double lon, double radiusMeters);
 
     // Shifts
     Task AddShift(string name, DateTime startTime, DateTime endTime, int maxCapacity);

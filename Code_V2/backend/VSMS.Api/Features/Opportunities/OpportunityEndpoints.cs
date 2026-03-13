@@ -61,11 +61,25 @@ public static class OpportunityEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/{id:guid}/geofence", async (Guid id, SetGeoFenceRequest req, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.SetGeoFence(req.Lat, req.Lon, req.RadiusMeters);
+            return Results.NoContent();
+        });
+
         group.MapPost("/{id:guid}/validate-geo", async (Guid id, ValidateGeoRequest req, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IOpportunityGrain>(id);
             var isValid = await grain.ValidateGeoLocation(req.Lat, req.Lon);
             return Results.Ok(new { isValid });
+        });
+
+        group.MapPut("/{id:guid}/skills", async (Guid id, SetRequiredSkillsRequest req, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.SetRequiredSkills(req.SkillIds);
+            return Results.NoContent();
         });
     }
 
