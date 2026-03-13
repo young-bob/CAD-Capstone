@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Heart, Menu, Bell, CheckCheck } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { attendanceService } from '../services/attendance';
+import type { ViewName } from '../types';
 
 type DisplayRole = 'volunteer' | 'coordinator' | 'admin';
 
@@ -9,17 +10,17 @@ interface Notification {
     id: string;
     title: string;
     subtitle: string;
-    view: string;
+    view: ViewName;
 }
 
 interface Props {
     userRole: DisplayRole;
     sidebarOpen: boolean;
     onToggleSidebar: () => void;
-    onNavigate: (view: string) => void;
+    onNavigate: (view: ViewName) => void;
 }
 
-export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar, onNavigate }: Props) {
+export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Props) {
     const [showNotif, setShowNotif] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [readIds, setReadIds] = useState<Set<string>>(new Set());
@@ -47,13 +48,13 @@ export default function AppHeader({ userRole, sidebarOpen, onToggleSidebar, onNa
                     id: `org-${o.orgId}`,
                     title: 'New Organization Application',
                     subtitle: o.name,
-                    view: 'admin_orgs',
+                    view: 'admin_orgs' as const,
                 })),
                 ...(Array.isArray(disputes) ? disputes : []).map(d => ({
                     id: `dispute-${d.attendanceId}`,
                     title: 'Attendance Dispute',
                     subtitle: `${d.volunteerName} — ${d.opportunityTitle}`,
-                    view: 'admin_disputes',
+                    view: 'admin_disputes' as const,
                 })),
             ];
             setNotifications(notifs);
