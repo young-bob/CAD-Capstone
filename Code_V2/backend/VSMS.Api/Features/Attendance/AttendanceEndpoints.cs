@@ -27,7 +27,7 @@ public static class AttendanceEndpoints
         group.MapPost("/{id:guid}/init", async (Guid id, InitAttendanceRequest req, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
-            await grain.Initialize(req.VolunteerId, req.ApplicationId, req.OpportunityId);
+            await grain.Initialize(req.VolunteerId, req.ApplicationId, req.OpportunityId, req.ShiftId);
             return Results.NoContent();
         });
 

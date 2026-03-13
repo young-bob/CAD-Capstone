@@ -4,7 +4,7 @@ namespace VSMS.Abstractions.Grains;
 
 public interface IAttendanceRecordGrain : IGrainWithGuidKey
 {
-    Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId);
+    Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId, Guid? shiftId = null);
     Task CheckIn(double lat, double lon, string proofPhotoUrl);
     Task WebCheckIn();
     Task CheckOut(DateTime? timeOut = null);

@@ -16,10 +16,10 @@ public class AttendanceRecordGrain(
     IEventBus eventBus,
     ILogger<AttendanceRecordGrain> logger) : Grain, IAttendanceRecordGrain, IRemindable
 {
-    public async Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId)
+    public async Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId, Guid? shiftId = null)
     {
         // Idempotent: skip if already initialized
-        if (state.State.Status != AttendanceStatus.Pending && state.State.VolunteerId != Guid.Empty)
+        if (state.State.VolunteerId != Guid.Empty)
             return;
 
         state.State.VolunteerId = volunteerId;
@@ -31,8 +31,7 @@ public class AttendanceRecordGrain(
         // Fetch metadata needed for the Read Model
         var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(volunteerId).GetProfile();
         var oppState = await grainFactory.GetGrain<IOpportunityGrain>(opportunityId).GetState();
-        var appState = await grainFactory.GetGrain<IApplicationGrain>(applicationId).GetState();
-        var shift = oppState.Shifts.FirstOrDefault(s => s.ShiftId == appState.ShiftId);
+        var shift = shiftId.HasValue ? oppState.Shifts.FirstOrDefault(s => s.ShiftId == shiftId.Value) : null;
         var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName)
             ? "Unknown Volunteer"
             : $"{volProfile.FirstName} {volProfile.LastName}".Trim();

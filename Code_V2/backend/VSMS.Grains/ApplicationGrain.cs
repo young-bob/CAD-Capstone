@@ -59,7 +59,7 @@ public class ApplicationGrain(
         }
 
         var attendanceGrain = grainFactory.GetGrain<IAttendanceRecordGrain>(attendanceId);
-        await attendanceGrain.Initialize(state.State.VolunteerId, this.GetPrimaryKey(), state.State.OpportunityId);
+        await attendanceGrain.Initialize(state.State.VolunteerId, this.GetPrimaryKey(), state.State.OpportunityId, state.State.ShiftId);
 
         // Notify volunteer
         var notif = grainFactory.GetGrain<INotificationGrain>(Guid.Empty);
