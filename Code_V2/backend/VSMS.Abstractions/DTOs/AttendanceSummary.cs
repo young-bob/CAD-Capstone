@@ -10,6 +10,7 @@ public record AttendanceSummary(
     string VolunteerName,
     string OpportunityTitle,
     AttendanceStatus Status,
+    DateTime? ShiftStartTime,
     DateTime? CheckInTime,
     DateTime? CheckOutTime,
     double TotalHours

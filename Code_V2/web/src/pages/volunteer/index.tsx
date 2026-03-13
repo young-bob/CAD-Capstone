@@ -31,11 +31,31 @@ function Empty({ msg }: { msg: string }) {
 function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
 
 // ─── GPS Check-In Button ──────────────────────────────────────
-function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceId: string; opportunityId: string; onDone: () => void }) {
+function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone }: {
+    attendanceId: string; opportunityId: string; shiftStartTime?: string | null; onDone: () => void
+}) {
     const [loading, setLoading] = useState(false);
     const [gpsState, setGpsState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
     const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
     const [errMsg, setErrMsg] = useState('');
+
+    // Compute check-in availability (30 min before shift start)
+    const checkInOpenTime = shiftStartTime
+        ? new Date(new Date(shiftStartTime).getTime() - 30 * 60 * 1000)
+        : null;
+    const isTooEarly = checkInOpenTime ? new Date() < checkInOpenTime : false;
+
+    const formatTime = (d: Date) => d.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    const extractErrMsg = (e: any): string => {
+        const data = e?.response?.data;
+        if (typeof data === 'string') return data;
+        if (data?.detail) return data.detail;
+        if (data?.title) return data.title;
+        return 'Check-in failed. Please try again.';
+    };
 
     const locate = () => {
         if (!navigator.geolocation) { doFallback(); return; }
@@ -50,7 +70,7 @@ function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceI
     const doFallback = async () => {
         setLoading(true);
         try { await attendanceService.webCheckIn(attendanceId); onDone(); }
-        catch (e: any) { setErrMsg(e?.response?.data?.toString() || 'Failed'); }
+        catch (e: any) { setErrMsg(extractErrMsg(e)); setGpsState('error'); }
         finally { setLoading(false); }
     };
 
@@ -60,9 +80,21 @@ function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceI
         try {
             await attendanceService.checkIn(attendanceId, { lat: coords.lat, lon: coords.lon, proofPhotoUrl: '' });
             onDone();
-        } catch (e: any) { setErrMsg(e?.response?.data?.toString() || 'Check-in failed'); }
+        } catch (e: any) { setErrMsg(extractErrMsg(e)); setGpsState('error'); }
         finally { setLoading(false); }
     };
+
+    // Too early — show disabled button with available time
+    if (isTooEarly) return (
+        <div className="mt-2 space-y-1">
+            <button disabled className="text-xs font-bold text-stone-400 bg-stone-100 px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-1">
+                🕐 Check-In Not Yet Available
+            </button>
+            <p className="text-xs text-stone-400">
+                Available from <span className="font-semibold text-stone-600">{formatTime(checkInOpenTime!)}</span>
+            </p>
+        </div>
+    );
 
     if (gpsState === 'idle') return (
         <button onClick={locate} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 mt-2 flex items-center gap-1">
@@ -78,9 +110,9 @@ function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceI
 
     if (gpsState === 'error') return (
         <div className="mt-2 space-y-2">
-            <p className="text-xs text-amber-600">{errMsg}</p>
-            <button onClick={doFallback} disabled={loading} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 flex items-center gap-1">
-                {loading && <Loader2 className="w-3 h-3 animate-spin" />} Check In Anyway
+            <p className="text-xs text-rose-500 font-medium">⚠️ {errMsg}</p>
+            <button onClick={() => { setGpsState('idle'); setErrMsg(''); }} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">
+                Try Again
             </button>
         </div>
     );
@@ -92,7 +124,7 @@ function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceI
             <Suspense fallback={<div className="h-48 bg-stone-100 rounded-xl flex items-center justify-center text-stone-400 text-xs">Loading map…</div>}>
                 {coords && <MapView lat={coords.lat} lon={coords.lon} radius={50} height={200} />}
             </Suspense>
-            {errMsg && <p className="text-xs text-rose-500">{errMsg}</p>}
+            {errMsg && <p className="text-xs text-rose-500">⚠️ {errMsg}</p>}
             <div className="flex gap-2">
                 <button onClick={() => setGpsState('idle')} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">Cancel</button>
                 <button onClick={doCheckIn} disabled={loading} className="text-xs font-bold text-white bg-blue-500 px-4 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-1">
@@ -444,7 +476,7 @@ export function VolAttendance() {
                                 </button>
                             )}
                             {r.status === 'Pending' && (
-                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} onDone={() => { showToast('Checked in ✅'); load(); }} />
+                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} shiftStartTime={r.shiftStartTime} onDone={() => { showToast('Checked in ✅'); load(); }} />
                             )}
                             {r.status === 'CheckedIn' && (
                                 <button onClick={async () => {

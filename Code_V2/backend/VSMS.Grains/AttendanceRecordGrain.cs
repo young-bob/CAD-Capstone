@@ -31,6 +31,8 @@ public class AttendanceRecordGrain(
         // Fetch metadata needed for the Read Model
         var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(volunteerId).GetProfile();
         var oppState = await grainFactory.GetGrain<IOpportunityGrain>(opportunityId).GetState();
+        var appState = await grainFactory.GetGrain<IApplicationGrain>(applicationId).GetState();
+        var shift = oppState.Shifts.FirstOrDefault(s => s.ShiftId == appState.ShiftId);
         var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName)
             ? "Unknown Volunteer"
             : $"{volProfile.FirstName} {volProfile.LastName}".Trim();
@@ -40,7 +42,8 @@ public class AttendanceRecordGrain(
         await eventBus.PublishAsync(new AttendanceRecordedEvent(
             this.GetPrimaryKey(), opportunityId, volunteerId,
             volunteerName, oppState.Info.Title,
-            AttendanceStatus.Pending, null, null, 0));
+            AttendanceStatus.Pending, null, null, 0,
+            ShiftStartTime: shift?.StartTime));
 
         logger.LogInformation("AttendanceRecord {Id} initialized for volunteer {VolId}", this.GetPrimaryKey(), volunteerId);
     }

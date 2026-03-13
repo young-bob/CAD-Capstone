@@ -14,7 +14,7 @@ public record OpportunitySkillsUpdatedEvent(Guid OpportunityId, List<Guid> Requi
 public record ApplicationSubmittedEvent(Guid ApplicationId, Guid OpportunityId, Guid ShiftId, string OpportunityTitle, string ShiftName, DateTime ShiftStartTime, DateTime ShiftEndTime, Guid VolunteerId, string VolunteerName, ApplicationStatus Status, DateTime AppliedAt);
 public record ApplicationStatusChangedEvent(Guid ApplicationId, ApplicationStatus Status);
 
-public record AttendanceRecordedEvent(Guid AttendanceId, Guid OpportunityId, Guid VolunteerId, string VolunteerName, string OpportunityTitle, AttendanceStatus Status, DateTime? CheckInTime, DateTime? CheckOutTime, double TotalHours);
+public record AttendanceRecordedEvent(Guid AttendanceId, Guid OpportunityId, Guid VolunteerId, string VolunteerName, string OpportunityTitle, AttendanceStatus Status, DateTime? CheckInTime, DateTime? CheckOutTime, double TotalHours, DateTime? ShiftStartTime = null);
 public record AttendanceStatusChangedEvent(Guid AttendanceId, AttendanceStatus Status, DateTime? CheckOutTime, double TotalHours);
 
 public record DisputeRaisedEvent(Guid AttendanceId, Guid VolunteerId, string VolunteerName, string OpportunityTitle, string Reason, string EvidenceUrl, DateTime RaisedAt);

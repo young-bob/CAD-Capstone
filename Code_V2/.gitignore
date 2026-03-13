@@ -34,6 +34,11 @@ $RECYCLE.BIN/
 # ====================
 bin/
 obj/
+**/bin/
+**/obj/
+**/bin\*/
+BuildHost-net472/
+BuildHost-netcore/
 [Ee]xecution/
 [Tt]est[Rr]esults/
 *.user

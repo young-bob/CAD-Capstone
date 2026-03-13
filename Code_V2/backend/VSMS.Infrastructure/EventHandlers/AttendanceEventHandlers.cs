@@ -34,6 +34,7 @@ public class AttendanceEventHandlers(AppDbContext dbContext) :
                 VolunteerName = domainEvent.VolunteerName,
                 OpportunityTitle = domainEvent.OpportunityTitle,
                 Status = domainEvent.Status,
+                ShiftStartTime = domainEvent.ShiftStartTime,
                 CheckInTime = domainEvent.CheckInTime,
                 CheckOutTime = domainEvent.CheckOutTime,
                 TotalHours = domainEvent.TotalHours
