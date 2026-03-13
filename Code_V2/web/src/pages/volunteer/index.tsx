@@ -63,7 +63,7 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
         navigator.geolocation.getCurrentPosition(
             (pos) => { setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsState('ready'); },
             () => { setErrMsg('Location access denied – submitting without GPS.'); setGpsState('error'); },
-            { timeout: 10000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
     };
 
