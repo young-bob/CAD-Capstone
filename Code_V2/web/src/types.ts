@@ -149,6 +149,7 @@ export interface ApplicationSummary {
     volunteerName: string;
     status: ApplicationStatus;
     appliedAt: string;
+    attendanceStatus?: string; // Populated by coordinator view: Pending | CheckedIn | CheckedOut | Confirmed | etc.
 }
 
 // ─── Attendance ───────────────────────────────────────────────

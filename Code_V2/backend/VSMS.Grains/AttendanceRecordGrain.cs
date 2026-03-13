@@ -228,42 +228,6 @@ public class AttendanceRecordGrain(
             this.GetPrimaryKey(), supervisorId, hours);
     }
 
-    public async Task ForceConfirm(double defaultHours, Guid supervisorId, int rating)
-    {
-        // If they never checked in/out, simulate a check in/out with default hours
-        if (state.State.Status is AttendanceStatus.Pending or AttendanceStatus.CheckedIn)
-        {
-            state.State.VerifiedTime = new TimeRecord 
-            {
-                CheckInTime = DateTime.UtcNow.AddHours(-defaultHours),
-                CheckOutTime = DateTime.UtcNow
-            };
-        }
-        
-        state.State.SupervisorRating = rating;
-        state.State.Status = AttendanceStatus.Confirmed;
-        state.State.Modifications.Add(new AuditLog
-        {
-            OperatorId = supervisorId,
-            Action = "ForceConfirm",
-            Reason = "Coordinator bypassed check-in"
-        });
-        await state.WriteStateAsync();
-
-        var finalHours = state.State.DisputeLog?.AdjustedHours ?? state.State.VerifiedTime?.TotalHours ?? defaultHours;
-
-        await eventBus.PublishAsync(new AttendanceStatusChangedEvent(
-            this.GetPrimaryKey(), AttendanceStatus.Confirmed, state.State.VerifiedTime?.CheckOutTime, finalHours));
-
-        // Update volunteer impact score
-        var volunteerGrain = grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId);
-        await volunteerGrain.AddCompletedHours(finalHours);
-        await volunteerGrain.IncrementCompletedOpportunities();
-
-        logger.LogInformation("Attendance {Id} force-confirmed by supervisor {SupervisorId}, {Hours:F1}h",
-            this.GetPrimaryKey(), supervisorId, finalHours);
-    }
-
     public Task<AttendanceRecordState> GetState() => Task.FromResult(state.State);
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)

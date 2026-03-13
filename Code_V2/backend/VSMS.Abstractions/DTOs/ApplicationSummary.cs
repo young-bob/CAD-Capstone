@@ -14,5 +14,6 @@ public record ApplicationSummary(
     Guid VolunteerId,
     string VolunteerName,
     ApplicationStatus Status,
-    DateTime AppliedAt
+    DateTime AppliedAt,
+    AttendanceStatus? AttendanceStatus = null // null means no check-in record yet
 );

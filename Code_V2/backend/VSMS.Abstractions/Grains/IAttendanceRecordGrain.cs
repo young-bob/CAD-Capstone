@@ -12,7 +12,6 @@ public interface IAttendanceRecordGrain : IGrainWithGuidKey
     Task RaiseDispute(string reason, string evidenceUrl);
     Task ResolveDispute(Guid resolverId, string resolution, double adjustedHours);
     Task Confirm(Guid supervisorId, int rating);
-    Task ForceConfirm(double defaultHours, Guid supervisorId, int rating);
 
     Task<States.AttendanceRecordState> GetState();
 }

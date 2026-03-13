@@ -32,9 +32,6 @@ export const attendanceService = {
     confirm: async (id: string, data: { supervisorId: string; rating: number }): Promise<void> => {
         await api.post(`/api/attendance/${id}/confirm`, data);
     },
-    forceConfirm: async (data: { volunteerId: string; applicationId: string; opportunityId: string; supervisorId: string; rating: number; defaultHours: number }): Promise<void> => {
-        await api.post('/api/attendance/force-confirm', data);
-    },
     getPendingDisputes: async (): Promise<DisputeSummary[]> => {
         const res = await api.get<DisputeSummary[]>('/api/attendance/disputes/pending');
         return res.data;

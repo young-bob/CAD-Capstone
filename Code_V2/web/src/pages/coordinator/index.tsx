@@ -863,19 +863,14 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const doConfirm = async (app: ApplicationSummary) => {
         setActionId(app.volunteerId + '_a');
         try {
-            const ms = new Date(app.shiftEndTime).getTime() - new Date(app.shiftStartTime).getTime();
-            const defaultHours = ms > 0 ? ms / 3600000 : 2;
-            await attendanceService.forceConfirm({
-                volunteerId: app.volunteerId,
-                applicationId: app.applicationId,
-                opportunityId: app.opportunityId,
-                supervisorId: oppId,
-                rating: 5,
-                defaultHours
-            });
-            showToast('Attendance confirmed');
+            // Look up the attendance record for this volunteer in this opportunity
+            const records = await attendanceService.getByOpportunity(app.opportunityId);
+            const record = records.find(r => r.volunteerId === app.volunteerId);
+            if (!record) { showToast('No attendance record found — volunteer must check in first'); return; }
+            await attendanceService.confirm(record.attendanceId, { supervisorId: oppId, rating: 5 });
+            showToast('Attendance confirmed ✅');
             setTimeout(() => load(), 600);
-        } catch { showToast('Failed'); }
+        } catch (err: any) { showToast(err?.response?.data?.toString() || 'Failed to confirm'); }
         finally { setActionId(null); }
     };
 
@@ -984,7 +979,13 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                             <div key={app.applicationId} className="flex items-start justify-between py-3 border-b border-stone-50 last:border-0">
                                 <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
                                 <div className="flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => doConfirm(app)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
+                                    {app.attendanceStatus === 'Confirmed' ? (
+                                        <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm">✅ Confirmed</span>
+                                    ) : app.attendanceStatus === 'CheckedOut' || app.attendanceStatus === 'Resolved' ? (
+                                        <button onClick={() => doConfirm(app)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
+                                    ) : (
+                                        <span className="px-3 py-1.5 bg-stone-100 text-stone-400 rounded-lg text-sm">Awaiting Check-in</span>
+                                    )}
                                     <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
                                     <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
                                 </div>
