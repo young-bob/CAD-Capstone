@@ -378,6 +378,8 @@ export function CoordApplications() {
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [actionId, setActionId] = useState<string | null>(null);
+    const [toast, setToast] = useState('');
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) {
@@ -396,14 +398,32 @@ export function CoordApplications() {
 
     useEffect(() => { load(); }, [load]);
 
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
     const handleApprove = async (id: string) => {
-        try { await applicationService.approve(id); load(); }
-        catch (err: any) { setError(getErr(err, 'Failed to approve')); }
+        setActionId(id);
+        try {
+            await applicationService.approve(id);
+            // Optimistic update: immediately show new status
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: 'Approved' as any } : a));
+            showToast('Application approved ✅');
+            load();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to approve'));
+        } finally { setActionId(null); }
     };
 
     const handleReject = async (id: string) => {
-        try { await applicationService.reject(id, 'Application rejected.'); load(); }
-        catch (err: any) { setError(getErr(err, 'Failed to reject')); }
+        setActionId(id);
+        try {
+            await applicationService.reject(id, 'Application rejected.');
+            // Optimistic update
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: 'Rejected' as any } : a));
+            showToast('Application rejected');
+            load();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to reject'));
+        } finally { setActionId(null); }
     };
 
     const statusColors: Record<string, string> = {
@@ -413,6 +433,7 @@ export function CoordApplications() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
@@ -429,8 +450,12 @@ export function CoordApplications() {
                             </div>
                             {app.status === 'Pending' && (
                                 <div className="flex gap-3 shrink-0">
-                                    <button onClick={() => handleReject(app.applicationId)} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100">Reject</button>
-                                    <button onClick={() => handleApprove(app.applicationId)} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100">Approve</button>
+                                    <button onClick={() => handleReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
+                                        {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Reject
+                                    </button>
+                                    <button onClick={() => handleApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1">
+                                        {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Approve
+                                    </button>
                                 </div>
                             )}
                         </div>
