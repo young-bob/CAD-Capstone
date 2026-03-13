@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { fetchApi, getAuthToken, setAuthToken, removeAuthToken, decodeToken } from "@/lib/apiClient";
 
-export type AppRole = "volunteer" | "coordinator" | "admin";
+export type AppRole = "volunteer" | "coordinator" | "admin" | "organizationmanager";
 
 export interface User {
   id: string;
@@ -40,6 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function getPrimaryRole(roles: AppRole[]): AppRole {
   if (roles.includes("admin")) return "admin";
   if (roles.includes("coordinator")) return "coordinator";
+  if (roles.includes("organizationmanager")) return "organizationmanager";
   return "volunteer";
 }
 
@@ -52,6 +53,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = (token: string, userData: UserData) => {
     setAuthToken(token);
 
+<<<<<<< HEAD
+=======
+    // Map .NET UserInfo to our User shape
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
     const newUser: User = {
       id: userData.userId ?? userData.id ?? "",
       email: userData.email ?? "",
@@ -68,7 +73,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(newSession);
     setUser(newUser);
 
+<<<<<<< HEAD
     const role = (userData.role?.toLowerCase() ?? "volunteer") as AppRole;
+=======
+    const role: AppRole = userData.role?.toLowerCase() as AppRole || "volunteer";
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
     setRoles([role]);
   };
 
@@ -136,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");

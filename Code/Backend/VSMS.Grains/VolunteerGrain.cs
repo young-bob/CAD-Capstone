@@ -28,6 +28,10 @@ public class VolunteerGrain : Grain, IVolunteerGrain
     {
         _state.State.Profile = profile;
         await _state.WriteStateAsync();
+
+        var registry = GrainFactory.GetGrain<IRegistryGrain>(0);
+        await registry.RegisterVolunteer(profile);
+
         _logger.LogInformation("Profile updated for volunteer {VolunteerId}", this.GetPrimaryKey());
     }
 
@@ -114,5 +118,27 @@ public class VolunteerGrain : Grain, IVolunteerGrain
     public Task<List<Guid>> GetCertificates()
     {
         return Task.FromResult(_state.State.CertificateIds);
+    }
+
+    // Organization Membership
+    public Task<bool> IsMemberOf(Guid organizationId)
+    {
+        var isMember = _state.State.JoinedOrganizations != null && _state.State.JoinedOrganizations.Contains(organizationId);
+        return Task.FromResult(isMember);
+    }
+
+    public async Task ApplyToOrganization(Guid organizationId)
+    {
+        _logger.LogInformation("Volunteer {VolunteerId} applying to Organization {OrganizationId}", this.GetPrimaryKey(), organizationId);
+
+        if (_state.State.JoinedOrganizations == null)
+            _state.State.JoinedOrganizations = new List<Guid>();
+
+        if (!_state.State.JoinedOrganizations.Contains(organizationId))
+        {
+            _state.State.JoinedOrganizations.Add(organizationId);
+            await _state.WriteStateAsync();
+            _logger.LogInformation("Successfully joined organization {OrganizationId}", organizationId);
+        }
     }
 }

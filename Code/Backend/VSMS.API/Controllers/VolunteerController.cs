@@ -36,6 +36,7 @@ public class VolunteerController : ControllerBase
         return Ok();
     }
 
+<<<<<<< HEAD
     [HttpPost("{id}/apply/{opportunityId}")]
     public async Task<IActionResult> Apply(Guid id, Guid opportunityId)
     {
@@ -84,5 +85,21 @@ public class VolunteerController : ControllerBase
         }
 
         return Ok(result);
+=======
+    [HttpGet("{id}/organizations/{organizationId}/is-member")]
+    public async Task<IActionResult> IsMemberOf(Guid id, Guid organizationId)
+    {
+        var grain = _client.GetGrain<IVolunteerGrain>(id);
+        var isMember = await grain.IsMemberOf(organizationId);
+        return Ok(new { isMember });
+    }
+
+    [HttpPost("{id}/organizations/{organizationId}/apply")]
+    public async Task<IActionResult> ApplyToOrganization(Guid id, Guid organizationId)
+    {
+        var orgGrain = _client.GetGrain<IOrganizationGrain>(organizationId.ToString());
+        await orgGrain.SubmitApplication(id);
+        return Ok(new { Message = "Application submitted to organization for review." });
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
     }
 }

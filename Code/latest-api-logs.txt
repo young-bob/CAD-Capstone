@@ -1,0 +1,59 @@
+﻿warn: Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository[60]
+      Storing keys in a directory '/root/.aspnet/DataProtection-Keys' that may not be persisted outside of the container. Protected data will be unavailable when container is destroyed. For more information go to https://aka.ms/aspnet/dataprotectionwarning
+info: Orleans.OutsideRuntimeClient[100314]
+      Starting Orleans client with runtime version '10.0.1. Commit Hash: c39ab742c87aeaaea4b73c860875b8ace1295142+c39ab742c87aeaaea4b73c860875b8ace1295142 (Release).', local address 'C172.19.0.3:0:-131067630' and client id 'sys.client/0ff2fb59c8c542c59c54bd15d5f97562'.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {8f23da8c-50cf-41f5-ac81-72c9fcbaeef2} may be persisted to storage in unencrypted form.
+info: Orleans.Messaging.GatewayManager[101309]
+      Found '1' gateways: '[gwy.tcp://172.19.0.2:30000/131067630]'.
+info: Orleans.Runtime.Messaging.NetworkingTrace[1075251272]
+      Establishing connection to endpoint S172.19.0.2:30000:0
+info: Orleans.Runtime.Messaging.NetworkingTrace[738228604]
+      Connected to endpoint S172.19.0.2:30000:0
+info: Orleans.Runtime.Messaging.NetworkingTrace[1513999691]
+      Established connection to S172.19.0.2:11111:131067630 with protocol version Version1
+info: Orleans.Runtime.Messaging.NetworkingTrace[2055215275]
+      Connection [Local: 172.19.0.3:56400, Remote: 172.19.0.2:30000, ConnectionId: 0HNJKOT1OURB8] established with S172.19.0.2:30000:0
+info: Orleans.OutsideRuntimeClient[100929]
+      Started client with address '[GrainAddress GrainId sys.client/0ff2fb59c8c542c59c54bd15d5f97562, ActivationId: @87161b22da884faeb33e7064e5a33eb4, SiloAddress: C172.19.0.3:0:-131067630]' and id 'sys.client/0ff2fb59c8c542c59c54bd15d5f97562'.
+info: Orleans.ClientOptionsLogger[54896279]
+      Configuration Orleans.Configuration.ClientMessagingOptions:
+      ClientSenderBuckets: 8192
+      PreferredFamily: InterNetwork
+      NetworkInterfaceName: 
+      LocalAddress: 
+      ResponseTimeout: 00:00:30
+      ResponseTimeoutWithDebugger: 00:30:00
+      DropExpiredMessages: True
+      MaxMessageHeaderSize: 10485760
+      MaxMessageBodySize: 104857600
+      CancelRequestOnTimeout: False
+      WaitForCancellationAcknowledgement: False
+      CancelUnknownRequestOnStatusUpdate: False
+      
+info: Orleans.ClientOptionsLogger[54896279]
+      Configuration Orleans.Configuration.ClusterOptions:
+      ClusterId: default
+      ServiceId: default
+      
+info: Orleans.ClientOptionsLogger[54896279]
+      Configuration Orleans.Configuration.ConnectionOptions:
+      ProtocolVersion: Version1
+      ConnectionsPerEndpoint: 1
+      ConnectionRetryDelay: 00:00:01
+      OpenConnectionTimeout: 00:00:05
+      
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://[::]:8080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /opt/vsms
+info: VSMS.API.Controllers.AuthController[0]
+      User logged in: 87d93611-bc92-410c-9710-5750f2b741fa
+info: VSMS.API.Controllers.AuthController[0]
+      User logged out: 87d93611-bc92-410c-9710-5750f2b741fa
+info: VSMS.API.Controllers.AuthController[0]
+      User logged in: 2afd2704-d7d3-4f64-a380-d7f43c118952

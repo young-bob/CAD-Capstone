@@ -15,6 +15,10 @@ public interface IVolunteerGrain : IGrainWithGuidKey
     Task<Application> ApplyForOpportunity(Guid opportunityId);
     Task<List<Application>> GetApplications();
 
+    Task<bool> IsMemberOf(Guid organizationId);
+    Task ApplyToOrganization(Guid organizationId);
+
+
     Task CheckIn(Guid opportunityId, Location location);
     Task CheckOut(Guid opportunityId);
 

@@ -8,6 +8,7 @@ export interface Opportunity {
   id: number;
   title: string;
   org: string;
+  orgId: string;
   orgType: string;
   distance: string;
   hours: string;
@@ -16,6 +17,7 @@ export interface Opportunity {
   spots: number;
   recommended: boolean;
   description: string;
+  orgIsActive?: boolean;
 }
 
 interface Props {
@@ -23,6 +25,7 @@ interface Props {
   index: number;
   isHighlighted: boolean;
   onHover: (id: number | null) => void;
+<<<<<<< HEAD
   onApply?: () => void;
   isApplied?: boolean;
   isFull?: boolean;
@@ -30,6 +33,12 @@ interface Props {
 }
 
 const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onApply, isApplied, isFull, applying }: Props) => {
+=======
+  onApply: (opportunity: Opportunity) => void;
+}
+
+const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onApply }: Props) => {
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
   const [isHovered, setIsHovered] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -50,9 +59,8 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onAp
       transition={{ delay: index * 0.04, duration: 0.3 }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`card-elevated p-5 cursor-pointer transition-all duration-200 ${
-        isHighlighted ? "ring-2 ring-primary/40 shadow-elevated" : ""
-      }`}
+      className={`card-elevated p-5 cursor-pointer transition-all duration-200 ${isHighlighted ? "ring-2 ring-primary/40 shadow-elevated" : ""
+        }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2 flex-1 min-w-0">
@@ -127,11 +135,11 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onAp
             className="p-1.5 rounded-full hover:bg-muted transition-colors"
           >
             <Heart
-              className={`w-4 h-4 transition-colors ${
-                saved ? "fill-destructive text-destructive" : "text-muted-foreground"
-              }`}
+              className={`w-4 h-4 transition-colors ${saved ? "fill-destructive text-destructive" : "text-muted-foreground"
+                }`}
             />
           </button>
+<<<<<<< HEAD
           <motion.div whileHover={!isApplied && !isFull ? { scale: 1.05 } : {}} whileTap={!isApplied && !isFull ? { scale: 0.95 } : {}}>
             {isApplied ? (
               <Badge className="bg-secondary/10 text-secondary border-0 text-[10px]">Applied</Badge>
@@ -147,6 +155,19 @@ const OpportunityCard = ({ opportunity: opp, index, isHighlighted, onHover, onAp
                 {applying ? "Applying..." : "Apply"}
               </Button>
             )}
+=======
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onApply(opp);
+              }}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 text-xs font-semibold shadow-sm"
+            >
+              Apply
+            </Button>
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
           </motion.div>
         </div>
       </div>
