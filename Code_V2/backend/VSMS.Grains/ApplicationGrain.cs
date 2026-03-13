@@ -46,6 +46,21 @@ public class ApplicationGrain(
         state.State.Status = ApplicationStatus.Approved;
         await state.WriteStateAsync();
 
+        // Create the Attendance Record for this volunteer/application
+        // Use a deterministic Guid derived from the applicationId so it's idempotent
+        var attendanceId = state.State.AttendanceRecordId == Guid.Empty
+            ? Guid.NewGuid()
+            : state.State.AttendanceRecordId;
+
+        if (state.State.AttendanceRecordId == Guid.Empty)
+        {
+            state.State.AttendanceRecordId = attendanceId;
+            await state.WriteStateAsync();
+        }
+
+        var attendanceGrain = grainFactory.GetGrain<IAttendanceRecordGrain>(attendanceId);
+        await attendanceGrain.Initialize(state.State.VolunteerId, this.GetPrimaryKey(), state.State.OpportunityId);
+
         // Notify volunteer
         var notif = grainFactory.GetGrain<INotificationGrain>(Guid.Empty);
         await notif.SendNotification(state.State.VolunteerId, "ApplicationApproved",
@@ -53,7 +68,7 @@ public class ApplicationGrain(
 
         await eventBus.PublishAsync(new ApplicationStatusChangedEvent(this.GetPrimaryKey(), ApplicationStatus.Approved));
 
-        logger.LogInformation("Application {Id} approved", this.GetPrimaryKey());
+        logger.LogInformation("Application {Id} approved, attendance record {AttId} created", this.GetPrimaryKey(), attendanceId);
     }
 
     public async Task Reject(string reason)

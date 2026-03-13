@@ -14,4 +14,5 @@ public sealed class ApplicationState
     [Id(5)] public DateTime? ExpirationTime { get; set; }
     [Id(6)] public Dictionary<string, string> QuestionAnswers { get; set; } = new();
     [Id(7)] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Id(8)] public Guid AttendanceRecordId { get; set; } = Guid.Empty;
 }
