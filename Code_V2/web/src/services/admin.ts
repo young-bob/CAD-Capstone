@@ -25,4 +25,17 @@ export const adminService = {
         const res = await api.get<OrganizationSummary[]>('/api/admin/pending-organizations');
         return res.data;
     },
+    getAllOrganizations: async (): Promise<OrganizationSummary[]> => {
+        const [pending, approved] = await Promise.all([
+            api.get<OrganizationSummary[]>('/api/organizations/pending'),
+            api.get<OrganizationSummary[]>('/api/organizations/approved'),
+        ]);
+        return [...(pending.data || []), ...(approved.data || [])];
+    },
+    resetPassword: async (userId: string, newPassword: string): Promise<void> => {
+        await api.post(`/api/admin/users/${userId}/reset-password`, { newPassword });
+    },
+    reassignCoordinator: async (orgId: string, coordinatorUserId: string): Promise<void> => {
+        await api.post(`/api/admin/organizations/${orgId}/reassign-coordinator`, { coordinatorUserId });
+    },
 };

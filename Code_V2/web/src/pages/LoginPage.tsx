@@ -21,7 +21,8 @@ export default function LoginPage({ onBack }: Props) {
             await auth.login({ email, password });
             // Navigation is handled by App.tsx effect
         } catch (err: any) {
-            setError(err.response?.data?.message || err.response?.data || 'Login failed. Please check your credentials.');
+            const d = err?.response?.data;
+            setError(typeof d === 'string' ? d : (d?.message || d?.error || d?.Error || 'Login failed. Please check your credentials.'));
         } finally {
             setLoading(false);
         }

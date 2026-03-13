@@ -59,6 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    // Listen for 401 unauthorized event dispatched by API interceptor
+    useEffect(() => {
+        const handler = () => dispatch({ type: 'LOGOUT' });
+        window.addEventListener('vsms-unauthorized', handler);
+        return () => window.removeEventListener('vsms-unauthorized', handler);
+    }, []);
+
     const login = async (data: LoginRequest) => {
         const res = await authService.login(data);
         localStorage.setItem('vsms_token', res.token);

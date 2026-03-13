@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2 } from 'lucide-react';
 import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
@@ -15,6 +15,7 @@ function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
     return (<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center"><AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" /><p className="text-rose-700 font-medium">{msg}</p>{onRetry && <button onClick={onRetry} className="mt-3 text-sm text-orange-600 font-bold hover:underline">Retry</button>}</div>);
 }
 function Empty({ msg }: { msg: string }) { return <div className="text-center py-16 text-stone-400 font-medium">{msg}</div>; }
+function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR DASHBOARD
@@ -214,28 +215,33 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
     const [creating, setCreating] = useState(false);
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) return;
+        if (!auth.linkedGrainId) {
+            setError('No organization linked to your account.');
+            setLoading(false);
+            return;
+        }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getOpportunities(auth.linkedGrainId);
-            setOpps(data);
+            setOpps(data || []);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load events');
+            setError(getErr(err, 'Failed to load events'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
 
     const handleCreate = async () => {
-        if (!auth.linkedGrainId || !createForm.title) return;
-        setCreating(true);
+        if (!auth.linkedGrainId) { setError('No organization linked to your account.'); return; }
+        if (!createForm.title) { setError('Title is required.'); return; }
+        setCreating(true); setError('');
         try {
             await organizationService.createOpportunity(auth.linkedGrainId, createForm);
             setShowCreate(false);
             setCreateForm({ title: '', description: '', category: '' });
-            load();
+            await load();
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to create opportunity');
+            setError(getErr(err, 'Failed to create opportunity'));
         } finally { setCreating(false); }
     };
 
@@ -244,7 +250,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
             await opportunityService.publish(id);
             load();
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to publish');
+            setError(getErr(err, 'Failed to publish'));
         }
     };
 
@@ -260,16 +266,16 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps = {})
         <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-extrabold text-stone-800">Manage Events</h1>
-                <button onClick={() => setShowCreate(!showCreate)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
+                <button onClick={() => { setShowCreate(!showCreate); setError(''); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
             </div>
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
                     <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
-                    <input placeholder="Title" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <input placeholder="Title *" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Category (e.g. Environment)" value={createForm.category} onChange={e => setCreateForm(p => ({ ...p, category: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <textarea placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" rows={3} />
                     <div className="flex gap-3 justify-end">
-                        <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                        <button onClick={() => { setShowCreate(false); setError(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                         <button onClick={handleCreate} disabled={creating} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
                             {creating && <Loader2 className="w-4 h-4 animate-spin" />}Create
                         </button>
@@ -314,13 +320,17 @@ export function CoordApplications() {
     const [error, setError] = useState('');
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) return;
+        if (!auth.linkedGrainId) {
+            setError('No organization linked to your account.');
+            setLoading(false);
+            return;
+        }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getApplications(auth.linkedGrainId);
-            setApps(data);
+            setApps(data || []);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load applications');
+            setError(getErr(err, 'Failed to load applications'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -328,12 +338,12 @@ export function CoordApplications() {
 
     const handleApprove = async (id: string) => {
         try { await applicationService.approve(id); load(); }
-        catch (err: any) { setError(err.response?.data || 'Failed to approve'); }
+        catch (err: any) { setError(getErr(err, 'Failed to approve')); }
     };
 
     const handleReject = async (id: string) => {
         try { await applicationService.reject(id, 'Application rejected.'); load(); }
-        catch (err: any) { setError(err.response?.data || 'Failed to reject'); }
+        catch (err: any) { setError(getErr(err, 'Failed to reject')); }
     };
 
     const statusColors: Record<string, string> = {
@@ -387,13 +397,17 @@ export function CoordMembers() {
     const [toast, setToast] = useState('');
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) return;
+        if (!auth.linkedGrainId) {
+            setError('No organization linked to your account.');
+            setLoading(false);
+            return;
+        }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getById(auth.linkedGrainId);
             setOrg(data);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load organization');
+            setError(getErr(err, 'Failed to load organization'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -412,7 +426,7 @@ export function CoordMembers() {
             showToast('Member invited!');
             load();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to invite member');
+            showToast(getErr(err, 'Failed to invite member'));
         } finally { setInviting(false); }
     };
 
@@ -482,7 +496,6 @@ export function CoordMembers() {
 
             {error && <ErrorBox msg={error} onRetry={load} />}
 
-            {/* Tabs */}
             <div className="flex gap-1 bg-stone-100 p-1 rounded-2xl w-fit">
                 {(['members', 'blocked'] as const).map(t => (
                     <button key={t} onClick={() => setTab(t)}
@@ -530,6 +543,7 @@ export function CoordMembers() {
         </div>
     );
 }
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR CERT TEMPLATES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -541,14 +555,21 @@ export function CoordCertTemplates() {
     const [showCreate, setShowCreate] = useState(false);
     const [createForm, setCreateForm] = useState({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C' });
     const [creating, setCreating] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
+    const [editForm, setEditForm] = useState({ name: '', description: '', primaryColor: '', accentColor: '' });
+    const [saving, setSaving] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [toast, setToast] = useState('');
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
             const data = await certificateService.getTemplates(auth.linkedGrainId || undefined);
-            setTemplates(data);
+            setTemplates(data || []);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load templates');
+            setError(getErr(err, 'Failed to load templates'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -564,21 +585,61 @@ export function CoordCertTemplates() {
             });
             setShowCreate(false);
             setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C' });
+            showToast('Template created!');
             load();
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to create template');
+            setError(getErr(err, 'Failed to create template'));
         } finally { setCreating(false); }
+    };
+
+    const openEdit = (t: CertificateTemplate) => {
+        setShowCreate(false);
+        setEditingTemplate(t);
+        setEditForm({ name: t.name, description: t.description, primaryColor: t.primaryColor, accentColor: t.accentColor });
+        setDeleteConfirm(null);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingTemplate) return;
+        setSaving(true);
+        try {
+            await certificateService.updateTemplate(editingTemplate.id, editForm);
+            setEditingTemplate(null);
+            showToast('Template updated!');
+            load();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to update template'));
+        } finally { setSaving(false); }
+    };
+
+    const handleDelete = async (id: string) => {
+        try {
+            await certificateService.deleteTemplate(id);
+            setDeleteConfirm(null);
+            setEditingTemplate(null);
+            showToast('Template deleted');
+            load();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to delete template'));
+        }
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
             <div className="flex justify-between items-center">
-                <div><h1 className="text-3xl font-extrabold text-stone-800">Certificate Templates</h1><p className="text-stone-500 mt-2 text-lg">Manage your organization's certificate designs.</p></div>
-                <button onClick={() => setShowCreate(!showCreate)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> New Template</button>
+                <div>
+                    <h1 className="text-3xl font-extrabold text-stone-800">Certificate Templates</h1>
+                    <p className="text-stone-500 mt-2 text-lg">Click any template to edit. Manage your certificate designs.</p>
+                </div>
+                <button onClick={() => { setShowCreate(!showCreate); setEditingTemplate(null); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> New Template</button>
             </div>
+
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
-                    <input placeholder="Template Name" value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <h3 className="text-lg font-bold text-stone-800">New Template</h3>
+                    <input placeholder="Template Name *" value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <div className="flex gap-4">
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={createForm.primaryColor} onChange={e => setCreateForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
@@ -592,15 +653,56 @@ export function CoordCertTemplates() {
                     </div>
                 </div>
             )}
+
+            {/* Edit panel */}
+            {editingTemplate && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2"><Pencil className="w-5 h-5 text-orange-500" /> Edit Template</h3>
+                        <button onClick={() => setEditingTemplate(null)} className="p-1 text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
+                    </div>
+                    <input placeholder="Template Name *" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <input placeholder="Description" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <div className="flex gap-4">
+                        <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={editForm.primaryColor} onChange={e => setEditForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
+                        <div><label className="block text-sm font-medium text-stone-600 mb-1">Accent Color</label><input type="color" value={editForm.accentColor} onChange={e => setEditForm(p => ({ ...p, accentColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
+                    </div>
+                    <div className="flex gap-3 justify-between">
+                        {deleteConfirm === editingTemplate.id ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-rose-600 font-medium">Delete this template?</span>
+                                <button onClick={() => handleDelete(editingTemplate.id)} className="px-3 py-1.5 bg-rose-500 text-white font-bold rounded-lg text-sm hover:bg-rose-600">Yes, Delete</button>
+                                <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1.5 bg-stone-100 text-stone-600 font-bold rounded-lg text-sm hover:bg-stone-200">Cancel</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setDeleteConfirm(editingTemplate.id)} className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">
+                                <Trash2 className="w-4 h-4" /> Delete
+                            </button>
+                        )}
+                        <div className="flex gap-3">
+                            <button onClick={() => setEditingTemplate(null)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleSaveEdit} disabled={saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
+                                {saving && <Loader2 className="w-4 h-4 animate-spin" />}Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {loading ? <Spinner /> : templates.length === 0 ? <Empty msg="No templates yet." /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {templates.map(t => (
-                        <div key={t.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.primaryColor }}></div>
-                                <h3 className="font-bold text-stone-800">{t.name}</h3>
-                                {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded">System</span>}
+                        <div key={t.id}
+                            onClick={() => openEdit(t)}
+                            className={`bg-white rounded-3xl p-6 shadow-sm border cursor-pointer hover:shadow-md hover:border-orange-200 transition-all ${editingTemplate?.id === t.id ? 'border-orange-300 ring-2 ring-orange-200' : 'border-stone-100'}`}>
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.primaryColor }}></div>
+                                    <h3 className="font-bold text-stone-800">{t.name}</h3>
+                                    {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded">System</span>}
+                                </div>
+                                <Pencil className="w-4 h-4 text-stone-300" />
                             </div>
                             <p className="text-sm text-stone-500">{t.description}</p>
                         </div>

@@ -87,6 +87,9 @@ data/
 # Environment files
 .env
 !.env.example
+# Local dev secrets — never commit these
+appsettings.Development.json
+appsettings.Local.json
 
 # ====================
 # Other

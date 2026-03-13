@@ -25,6 +25,7 @@ function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
 function Empty({ msg }: { msg: string }) {
     return <div className="text-center py-16 text-stone-400 font-medium">{msg}</div>;
 }
+function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER DASHBOARD
@@ -44,7 +45,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
             const p = await volunteerService.getProfile(auth.linkedGrainId);
             setProfile(p);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load profile');
+            setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -101,7 +102,7 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
             const data = await opportunityService.search(q);
             setOpps(data);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load opportunities');
+            setError(getErr(err, 'Failed to load opportunities'));
         } finally { setLoading(false); }
     }, []);
 
@@ -178,7 +179,7 @@ export function VolApplications() {
             const data = await applicationService.getForVolunteer(auth.linkedGrainId);
             setApps(data);
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load applications');
+            setError(getErr(err, 'Failed to load applications'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -459,29 +460,38 @@ export function VolCertificates() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER PROFILE
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function VolProfile() {
+interface VolProfileProps { onNavigate?: (view: ViewName) => void; }
+
+export function VolProfile({ onNavigate }: VolProfileProps) {
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [skills, setSkills] = useState<Skill[]>([]);
+    const [allSkills, setAllSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', bio: '' });
+    const [showAddSkill, setShowAddSkill] = useState(false);
+    const [toast, setToast] = useState('');
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const [p, s] = await Promise.all([
+            const [p, s, all] = await Promise.all([
                 volunteerService.getProfile(auth.linkedGrainId),
                 skillService.getVolunteerSkills(auth.userId!),
+                skillService.getAll(),
             ]);
             setProfile(p);
-            setSkills(s);
+            setSkills(s || []);
+            setAllSkills(all || []);
             setForm({ firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, bio: p.bio });
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load profile');
+            setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
     }, [auth.linkedGrainId, auth.userId]);
 
@@ -494,7 +504,7 @@ export function VolProfile() {
             await volunteerService.updateProfile(auth.linkedGrainId, form);
             setSuccess('Profile updated!');
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to save profile');
+            setError(getErr(err, 'Failed to save profile'));
         } finally { setSaving(false); }
     };
 
@@ -516,18 +526,34 @@ export function VolProfile() {
         try {
             await skillService.removeSkill(auth.userId, skillId);
             setSkills(prev => prev.filter(s => s.id !== skillId));
+            showToast('Skill removed');
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to remove skill');
+            setError(getErr(err, 'Failed to remove skill'));
+        }
+    };
+
+    const handleAddSkill = async (skill: Skill) => {
+        if (!auth.userId) return;
+        try {
+            await skillService.addSkill(auth.userId, skill.id);
+            setSkills(prev => [...prev, skill]);
+            showToast(`Added: ${skill.name}`);
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to add skill'));
         }
     };
 
     if (loading) return <Spinner />;
     if (error && !profile) return <ErrorBox msg={error} onRetry={load} />;
 
+    const mySkillIds = new Set(skills.map(s => s.id));
+    const availableToAdd = allSkills.filter(s => !mySkillIds.has(s.id));
+
     const initials = `${form.firstName?.charAt(0) || ''}${form.lastName?.charAt(0) || ''}`.toUpperCase() || '?';
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             <div><h1 className="text-3xl font-extrabold text-stone-800">Profile & Skills</h1></div>
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {success && <div className="p-3 bg-emerald-50 text-emerald-600 text-sm font-medium rounded-xl border border-emerald-100">{success}</div>}
@@ -550,8 +576,17 @@ export function VolProfile() {
                     {saving ? 'Saving...' : 'Save Profile'}
                 </button>
             </div>
+            {/* Skills section with add */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
-                <h3 className="text-xl font-bold text-stone-800 mb-4">Skills</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-stone-800">My Skills</h3>
+                    <button
+                        onClick={() => setShowAddSkill(v => !v)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 hover:bg-orange-100 transition-colors"
+                    >
+                        + Add Skill
+                    </button>
+                </div>
                 <div className="flex flex-wrap gap-3">
                     {skills.map(s => (
                         <span key={s.id} className="px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 flex items-center gap-2">
@@ -608,7 +643,7 @@ export function VolSkills() {
             setAllSkills(all);
             setMySkillIds(new Set(mine.map(s => s.id)));
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load skills');
+            setError(getErr(err, 'Failed to load skills'));
         } finally { setLoading(false); }
     }, [auth.userId]);
 
@@ -664,11 +699,10 @@ export function VolSkills() {
                                             key={skill.id}
                                             onClick={() => toggle(skill)}
                                             title={skill.description}
-                                            className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${
-                                                selected
+                                            className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${selected
                                                     ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/30'
                                                     : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600'
-                                            }`}
+                                                }`}
                                         >
                                             {selected && <span className="mr-1">✓</span>}
                                             {skill.name}
