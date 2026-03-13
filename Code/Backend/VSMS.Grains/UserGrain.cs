@@ -31,6 +31,11 @@ public class UserGrain : Grain, IUserGrain
 
         _state.State.User = user;
         await _state.WriteStateAsync();
+
+        // Also register globally so Admins can see them
+        var registry = this.GrainFactory.GetGrain<IRegistryGrain>(0);
+        await registry.RegisterUser(user);
+
         _logger.LogInformation("Created user: {UserId} with role {Role}", user.UserId, user.Role);
     }
 
@@ -76,6 +81,18 @@ public class UserGrain : Grain, IUserGrain
         return true;
     }
 
+    public async Task ForceResetPassword(string newPassword)
+    {
+        if (_state.State.User == null)
+            throw new InvalidOperationException("User does not exist");
+
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        _state.State.User = _state.State.User with { PasswordHash = hashedPassword };
+        await _state.WriteStateAsync();
+
+        _logger.LogInformation("Admin forcibly reset password for user {UserId}", this.GetPrimaryKey());
+    }
+
     public Task<User?> GetProfile()
     {
         return Task.FromResult(_state.State.User);
@@ -118,5 +135,28 @@ public class UserGrain : Grain, IUserGrain
     public Task<string?> GetEmail()
     {
         return Task.FromResult(_state.State.User?.Email);
+    }
+
+    public async Task UpdateRole(string newRole)
+    {
+        if (_state.State.User == null)
+            throw new InvalidOperationException("User does not exist");
+
+        _state.State.User = _state.State.User with { Role = newRole };
+        await _state.WriteStateAsync();
+
+        var registry = this.GrainFactory.GetGrain<IRegistryGrain>(0);
+        await registry.RegisterUser(_state.State.User);
+
+        _logger.LogInformation("Updated role to {Role} for user {UserId}", newRole, this.GetPrimaryKey());
+    }
+
+    public async Task DeleteUser()
+    {
+        if (_state.State.User != null)
+        {
+            await _state.ClearStateAsync();
+            _logger.LogInformation("Deleted user {UserId}", this.GetPrimaryKey());
+        }
     }
 }

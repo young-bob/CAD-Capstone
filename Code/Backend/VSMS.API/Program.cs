@@ -69,6 +69,13 @@ builder.Host.UseOrleansClient(client =>
             options.Invariant = "Npgsql";
             options.ConnectionString = connectionString;
         });
+
+        client.UseConnectionRetryFilter(async (exception, cancellationToken) =>
+        {
+            Console.WriteLine($"Failed to connect to Orleans cluster. Retrying in 3 seconds... Exception: {exception.Message}");
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+            return true;
+        });
     }
     else
     {

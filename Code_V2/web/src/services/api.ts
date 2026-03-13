@@ -24,9 +24,13 @@ api.interceptors.response.use(
     (response: AxiosResponse) => response,
     (error: AxiosError) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('vsms_token');
-            localStorage.removeItem('vsms_user');
-            // Auth context will detect and redirect
+            const url = error.config?.url || '';
+            // Don't auto-logout on auth endpoints (wrong password returns 401 too)
+            if (!url.includes('/api/auth/')) {
+                localStorage.removeItem('vsms_token');
+                localStorage.removeItem('vsms_user');
+                window.dispatchEvent(new Event('vsms-unauthorized'));
+            }
         }
         return Promise.reject(error);
     }

@@ -1,5 +1,8 @@
 import { fetchApi } from '@/lib/apiClient';
+<<<<<<< HEAD
 import type { Application } from './opportunityService';
+=======
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
 
 export interface Location {
   latitude: number;
@@ -22,6 +25,7 @@ export interface VolunteerProfile {
 }
 
 export const volunteerService = {
+<<<<<<< HEAD
   getProfile: (id: string) =>
     fetchApi<VolunteerProfile>(`/volunteer/${id}`),
 
@@ -38,4 +42,19 @@ export const volunteerService = {
 
   getApplications: (volunteerId: string) =>
     fetchApi<Application[]>(`/volunteer/${volunteerId}/applications`),
+=======
+  getProfile: async (id: string) =>
+    await fetchApi<VolunteerProfile>(`/api/Volunteer/${id}`),
+
+  updateProfile: async (id: string, profile: VolunteerProfile) =>
+    await fetchApi<void>(`/api/Volunteer/${id}`, { method: "POST", body: JSON.stringify(profile) }),
+
+  isMemberOf: async (id: string, organizationId: string) => {
+    const res = await fetchApi<{ isMember: boolean }>(`/api/Volunteer/${id}/organizations/${organizationId}/is-member`);
+    return res.isMember;
+  },
+
+  applyToOrganization: async (id: string, organizationId: string) =>
+    await fetchApi<void>(`/api/Volunteer/${id}/organizations/${organizationId}/apply`, { method: "POST" }),
+>>>>>>> ea71196db2b2d45c0d03ad964ec61df1b885cd0b
 };

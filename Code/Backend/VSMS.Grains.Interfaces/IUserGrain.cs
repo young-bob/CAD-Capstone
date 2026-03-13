@@ -8,6 +8,7 @@ public interface IUserGrain : IGrainWithGuidKey
     // Authentication
     Task<bool> ValidatePassword(string password);
     Task<bool> ResetPassword(string oldPassword, string newPassword);
+    Task ForceResetPassword(string newPassword);
 
     // User Management
     Task CreateUser(User user);
@@ -19,4 +20,6 @@ public interface IUserGrain : IGrainWithGuidKey
     // Role Management
     Task<string?> GetRole();
     Task<string?> GetEmail();
+    Task UpdateRole(string newRole);
+    Task DeleteUser();
 }

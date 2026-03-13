@@ -41,11 +41,6 @@ public class AuthController : ControllerBase
                 return BadRequest(new { Message = "Email and password are required" });
             }
 
-            if (request.Role != "Volunteer" && request.Role != "Coordinator")
-            {
-                return BadRequest(new { Message = "Role must be either 'Volunteer' or 'Coordinator'" });
-            }
-
             // Check if email already exists
             var emailIndexGrain = _client.GetGrain<IEmailIndexGrain>(request.Email.ToLower());
             var existingUserId = await emailIndexGrain.GetUserIdByEmail();
@@ -54,6 +49,11 @@ public class AuthController : ControllerBase
             {
                 return Conflict(new { Message = "Email already registered" });
             }
+
+            // All public registrations default strictly to "User" role.
+            // They can later be promoted to "Volunteer" by a Coordinator 
+            // or to "Coordinator" by an Admin.
+            string assignedRole = "User";
 
             // Create new user
             var userId = Guid.NewGuid();
@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
                 userId,
                 request.Email.ToLower(),
                 hashedPassword,
-                request.Role,
+                assignedRole,
                 DateTime.UtcNow,
                 null,
                 true
@@ -76,28 +76,7 @@ public class AuthController : ControllerBase
             // Register email index
             await emailIndexGrain.RegisterEmail(userId);
 
-            // Create corresponding Volunteer or Coordinator grain
-            if (request.Role == "Volunteer")
-            {
-                var volunteerGrain = _client.GetGrain<IVolunteerGrain>(userId);
-                await volunteerGrain.UpdateProfile(new VolunteerProfile(
-                    userId,
-                    request.Name ?? "User",
-                    request.Email,
-                    request.PhoneNumber ?? "",
-                    request.Bio ?? "",
-                    0.0,
-                    request.Location ?? new Location(0, 0, "", "", "", ""),
-                    new List<Guid>()
-                ));
-            }
-            else if (request.Role == "Coordinator")
-            {
-                var coordinatorGrain = _client.GetGrain<ICoordinatorGrain>(userId);
-                // Initialize coordinator profile if needed
-            }
-
-            _logger.LogInformation("New user registered: {UserId}, Role: {Role}", userId, request.Role);
+            _logger.LogInformation("New base user registered: {UserId}, Role: {Role}", userId, assignedRole);
 
             return Created($"/api/auth/{userId}", new
             {
@@ -111,6 +90,65 @@ public class AuthController : ControllerBase
         {
             _logger.LogError(ex, "Error during registration");
             return StatusCode(500, new { Message = "An error occurred during registration" });
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("setup-admin")]
+    public async Task<IActionResult> SetupAdmin([FromBody] RegisterRequest request)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new { Message = "Email and password are required" });
+            }
+
+            // Check if email already exists
+            var emailIndexGrain = _client.GetGrain<IEmailIndexGrain>(request.Email.ToLower());
+            var existingUserId = await emailIndexGrain.GetUserIdByEmail();
+
+            if (existingUserId.HasValue)
+            {
+                return Conflict(new { Message = "Email already registered" });
+            }
+
+            // Create new admin user
+            var userId = Guid.NewGuid();
+            var userGrain = _client.GetGrain<IUserGrain>(userId);
+
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            var user = new User(
+                userId,
+                request.Email.ToLower(),
+                hashedPassword,
+                "admin",
+                DateTime.UtcNow,
+                null,
+                true
+            );
+
+            await userGrain.CreateUser(user);
+
+            // Register email index
+            await emailIndexGrain.RegisterEmail(userId);
+
+            _logger.LogInformation("New admin user registered: {UserId}", userId);
+
+            return Created($"/api/auth/{userId}", new
+            {
+                UserId = userId,
+                Email = user.Email,
+                Role = user.Role,
+                Message = "Admin setup successful"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during admin setup");
+            return StatusCode(500, new { Message = "An error occurred during admin setup" });
         }
     }
 
@@ -286,7 +324,6 @@ public record RegisterRequest(
     string Name,
     string Email,
     string Password,
-    string Role,  // "Volunteer" or "Coordinator"
     string? PhoneNumber,
     string? Bio,
     Location? Location

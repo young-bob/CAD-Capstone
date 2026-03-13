@@ -38,6 +38,20 @@ public static class SkillEndpoints
             return Results.Created($"/api/skills/{skill.Id}", new { skill.Id, skill.Name, skill.Category });
         }).RequireAuthorization(p => p.RequireRole("SystemAdmin"));
 
+        // Update a skill definition
+        group.MapPut("/{id:guid}", async (Guid id, CreateSkillRequest req, AppDbContext db) =>
+        {
+            var skill = await db.Skills.FindAsync(id);
+            if (skill is null) return Results.NotFound(new { Error = "Skill not found." });
+            if (await db.Skills.AnyAsync(s => s.Name == req.Name && s.Id != id))
+                return Results.Conflict(new { Error = "A skill with this name already exists." });
+            skill.Name = req.Name;
+            skill.Category = req.Category;
+            skill.Description = req.Description;
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }).RequireAuthorization(p => p.RequireRole("SystemAdmin"));
+
         // Delete a skill
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db) =>
         {
@@ -46,6 +60,29 @@ public static class SkillEndpoints
             db.Skills.Remove(skill);
             await db.SaveChangesAsync();
             return Results.NoContent();
+        }).RequireAuthorization(p => p.RequireRole("SystemAdmin"));
+
+        // Bulk import skills — skips duplicates by name
+        group.MapPost("/bulk", async (List<CreateSkillRequest> reqs, AppDbContext db) =>
+        {
+            var results = new List<object>();
+            foreach (var req in reqs)
+            {
+                if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Category))
+                {
+                    results.Add(new { Name = req.Name ?? "", Status = "Skipped", Reason = "Missing name or category" });
+                    continue;
+                }
+                if (await db.Skills.AnyAsync(s => s.Name == req.Name))
+                {
+                    results.Add(new { req.Name, Status = "Skipped", Reason = "Already exists" });
+                    continue;
+                }
+                db.Skills.Add(new SkillEntity { Name = req.Name, Category = req.Category, Description = req.Description });
+                results.Add(new { req.Name, Status = "Created" });
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok(results);
         }).RequireAuthorization(p => p.RequireRole("SystemAdmin"));
 
         // ─── Volunteer skill management (Orleans-first) ──────────────────────

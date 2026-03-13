@@ -249,6 +249,8 @@ export interface UserRecord {
     isBanned: boolean;
     linkedGrainId: string;
     createdAt: string;
+    organizationId?: string;
+    organizationName?: string;
 }
 
 export interface DisputeSummary {

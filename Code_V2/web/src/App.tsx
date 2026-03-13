@@ -1,6 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react';
 import type { ViewName } from './types';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+    constructor(props: { children: ReactNode }) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error: Error) { return { error }; }
+    componentDidCatch(error: Error, info: ErrorInfo) { console.error('App error:', error, info); }
+    render() {
+        if (this.state.error) {
+            return (
+                <div style={{ padding: 40, fontFamily: 'monospace', background: '#fff5f5', minHeight: '100vh' }}>
+                    <h2 style={{ color: '#c00' }}>Application Error</h2>
+                    <pre style={{ whiteSpace: 'pre-wrap', color: '#333', background: '#fee', padding: 16, borderRadius: 8 }}>
+                        {this.state.error.message}
+                        {'\n\n'}
+                        {this.state.error.stack}
+                    </pre>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 import AppHeader from './components/AppHeader';
 import Sidebar from './components/Sidebar';
@@ -62,7 +86,7 @@ function AppInner() {
                 case 'applications': return <VolApplications />;
                 case 'attendance': return <VolAttendance />;
                 case 'certificates': return <VolCertificates />;
-                case 'profile': return <VolProfile />;
+                case 'profile': return <VolProfile onNavigate={setCurrentView} />;
                 case 'skills': return <VolSkills />;
                 default: return <VolDashboard onNavigate={navigateTo} />;
             }
@@ -126,8 +150,10 @@ function AppInner() {
 
 export default function App() {
     return (
-        <AuthProvider>
-            <AppInner />
-        </AuthProvider>
+        <ErrorBoundary>
+            <AuthProvider>
+                <AppInner />
+            </AuthProvider>
+        </ErrorBoundary>
     );
 }

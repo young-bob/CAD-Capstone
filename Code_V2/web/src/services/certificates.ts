@@ -15,6 +15,11 @@ export const certificateService = {
         const res = await api.post<{ id: string }>('/api/certificates/templates', data);
         return res.data;
     },
+    updateTemplate: async (templateId: string, data: {
+        name?: string; description?: string; primaryColor?: string; accentColor?: string;
+    }): Promise<void> => {
+        await api.put(`/api/certificates/templates/${templateId}`, data);
+    },
     deleteTemplate: async (templateId: string): Promise<void> => {
         await api.delete(`/api/certificates/templates/${templateId}`);
     },
