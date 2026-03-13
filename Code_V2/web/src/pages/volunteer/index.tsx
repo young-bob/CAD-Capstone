@@ -9,6 +9,8 @@ import { attendanceService } from '../../services/attendance';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
+const MapView = lazy(() => import('../../components/MapView'));
+import { lazy, Suspense } from 'react';
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {
@@ -27,6 +29,79 @@ function Empty({ msg }: { msg: string }) {
     return <div className="text-center py-16 text-stone-400 font-medium">{msg}</div>;
 }
 function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
+
+// ─── GPS Check-In Button ──────────────────────────────────────
+function GpsCheckInButton({ attendanceId, opportunityId, onDone }: { attendanceId: string; opportunityId: string; onDone: () => void }) {
+    const [loading, setLoading] = useState(false);
+    const [gpsState, setGpsState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
+    const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+    const [errMsg, setErrMsg] = useState('');
+
+    const locate = () => {
+        if (!navigator.geolocation) { doFallback(); return; }
+        setGpsState('locating');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => { setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsState('ready'); },
+            () => { setErrMsg('Location access denied – submitting without GPS.'); setGpsState('error'); },
+            { timeout: 10000 }
+        );
+    };
+
+    const doFallback = async () => {
+        setLoading(true);
+        try { await attendanceService.webCheckIn(attendanceId); onDone(); }
+        catch (e: any) { setErrMsg(e?.response?.data?.toString() || 'Failed'); }
+        finally { setLoading(false); }
+    };
+
+    const doCheckIn = async () => {
+        if (!coords) { doFallback(); return; }
+        setLoading(true);
+        try {
+            await attendanceService.checkIn(attendanceId, { lat: coords.lat, lon: coords.lon, proofPhotoUrl: '' });
+            onDone();
+        } catch (e: any) { setErrMsg(e?.response?.data?.toString() || 'Check-in failed'); }
+        finally { setLoading(false); }
+    };
+
+    if (gpsState === 'idle') return (
+        <button onClick={locate} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 mt-2 flex items-center gap-1">
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : '📍'} Check In Now
+        </button>
+    );
+
+    if (gpsState === 'locating') return (
+        <div className="mt-2 flex items-center gap-2 text-xs text-stone-500">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-500" /> Getting your location…
+        </div>
+    );
+
+    if (gpsState === 'error') return (
+        <div className="mt-2 space-y-2">
+            <p className="text-xs text-amber-600">{errMsg}</p>
+            <button onClick={doFallback} disabled={loading} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 flex items-center gap-1">
+                {loading && <Loader2 className="w-3 h-3 animate-spin" />} Check In Anyway
+            </button>
+        </div>
+    );
+
+    // gpsState === 'ready' — show map preview
+    return (
+        <div className="mt-3 space-y-3">
+            <p className="text-xs font-bold text-stone-600">📍 Your location detected. Confirm check-in:</p>
+            <Suspense fallback={<div className="h-48 bg-stone-100 rounded-xl flex items-center justify-center text-stone-400 text-xs">Loading map…</div>}>
+                {coords && <MapView lat={coords.lat} lon={coords.lon} radius={50} height={200} />}
+            </Suspense>
+            {errMsg && <p className="text-xs text-rose-500">{errMsg}</p>}
+            <div className="flex gap-2">
+                <button onClick={() => setGpsState('idle')} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">Cancel</button>
+                <button onClick={doCheckIn} disabled={loading} className="text-xs font-bold text-white bg-blue-500 px-4 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-1">
+                    {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : '✅'} Confirm Check-In
+                </button>
+            </div>
+        </div>
+    );
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER DASHBOARD
@@ -369,15 +444,7 @@ export function VolAttendance() {
                                 </button>
                             )}
                             {r.status === 'Pending' && (
-                                <button onClick={async () => {
-                                    try {
-                                        await attendanceService.webCheckIn(r.attendanceId);
-                                        showToast('Checked in successfully ✅');
-                                        load();
-                                    } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to check in'); }
-                                }} className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 mt-2">
-                                    📍 Check In Now
-                                </button>
+                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} onDone={() => { showToast('Checked in ✅'); load(); }} />
                             )}
                             {r.status === 'CheckedIn' && (
                                 <button onClick={async () => {

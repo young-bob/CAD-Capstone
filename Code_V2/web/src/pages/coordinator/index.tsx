@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2 } from 'lucide-react';
 import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,7 +9,7 @@ import { certificateService } from '../../services/certificates';
 import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
 import { MiniCalendar } from '../../components/MiniCalendar';
-
+const MapPicker = lazy(() => import('../../components/MapPicker'));
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
 function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
@@ -323,11 +323,15 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                             <h4 className="font-bold text-stone-700">Check-In Location (Geofence)</h4>
                             <button onClick={handleGetLocation} className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 flex items-center gap-1">📍 Use My Location</button>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div><label className="text-xs font-bold text-stone-500 ml-1">Latitude</label><input type="number" step="any" value={createForm.lat} onChange={e => setCreateForm(p => ({ ...p, lat: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
-                            <div><label className="text-xs font-bold text-stone-500 ml-1">Longitude</label><input type="number" step="any" value={createForm.lon} onChange={e => setCreateForm(p => ({ ...p, lon: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
-                            <div><label className="text-xs font-bold text-stone-500 ml-1">Radius (meters)</label><input type="number" value={createForm.radius} onChange={e => setCreateForm(p => ({ ...p, radius: parseInt(e.target.value) || 200 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
-                        </div>
+                        <Suspense fallback={<div className="h-60 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-400 text-sm">Loading map…</div>}>
+                            <MapPicker
+                                lat={createForm.lat}
+                                lon={createForm.lon}
+                                radius={createForm.radius}
+                                onChange={(lat, lon) => setCreateForm(p => ({ ...p, lat, lon }))}
+                                onRadiusChange={(radius) => setCreateForm(p => ({ ...p, radius }))}
+                            />
+                        </Suspense>
                     </div>
 
                     <div className="flex gap-3 justify-end mt-4">
