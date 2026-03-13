@@ -133,6 +133,8 @@ public static class ServiceCollectionExtensions
             {
                 {securityScheme, new string[] { }}
             });
+            // Use fully-qualified type names to avoid conflicts when two types share the same short name
+            c.CustomSchemaIds(type => type.FullName?.Replace("+", ".") ?? type.Name);
         });
 
         return builder;

@@ -27,8 +27,13 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/users/{userId:guid}/ban", async (Guid userId, IGrainFactory grains) =>
+        group.MapPost("/users/{userId:guid}/ban", async (Guid userId, HttpContext http, IGrainFactory grains) =>
         {
+            var callerId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? http.User.FindFirst("sub")?.Value;
+            if (callerId != null && Guid.TryParse(callerId, out var callerGuid) && callerGuid == userId)
+                return Results.BadRequest(new { Error = "You cannot ban yourself." });
+
             var grain = grains.GetGrain<IAdminGrain>(Guid.Empty);
             await grain.BanUser(userId);
             return Results.NoContent();

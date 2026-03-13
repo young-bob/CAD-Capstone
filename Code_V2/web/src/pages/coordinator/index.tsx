@@ -574,7 +574,7 @@ export function CoordMembers() {
                                         <td className="p-5 text-stone-800 font-bold">{m.email}</td>
                                         <td className="p-5"><span className={`px-2 py-0.5 rounded text-xs font-bold ${roleColors[m.role] || 'bg-stone-100 text-stone-600'}`}>{m.role}</span></td>
                                         <td className="p-5 text-stone-400 text-sm">{new Date(m.joinedAt).toLocaleDateString()}</td>
-                                        <td className="p-5 text-right"><button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button></td>
+                                        <td className="p-5 text-right">{m.userId !== auth.userId ? <button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button> : <span className="text-stone-300 text-sm">You</span>}</td>
                                     </tr>
                                 ))}
                             </tbody>

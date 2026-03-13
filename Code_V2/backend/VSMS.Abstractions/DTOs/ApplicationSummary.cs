@@ -15,5 +15,5 @@ public record ApplicationSummary(
     string VolunteerName,
     ApplicationStatus Status,
     DateTime AppliedAt,
-    AttendanceStatus? AttendanceStatus = null // null means no check-in record yet
+    string? AttendanceStatus = null // null = no check-in record yet; values match AttendanceStatus enum names
 );

@@ -21,9 +21,17 @@ public static class ApplicationEndpoints
         group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, IApplicationQueryService queryService) =>
             Results.Ok(await queryService.GetByVolunteerAsync(volunteerId)));
 
-        group.MapPost("/{id:guid}/approve", async (Guid id, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/approve", async (Guid id, HttpContext http, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IApplicationGrain>(id);
+            var state = await grain.GetState();
+
+            // Prevent coordinator from approving their own volunteer application
+            var callerId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                        ?? http.User.FindFirst("sub")?.Value;
+            if (callerId != null && Guid.TryParse(callerId, out var callerGuid) && callerGuid == state.VolunteerId)
+                return Results.BadRequest(new { Error = "You cannot approve your own application." });
+
             await grain.Approve();
             return Results.NoContent();
         });
