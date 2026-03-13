@@ -36,7 +36,9 @@ export default function RegisterPage({ onBack, onGoLogin }: Props) {
             await auth.register({ email, password, role });
             // Navigation is handled by App.tsx effect
         } catch (err: any) {
-            setError(err.response?.data?.message || err.response?.data || 'Registration failed. Please try again.');
+            const d = err.response?.data;
+            const msg = d?.message || (typeof d === 'string' ? d : d?.detail || d?.title || d?.error) || 'Registration failed. Please try again.';
+            setError(String(msg));
         } finally {
             setLoading(false);
         }

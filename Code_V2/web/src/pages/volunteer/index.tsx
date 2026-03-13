@@ -417,7 +417,7 @@ export function VolAttendance() {
         try {
             const data = await attendanceService.getByVolunteer(auth.linkedGrainId);
             setRecords(data);
-        } catch (err: any) { setError(err.response?.data || 'Failed to load attendance'); }
+        } catch (err: any) { setError(getErr(err, 'Failed to load attendance')); }
         finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
@@ -534,7 +534,7 @@ export function VolCertificates() {
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try { const data = await certificateService.getTemplates(); setTemplates(data); }
-        catch (err: any) { setError(err.response?.data || 'Failed to load certificates'); }
+        catch (err: any) { setError(getErr(err, 'Failed to load certificates')); }
         finally { setLoading(false); }
     }, []);
 
@@ -666,7 +666,7 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
         try {
             await volunteerService.uploadCredential(auth.linkedGrainId, credUrl.trim());
             setCredUrl(''); setSuccess('Credential uploaded! ✅');
-        } catch (err: any) { setError(err.response?.data || 'Failed to upload credential'); }
+        } catch (err: any) { setError(getErr(err, 'Failed to upload credential')); }
         finally { setUploadingCred(false); }
     };
 
@@ -892,7 +892,7 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
             setOpp(oppData);
             setMyApps((appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId));
         } catch (err: any) {
-            setError(err.response?.data || 'Failed to load opportunity');
+            setError(getErr(err, 'Failed to load opportunity'));
         } finally { setLoading(false); }
     }, [oppId, auth.linkedGrainId]);
 

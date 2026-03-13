@@ -70,7 +70,7 @@ export function CoordDashboard() {
             setShowCreate(false); setOrgName(''); setOrgDesc('');
             showToast('Organization created! Awaiting admin approval.');
             load();
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to create organization'); }
+        } catch (err: any) { showToast(getErr(err, 'Failed to create organization')); }
         finally { setCreating(false); }
     };
 
@@ -80,7 +80,7 @@ export function CoordDashboard() {
         try {
             await organizationService.updateInfo(auth.linkedGrainId, { name: editName, description: editDesc });
             setShowEdit(false); showToast('Organization updated!'); load();
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to update'); }
+        } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
         finally { setSaving(false); }
     };
 
@@ -875,7 +875,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         try {
             const [d, a] = await Promise.all([opportunityService.getById(oppId), applicationService.getForOpportunity(oppId)]);
             setOpp(d); setApps(a);
-        } catch (err: any) { setError(err.response?.data || 'Failed to load'); }
+        } catch (err: any) { setError(getErr(err, 'Failed to load')); }
         finally { setLoading(false); }
     }, [oppId]);
 
@@ -886,14 +886,14 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const doPublish = async () => {
         setActionId('pub');
         try { await opportunityService.publish(oppId); showToast('Published ✅'); load(); }
-        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to publish'); }
+        catch (err: any) { showToast(getErr(err, 'Failed to publish')); }
         finally { setActionId(null); }
     };
 
     const doCancelSubmit = async () => {
         if (!cancelReason) return; setCancelling(true);
         try { await opportunityService.cancel(oppId, cancelReason); setShowCancel(false); showToast('Cancelled'); load(); }
-        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setCancelling(false); }
     };
 
@@ -903,7 +903,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             await opportunityService.addShift(oppId, { name: shiftName, startTime: new Date(shiftStart).toISOString(), endTime: new Date(shiftEnd).toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
             setShowAddShift(false); setShiftName(''); setShiftStart(''); setShiftEnd(''); setShiftCap('10');
             showToast('Shift added!'); load();
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        } catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setAddingShift(false); }
     };
 
@@ -932,7 +932,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             await attendanceService.confirm(record.attendanceId, { supervisorId: oppId, rating: 5 });
             showToast('Attendance confirmed ✅');
             setTimeout(() => load(), 600);
-        } catch (err: any) { showToast(err?.response?.data?.toString() || 'Failed to confirm'); }
+        } catch (err: any) { showToast(getErr(err, 'Failed to confirm')); }
         finally { setActionId(null); }
     };
 
@@ -944,7 +944,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const doIssueCert = async () => {
         if (!certTargetId || !selTemplate) return; setIssuingCert(true);
         try { const r = await certificateService.generate(certTargetId, selTemplate); setShowCert(false); showToast(`Certificate issued: ${r.fileName}`); window.open(r.downloadUrl, '_blank'); }
-        catch (err: any) { showToast(err.response?.data?.toString() || 'Failed'); }
+        catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setIssuingCert(false); }
     };
 
