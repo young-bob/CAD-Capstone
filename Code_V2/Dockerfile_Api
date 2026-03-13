@@ -2,24 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and project files for restore
+# Copy solution and ALL backend source upfront
 COPY VSMS.slnx .
-COPY backend/VSMS.Abstractions/VSMS.Abstractions.csproj backend/VSMS.Abstractions/
-COPY backend/VSMS.Grains/VSMS.Grains.csproj backend/VSMS.Grains/
-COPY backend/VSMS.Api/VSMS.Api.csproj backend/VSMS.Api/
-COPY backend/VSMS.Infrastructure/VSMS.Infrastructure.csproj backend/VSMS.Infrastructure/
-
-# Restore dependencies (cached layer)
-RUN dotnet restore backend/VSMS.Api/VSMS.Api.csproj
-
-# Copy full source
 COPY backend/ backend/
 
-# Build and publish release
+# Restore + Build + Publish in one step.
 RUN dotnet publish backend/VSMS.Api/VSMS.Api.csproj \
     -c Release \
-    -o /app/publish \
-    --no-restore
+    -o /app/publish
 
 # ============ Stage 2: Runtime ============
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime
