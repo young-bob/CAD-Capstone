@@ -870,6 +870,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [certTargetName, setCertTargetName] = useState('');
     const [selTemplate, setSelTemplate] = useState<string | null>(null);
     const [issuingCert, setIssuingCert] = useState(false);
+    const [issuedCerts, setIssuedCerts] = useState<Set<string>>(new Set());
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
@@ -952,7 +953,13 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
     const doIssueCert = async () => {
         if (!certTargetId || !selTemplate) return; setIssuingCert(true);
-        try { const r = await certificateService.generate(certTargetId, selTemplate); setShowCert(false); showToast(`Certificate issued: ${r.fileName}`); window.open(r.downloadUrl, '_blank'); }
+        try { 
+            const r = await certificateService.generate(certTargetId, selTemplate); 
+            setShowCert(false); 
+            showToast(`Certificate issued: ${r.fileName}`); 
+            setIssuedCerts(prev => new Set(prev).add(certTargetId));
+            window.open(r.downloadUrl, '_blank'); 
+        }
         catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setIssuingCert(false); }
     };
@@ -1062,7 +1069,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                         <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
                                     )}
                                     {app.attendanceStatus === 'Confirmed' && (
-                                        <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
+                                        <button 
+                                            onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} 
+                                            disabled={issuedCerts.has(app.volunteerId)}
+                                            className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1 disabled:opacity-50 disabled:bg-stone-100 disabled:text-stone-400">
+                                            <Award className="w-3.5 h-3.5" /> {issuedCerts.has(app.volunteerId) ? 'Issued' : 'Certificate'}
+                                        </button>
                                     )}
                                 </div>
                             </div>
