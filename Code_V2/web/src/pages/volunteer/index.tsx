@@ -189,7 +189,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[
-                            { label: 'Total Hours', val: String(profile?.totalHours ?? 0), unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
+                            { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
                             { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
                             { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50' },
                         ].map((s, i) => (
