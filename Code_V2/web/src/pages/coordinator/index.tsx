@@ -803,6 +803,7 @@ export function CoordCertTemplates() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 interface CoordOppDetailProps { oppId: string; onBack: () => void; }
 export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
+    const auth = useAuth();
     const [opp, setOpp] = useState<OpportunityState | null>(null);
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -937,8 +938,16 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     };
 
     const openCert = async (vid: string, name: string) => {
-        try { const l = await certificateService.getTemplates(); setCertTemplates(l); setSelTemplate(l.length > 0 ? l[0].id : null); setCertTargetId(vid); setCertTargetName(name); setShowCert(true); }
-        catch { showToast('Failed to load templates'); }
+        try { 
+            const l = await certificateService.getTemplates(auth.linkedGrainId || undefined); 
+            setCertTemplates(l); 
+            setSelTemplate(l.length > 0 ? l[0].id : null); 
+            setCertTargetId(vid); 
+            setCertTargetName(name); 
+            setShowCert(true); 
+        } catch { 
+            showToast('Failed to load templates'); 
+        }
     };
 
     const doIssueCert = async () => {
