@@ -1049,8 +1049,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                     ) : (
                                         <span className="px-3 py-1.5 bg-stone-100 text-stone-400 rounded-lg text-sm">Awaiting Check-in</span>
                                     )}
-                                    <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
-                                    <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
+                                    {app.attendanceStatus !== 'Confirmed' && (
+                                        <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
+                                    )}
+                                    {app.attendanceStatus === 'Confirmed' && (
+                                        <button onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1"><Award className="w-3.5 h-3.5" /> Certificate</button>
+                                    )}
                                 </div>
                             </div>
                         ))}
