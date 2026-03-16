@@ -2,9 +2,20 @@ import api from './api';
 import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole } from '../types';
 
 export const organizationService = {
-    create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string }): Promise<{ orgId: string }> => {
+    create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string; proofUrl?: string }): Promise<{ orgId: string }> => {
         const res = await api.post('/api/organizations', data);
         return res.data;
+    },
+    uploadProof: async (file: File): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'organizations');
+        const uploadRes = await api.post<{ fileKey: string }>('/api/files/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        const { fileKey } = uploadRes.data;
+        const urlRes = await api.get<{ url: string }>(`/api/files/url/${fileKey}`);
+        return urlRes.data.url;
     },
     getById: async (id: string): Promise<OrgState> => {
         const res = await api.get<OrgState>(`/api/organizations/${id}`);
@@ -33,5 +44,8 @@ export const organizationService = {
     },
     updateInfo: async (orgId: string, data: { name: string; description: string }): Promise<void> => {
         await api.put(`/api/organizations/${orgId}`, data);
+    },
+    resubmit: async (orgId: string, data: { name: string; description: string; proofUrl?: string }): Promise<void> => {
+        await api.post(`/api/organizations/${orgId}/resubmit`, data);
     },
 };

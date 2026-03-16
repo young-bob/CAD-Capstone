@@ -4,6 +4,7 @@ using VSMS.Abstractions.Services;
 
 namespace VSMS.Api.Features.Organizations;
 
-public record CreateOrgRequest(string Name, string Description, Guid CreatorUserId, string CreatorEmail);
+public record CreateOrgRequest(string Name, string Description, Guid CreatorUserId, string CreatorEmail, string? ProofUrl = null);
+public record ResubmitOrgRequest(string Name, string Description, string? ProofUrl = null);
 public record CreateOppRequest(string Title, string Description, string Category);
 public record InviteMemberRequest(string Email, OrgRole Role);

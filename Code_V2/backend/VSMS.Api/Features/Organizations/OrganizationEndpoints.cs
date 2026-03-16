@@ -24,7 +24,7 @@ public static class OrganizationEndpoints
 
             // Create the organization grain using the coordinator's grain ID
             var orgGrain = grains.GetGrain<IOrganizationGrain>(orgId);
-            await orgGrain.Initialize(req.Name, req.Description, req.CreatorUserId, req.CreatorEmail);
+            await orgGrain.Initialize(req.Name, req.Description, req.CreatorUserId, req.CreatorEmail, req.ProofUrl);
 
             // Link the coordinator grain to this organization
             var coordGrain = grains.GetGrain<ICoordinatorGrain>(orgId);
@@ -53,6 +53,13 @@ public static class OrganizationEndpoints
         {
             var grain = grains.GetGrain<IOrganizationGrain>(id);
             await grain.UpdateInfo(req.Name, req.Description);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:guid}/resubmit", async (Guid id, ResubmitOrgRequest req, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IOrganizationGrain>(id);
+            await grain.Resubmit(req.Name, req.Description, req.ProofUrl);
             return Results.NoContent();
         });
 

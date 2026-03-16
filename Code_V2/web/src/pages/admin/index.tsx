@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw } from 'lucide-react';
-import type { OrganizationSummary, UserRecord, DisputeSummary, Skill } from '../../types';
+import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink } from 'lucide-react';
+import type { OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState } from '../../types';
+import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { adminService } from '../../services/admin';
 import { organizationService } from '../../services/organizations';
@@ -153,14 +154,20 @@ export function AdminOrgs() {
     const [showCreate, setShowCreate] = useState(false);
     const [createForm, setCreateForm] = useState({ name: '', description: '', coordinatorUserId: '' });
     const [creating, setCreating] = useState(false);
-    const [editingOrg, setEditingOrg] = useState<{ id: string; name: string; description: string } | null>(null);
+    const [editingOrg, setEditingOrg] = useState<{ id: string; name: string; description: string; proofUrl?: string } | null>(null);
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [deleteConfirmName, setDeleteConfirmName] = useState('');
     const [toast, setToast] = useState('');
     const [reassignCoordId, setReassignCoordId] = useState('');
     const [addCoordId, setAddCoordId] = useState('');
     const [coordAction, setCoordAction] = useState(false);
     const [orgFilter, setOrgFilter] = useState({ search: '', status: '', dateFrom: '', dateTo: '' });
+    const [orgMembers, setOrgMembers] = useState<OrgState['members']>([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
+    const [removingCoordId, setRemovingCoordId] = useState<string | null>(null);
+    const [orgMembersMap, setOrgMembersMap] = useState<Record<string, OrgState['members']>>({});
+    const [orgProofUrlMap, setOrgProofUrlMap] = useState<Record<string, string | undefined>>({});
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -179,6 +186,23 @@ export function AdminOrgs() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (orgs.length === 0) { setOrgMembersMap({}); setOrgProofUrlMap({}); return; }
+        Promise.allSettled(orgs.map(o => organizationService.getById(o.orgId))).then(results => {
+            const membersMap: Record<string, OrgState['members']> = {};
+            const proofMap: Record<string, string | undefined> = {};
+            results.forEach((r, i) => {
+                if (r.status === 'fulfilled') {
+                    membersMap[orgs[i].orgId] = r.value.members || [];
+                    proofMap[orgs[i].orgId] = r.value.proofUrl;
+                }
+            });
+            setOrgMembersMap(membersMap);
+            setOrgProofUrlMap(proofMap);
+        });
+    }, [orgs]);
+
     const handleApprove = async (orgId: string) => {
         try { await adminService.approveOrg(orgId); showToast('Organization approved'); setTimeout(() => load(), 600); }
         catch (err: any) { showToast(getErr(err, 'Failed to approve')); }
@@ -227,7 +251,12 @@ export function AdminOrgs() {
         try {
             await adminService.rejectOrg(orgId, 'Removed by administrator.');
             setDeleteConfirm(null);
+            setDeleteConfirmName('');
             showToast('Organization removed');
+            // Optimistically clear org association for coordinators in this org
+            setCoordinators(prev => prev.map(c =>
+                c.organizationId === orgId ? { ...c, organizationId: undefined, organizationName: undefined } : c
+            ));
             load();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to remove organization'));
@@ -254,10 +283,39 @@ export function AdminOrgs() {
             await adminService.addCoordinatorToOrg(editingOrg.id, addCoordId);
             showToast('Coordinator added');
             setAddCoordId('');
+            const updated = await organizationService.getById(editingOrg.id);
+            setOrgMembers(updated.members || []);
+            setOrgMembersMap(prev => ({ ...prev, [editingOrg.id]: updated.members || [] }));
             load();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to add coordinator'));
         } finally { setCoordAction(false); }
+    };
+
+    const startEditOrg = async (org: OrganizationSummary) => {
+        setEditingOrg({ id: org.orgId, name: org.name, description: org.description });
+        setReassignCoordId(''); setAddCoordId(''); setOrgMembers([]);
+        setLoadingMembers(true);
+        try {
+            const state = await organizationService.getById(org.orgId);
+            setOrgMembers(state.members || []);
+            setEditingOrg(prev => prev ? { ...prev, proofUrl: state.proofUrl } : null);
+        } catch { /* silent */ }
+        finally { setLoadingMembers(false); }
+    };
+
+    const handleRemoveCoord = async (userId: string) => {
+        if (!editingOrg) return;
+        setRemovingCoordId(userId);
+        try {
+            await adminService.removeCoordinatorFromOrg(editingOrg.id, userId);
+            showToast('Coordinator removed');
+            setOrgMembers(prev => prev.filter(m => m.userId !== userId));
+            setOrgMembersMap(prev => ({ ...prev, [editingOrg.id]: (prev[editingOrg.id] || []).filter(m => m.userId !== userId) }));
+            load();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to remove coordinator'));
+        } finally { setRemovingCoordId(null); }
     };
 
     const filteredOrgs = orgs.filter(org => {
@@ -322,7 +380,7 @@ export function AdminOrgs() {
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-stone-800">Edit Organization</h3>
-                        <button onClick={() => setEditingOrg(null)} className="text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
+                        <button onClick={() => { setEditingOrg(null); setOrgMembers([]); }} className="text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
                     </div>
                     <div className="space-y-4">
                         <div>
@@ -333,15 +391,52 @@ export function AdminOrgs() {
                             <label className="block text-sm font-medium text-stone-600 mb-1">Description</label>
                             <textarea value={editingOrg.description} onChange={e => setEditingOrg(p => p && ({ ...p, description: e.target.value }))} rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
                         </div>
+                        {editingOrg.proofUrl && (
+                            <div>
+                                <label className="block text-sm font-medium text-stone-600 mb-1">Proof Document</label>
+                                <a href={editingOrg.proofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:underline">
+                                    <ExternalLink className="w-3.5 h-3.5" /> View Proof Document
+                                </a>
+                            </div>
+                        )}
                         <div className="border-t border-stone-100 pt-4">
                             <p className="text-sm font-bold text-stone-600 mb-3">Coordinator Management</p>
                             <div className="space-y-3">
+                                {/* Current coordinators list */}
+                                <div>
+                                    <p className="text-xs font-medium text-stone-500 mb-2">Current Coordinators</p>
+                                    {loadingMembers ? (
+                                        <div className="flex items-center gap-2 text-xs text-stone-400 py-1"><Loader2 className="w-3 h-3 animate-spin" />Loading…</div>
+                                    ) : orgMembers.filter(m => m.role === OrgRole.Admin || m.role === OrgRole.Coordinator).length === 0 ? (
+                                        <p className="text-xs text-stone-300 italic">No coordinators found</p>
+                                    ) : (
+                                        <ul className="space-y-1.5">
+                                            {orgMembers.filter(m => m.role === OrgRole.Admin || m.role === OrgRole.Coordinator).map(m => (
+                                                <li key={m.userId} className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2">
+                                                    <div className="min-w-0">
+                                                        <span className="text-sm font-medium text-stone-700 truncate block">{m.email}</span>
+                                                        <span className={`text-xs font-bold ${m.role === OrgRole.Admin ? 'text-amber-600' : 'text-stone-400'}`}>
+                                                            {m.role === OrgRole.Admin ? 'Primary' : 'Additional'}
+                                                        </span>
+                                                    </div>
+                                                    {m.role === OrgRole.Coordinator && (
+                                                        <button
+                                                            onClick={() => handleRemoveCoord(m.userId)}
+                                                            disabled={removingCoordId === m.userId}
+                                                            className="ml-3 p-1 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                                                            title="Remove coordinator"
+                                                        >
+                                                            {removingCoordId === m.userId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        </button>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
                                 <div>
                                     <label className="block text-xs font-medium text-stone-500 mb-1">
                                         Reassign Primary Coordinator
-                                        {coordinators.find(c => c.organizationId === editingOrg.id) && (
-                                            <span className="ml-2 text-stone-400 font-normal">Current: {coordinators.find(c => c.organizationId === editingOrg.id)?.email}</span>
-                                        )}
                                     </label>
                                     <div className="flex gap-2">
                                         <CoordCombobox
@@ -373,7 +468,7 @@ export function AdminOrgs() {
                             </div>
                         </div>
                         <div className="flex gap-3 justify-end">
-                            <button onClick={() => { setEditingOrg(null); setReassignCoordId(''); setAddCoordId(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={() => { setEditingOrg(null); setReassignCoordId(''); setAddCoordId(''); setOrgMembers([]); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                             <button onClick={handleSaveEdit} disabled={saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
                                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}Save
                             </button>
@@ -435,26 +530,55 @@ export function AdminOrgs() {
                             {filteredOrgs.map(org => (
                                 <tr key={org.orgId} className="hover:bg-orange-50/30">
                                     <td className="p-5 text-stone-800 font-bold">{org.name}</td>
-                                    <td className="p-5 text-stone-500 text-sm">{coordinators.find(c => c.organizationId === org.orgId)?.email ?? <span className="text-stone-300">—</span>}</td>
+                                    <td className="p-5 text-stone-500 text-sm">
+                                        {(() => {
+                                            const membersList = orgMembersMap[org.orgId];
+                                            if (membersList !== undefined) {
+                                                const members = membersList.filter(m => m.role === OrgRole.Admin || m.role === OrgRole.Coordinator);
+                                                if (!members.length) return <span className="text-stone-300">—</span>;
+                                                return <div className="space-y-0.5">{members.map(m => (
+                                                    <div key={m.userId} className="flex items-baseline gap-1 flex-wrap">
+                                                        <span className="text-sm">{m.email}</span>
+                                                        <span className={`text-xs font-bold ${m.role === OrgRole.Admin ? 'text-amber-500' : 'text-stone-400'}`}>{m.role === OrgRole.Admin ? '(Primary)' : '(Extra)'}</span>
+                                                    </div>
+                                                ))}</div>;
+                                            }
+                                            // Fallback: show primary coordinator from users list while orgMembersMap loads
+                                            const primaryCoord = coordinators.find(c => c.organizationId === org.orgId);
+                                            if (primaryCoord) return <span className="text-sm">{primaryCoord.email} <span className="text-xs text-amber-500 font-bold">(Primary)</span></span>;
+                                            return <span className="text-stone-300 text-xs">—</span>;
+                                        })()}
+                                    </td>
                                     <td className="p-5"><OrgStatusBadge status={org.status} /></td>
                                     <td className="p-5 text-stone-500 text-sm">{new Date(org.createdAt).toLocaleDateString()}</td>
                                     <td className="p-5">
                                         <div className="flex justify-end gap-2 flex-wrap">
+                                            {(org.proofUrl || orgProofUrlMap[org.orgId]) && (
+                                                <a href={org.proofUrl || orgProofUrlMap[org.orgId]} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-blue-50 text-blue-600 font-bold rounded-lg text-sm hover:bg-blue-100 flex items-center gap-1">
+                                                    <ExternalLink className="w-3.5 h-3.5" /> Proof
+                                                </a>
+                                            )}
                                             {org.status === 'PendingApproval' && <>
                                                 <button onClick={() => handleReject(org.orgId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Reject</button>
                                                 <button onClick={() => handleApprove(org.orgId)} className="px-3 py-1.5 bg-emerald-50 text-emerald-600 font-bold rounded-lg text-sm hover:bg-emerald-100">Approve</button>
                                             </>}
-                                            <button onClick={() => setEditingOrg({ id: org.orgId, name: org.name, description: org.description })} className="p-1.5 text-stone-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
+                                            <button onClick={() => startEditOrg(org)} className="p-1.5 text-stone-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
                                                 <Pencil className="w-4 h-4" />
                                             </button>
                                             {deleteConfirm === org.orgId ? (
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs text-rose-600 font-medium">Remove?</span>
-                                                    <button onClick={() => handleDelete(org.orgId)} className="px-2 py-1 bg-rose-500 text-white text-xs font-bold rounded-lg hover:bg-rose-600">Yes</button>
-                                                    <button onClick={() => setDeleteConfirm(null)} className="px-2 py-1 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">No</button>
+                                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                                    <input
+                                                        value={deleteConfirmName}
+                                                        onChange={e => setDeleteConfirmName(e.target.value)}
+                                                        placeholder={`Type "${org.name}"`}
+                                                        className="px-2 py-1 text-xs rounded-lg border border-rose-200 bg-rose-50 focus:ring-2 focus:ring-rose-400 outline-none w-36"
+                                                        autoFocus
+                                                    />
+                                                    <button onClick={() => handleDelete(org.orgId)} disabled={deleteConfirmName !== org.name} className="px-2 py-1 bg-rose-500 text-white text-xs font-bold rounded-lg hover:bg-rose-600 disabled:bg-rose-300">Remove</button>
+                                                    <button onClick={() => { setDeleteConfirm(null); setDeleteConfirmName(''); }} className="px-2 py-1 bg-stone-100 text-stone-600 text-xs font-bold rounded-lg hover:bg-stone-200">Cancel</button>
                                                 </div>
                                             ) : (
-                                                <button onClick={() => setDeleteConfirm(org.orgId)} className="p-1.5 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                                                <button onClick={() => { setDeleteConfirm(org.orgId); setDeleteConfirmName(''); }} className="p-1.5 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             )}

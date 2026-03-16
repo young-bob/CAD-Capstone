@@ -47,4 +47,7 @@ export const adminService = {
     addCoordinatorToOrg: async (orgId: string, coordinatorUserId: string): Promise<void> => {
         await api.post(`/api/admin/organizations/${orgId}/add-coordinator`, { coordinatorUserId });
     },
+    removeCoordinatorFromOrg: async (orgId: string, coordinatorUserId: string): Promise<void> => {
+        await api.post(`/api/admin/organizations/${orgId}/remove-coordinator`, { coordinatorUserId });
+    },
 };

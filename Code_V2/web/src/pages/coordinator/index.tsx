@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2 } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
+import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
 import { opportunityService } from '../../services/opportunities';
@@ -12,6 +13,30 @@ import { MiniCalendar } from '../../components/MiniCalendar';
 const MapPicker = lazy(() => import('../../components/MapPicker'));
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
+
+function useOrgStatus(): string | null {
+    const auth = useAuth();
+    const [status, setStatus] = useState<string | null>(null);
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        organizationService.getById(auth.linkedGrainId).then(o => setStatus(o.status)).catch(() => {});
+    }, [auth.linkedGrainId]);
+    return status;
+}
+
+function OrgPendingBanner() {
+    const auth = useAuth();
+    const status = useOrgStatus();
+    // Show when: no org at all, OR org exists but status is known and not Approved
+    const shouldShow = !auth.linkedGrainId || (status !== null && status !== 'Approved');
+    if (!shouldShow) return null;
+    return (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+            <span className="text-amber-500 text-xl">🔒</span>
+            <p className="text-amber-700 text-sm font-medium">Creating events, inviting members, and other actions require admin approval first.</p>
+        </div>
+    );
+}
 function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
     return (<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center"><AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" /><p className="text-rose-700 font-medium">{msg}</p>{onRetry && <button onClick={onRetry} className="mt-3 text-sm text-orange-600 font-bold hover:underline">Retry</button>}</div>);
 }
@@ -34,42 +59,72 @@ export function CoordDashboard() {
     const [showCreate, setShowCreate] = useState(false);
     const [orgName, setOrgName] = useState('');
     const [orgDesc, setOrgDesc] = useState('');
+    const [orgProofFile, setOrgProofFile] = useState<File | null>(null);
+    const [orgProofUploading, setOrgProofUploading] = useState(false);
     const [creating, setCreating] = useState(false);
 
-    // Edit org form
+    // Edit org form (approved orgs)
     const [showEdit, setShowEdit] = useState(false);
     const [editName, setEditName] = useState('');
     const [editDesc, setEditDesc] = useState('');
     const [saving, setSaving] = useState(false);
 
+    // Resubmit / edit application form (pending or rejected orgs)
+    const [showResubmit, setShowResubmit] = useState(false);
+    const [resubmitName, setResubmitName] = useState('');
+    const [resubmitDesc, setResubmitDesc] = useState('');
+    const [resubmitProofFile, setResubmitProofFile] = useState<File | null>(null);
+    const [resubmitUploading, setResubmitUploading] = useState(false);
+    const [resubmitting, setResubmitting] = useState(false);
+
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) return;
+        if (!auth.linkedGrainId) { setLoading(false); return; }
         setLoading(true);
         try {
             const o = await organizationService.getById(auth.linkedGrainId);
             setOrg(o); setOrgNotFound(false);
+        } catch {
+            setOrg(null); setOrgNotFound(true);
+            setLoading(false);
+            return;
+        }
+        // Fetch sub-resources separately so a Bad Request here doesn't hide the org
+        try {
             const [ops, ap] = await Promise.all([
                 organizationService.getOpportunities(auth.linkedGrainId),
                 organizationService.getApplications(auth.linkedGrainId),
             ]);
-            setOpps(ops); setApps(ap);
+            setOpps(ops || []); setApps(ap || []);
         } catch {
-            setOrg(null); setOrgNotFound(true);
+            setOpps([]); setApps([]);
         } finally { setLoading(false); }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
 
     const handleCreateOrg = async () => {
-        if (!orgName || !auth.linkedGrainId || !auth.userId) return;
+        if (!orgName || !auth.userId) return;
         setCreating(true);
         try {
-            await organizationService.create({ name: orgName, description: orgDesc, creatorUserId: auth.userId, creatorEmail: auth.email || '' });
-            setShowCreate(false); setOrgName(''); setOrgDesc('');
+            let proofUrl: string | undefined;
+            if (orgProofFile) {
+                setOrgProofUploading(true);
+                try {
+                    proofUrl = await organizationService.uploadProof(orgProofFile);
+                } catch {
+                    showToast('Proof upload failed. Submitting without proof.');
+                } finally { setOrgProofUploading(false); }
+            }
+            const capturedName = orgName;
+            const capturedDesc = orgDesc;
+            const res = await organizationService.create({ name: capturedName, description: capturedDesc, creatorUserId: auth.userId, creatorEmail: auth.email || '', proofUrl });
+            setShowCreate(false); setOrgName(''); setOrgDesc(''); setOrgProofFile(null);
+            auth.setLinkedGrainId(res.orgId);
             showToast('Organization created! Awaiting admin approval.');
-            load();
+            setOrg({ name: capturedName, description: capturedDesc, status: 'PendingApproval', members: [], opportunityIds: [], blockedVolunteerIds: [], isInitialized: true, createdAt: new Date().toISOString(), proofUrl });
+            setOrgNotFound(false);
         } catch (err: any) { showToast(getErr(err, 'Failed to create organization')); }
         finally { setCreating(false); }
     };
@@ -84,6 +139,34 @@ export function CoordDashboard() {
         finally { setSaving(false); }
     };
 
+    const openResubmitForm = (prefill: boolean) => {
+        setResubmitName(prefill && org ? org.name : '');
+        setResubmitDesc(prefill && org ? (org.description || '') : '');
+        setResubmitProofFile(null);
+        setShowResubmit(true);
+    };
+
+    const handleResubmit = async () => {
+        if (!resubmitName || !auth.linkedGrainId) return;
+        setResubmitting(true);
+        try {
+            let proofUrl: string | undefined = org?.proofUrl;
+            if (resubmitProofFile) {
+                setResubmitUploading(true);
+                try {
+                    proofUrl = await organizationService.uploadProof(resubmitProofFile);
+                } catch {
+                    showToast('Proof upload failed. Submitting without new proof.');
+                } finally { setResubmitUploading(false); }
+            }
+            await organizationService.resubmit(auth.linkedGrainId, { name: resubmitName, description: resubmitDesc, proofUrl });
+            setShowResubmit(false);
+            showToast('Application resubmitted! Awaiting admin approval.');
+            setOrg(prev => prev ? { ...prev, name: resubmitName, description: resubmitDesc, status: 'PendingApproval', proofUrl } : prev);
+        } catch (err: any) { showToast(getErr(err, 'Failed to resubmit')); }
+        finally { setResubmitting(false); }
+    };
+
     const statusConfig: Record<string, { color: string; bg: string; icon: string; msg: string }> = {
         PendingApproval: { color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '⏳', msg: 'Your organization is pending admin approval. You cannot create events until approved.' },
         Approved: { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '✅', msg: 'Your organization is approved and active.' },
@@ -93,8 +176,8 @@ export function CoordDashboard() {
 
     if (loading) return <Spinner />;
 
-    // ─── No Org yet ──────────────────────────────────────────────
-    if (orgNotFound || !org?.isInitialized) {
+    // ─── No Org yet (includes backend-allocated empty org grain with no name) ──
+    if (orgNotFound || !org || !org.name) {
         return (
             <div className="max-w-2xl mx-auto">
                 {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
@@ -113,11 +196,19 @@ export function CoordDashboard() {
                         <div className="space-y-3">
                             <input value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="Organization name *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                             <textarea value={orgDesc} onChange={e => setOrgDesc(e.target.value)} placeholder="Description (what your organization does)" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                            <div>
+                                <label className="block text-sm font-medium text-stone-600 mb-1">Proof of Organization *</label>
+                                <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 cursor-pointer hover:bg-stone-100 transition-colors">
+                                    <span className="text-sm text-stone-500">{orgProofFile ? orgProofFile.name : 'Upload document (PDF, image, etc.)'}</span>
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" className="hidden" onChange={e => setOrgProofFile(e.target.files?.[0] ?? null)} />
+                                </label>
+                                <p className="text-xs text-stone-400 mt-1">Upload your organization's registration certificate or proof of identity.</p>
+                            </div>
                         </div>
                         <div className="flex gap-3 justify-end">
-                            <button onClick={() => setShowCreate(false)} className="px-5 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
-                            <button onClick={handleCreateOrg} disabled={!orgName || creating} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">
-                                {creating && <Loader2 className="w-4 h-4 animate-spin" />} Submit
+                            <button onClick={() => { setShowCreate(false); setOrgProofFile(null); }} className="px-5 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={handleCreateOrg} disabled={!orgName || creating || orgProofUploading} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">
+                                {(creating || orgProofUploading) && <Loader2 className="w-4 h-4 animate-spin" />} Submit
                             </button>
                         </div>
                     </div>
@@ -129,6 +220,7 @@ export function CoordDashboard() {
     // ─── Has Org ──────────────────────────────────────────────────
     const status = statusConfig[org.status] || statusConfig['PendingApproval'];
     const isApproved = org.status === 'Approved';
+    const isPrimaryCoord = org.members?.some(m => m.userId === auth.userId && m.role === OrgRole.Admin) ?? false;
     const pendingApps = apps.filter(a => a.status === 'Pending').length;
 
     return (
@@ -140,7 +232,7 @@ export function CoordDashboard() {
                     <h1 className="text-3xl font-extrabold text-stone-800">{org.name}</h1>
                     {org.description && <p className="text-stone-500 mt-1 text-lg">{org.description}</p>}
                 </div>
-                {isApproved && (
+                {isApproved && isPrimaryCoord && (
                     <button onClick={() => { setEditName(org.name); setEditDesc(org.description || ''); setShowEdit(true); }}
                         className="px-4 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200 text-sm">
                         ✏️ Edit Organization
@@ -156,6 +248,46 @@ export function CoordDashboard() {
                     <p className="text-stone-500 text-sm mt-0.5">{status.msg}</p>
                 </div>
             </div>
+
+            {/* Submission details for pending orgs */}
+            {org.status === 'PendingApproval' && (
+                <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm space-y-3">
+                    <div className="flex justify-between items-center">
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">Submission Details</p>
+                        <button onClick={() => openResubmitForm(true)} className="text-sm text-orange-500 font-bold hover:underline flex items-center gap-1">
+                            <Pencil className="w-3.5 h-3.5" /> Edit Submission
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div><span className="text-stone-500 font-medium">Name: </span><span className="text-stone-800 font-bold">{org.name}</span></div>
+                        <div><span className="text-stone-500 font-medium">Description: </span><span className="text-stone-700">{org.description || '—'}</span></div>
+                        <div><span className="text-stone-500 font-medium">Submitted: </span><span className="text-stone-700">{new Date(org.createdAt).toLocaleDateString()}</span></div>
+                        {org.proofUrl && (
+                            <div className="flex items-center gap-1">
+                                <span className="text-stone-500 font-medium">Proof: </span>
+                                <a href={org.proofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                                    View Document <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Rejected actions */}
+            {org.status === 'Rejected' && (
+                <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm space-y-3">
+                    <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">What would you like to do?</p>
+                    <div className="flex flex-wrap gap-3">
+                        <button onClick={() => openResubmitForm(true)} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 text-sm">
+                            ✏️ Edit & Resubmit
+                        </button>
+                        <button onClick={() => openResubmitForm(false)} className="px-5 py-2.5 bg-stone-100 text-stone-700 font-bold rounded-xl hover:bg-stone-200 text-sm">
+                            🆕 New Application
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Restricted notice */}
             {!isApproved && (
@@ -199,7 +331,7 @@ export function CoordDashboard() {
                 </>
             )}
 
-            {/* Edit Modal */}
+            {/* Edit Modal (approved orgs) */}
             {showEdit && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md w-full space-y-4">
@@ -209,6 +341,47 @@ export function CoordDashboard() {
                         <div className="flex gap-3 justify-end">
                             <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                             <button onClick={handleSaveOrg} disabled={!editName.trim() || saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{saving && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Resubmit Modal (pending / rejected orgs) */}
+            {showResubmit && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-md w-full space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-stone-800">
+                                {org.status === 'Rejected' ? 'Resubmit Application' : 'Edit Submission'}
+                            </h3>
+                            <button onClick={() => setShowResubmit(false)}><X className="w-5 h-5 text-stone-400" /></button>
+                        </div>
+                        <input value={resubmitName} onChange={e => setResubmitName(e.target.value)} placeholder="Organization name *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                        <textarea value={resubmitDesc} onChange={e => setResubmitDesc(e.target.value)} placeholder="Description" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                        <div>
+                            <label className="block text-sm font-medium text-stone-600 mb-1">
+                                Proof of Organization {org.proofUrl ? '(leave empty to keep existing)' : '*'}
+                            </label>
+                            <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 cursor-pointer hover:bg-stone-100 transition-colors">
+                                <span className="text-sm text-stone-500">{resubmitProofFile ? resubmitProofFile.name : 'Upload new document (PDF, image, etc.)'}</span>
+                                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" className="hidden" onChange={e => setResubmitProofFile(e.target.files?.[0] ?? null)} />
+                            </label>
+                            {org.proofUrl && !resubmitProofFile && (
+                                <p className="text-xs text-stone-400 mt-1 flex items-center gap-1">
+                                    Current: <a href={org.proofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-0.5">View existing <ExternalLink className="w-3 h-3" /></a>
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowResubmit(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button
+                                onClick={handleResubmit}
+                                disabled={!resubmitName.trim() || resubmitting || resubmitUploading || (!org.proofUrl && !resubmitProofFile)}
+                                className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2"
+                            >
+                                {(resubmitting || resubmitUploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+                                {org.status === 'Rejected' ? 'Resubmit' : 'Save & Resubmit'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -224,6 +397,8 @@ export function CoordDashboard() {
 interface CoordManageEventsProps { onViewDetail?: (id: string) => void; }
 export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const auth = useAuth();
+    const orgStatus = useOrgStatus();
+    const isOrgApproved = !!auth.linkedGrainId && orgStatus === 'Approved';
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -232,11 +407,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [creating, setCreating] = useState(false);
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) {
-            setError('No organization linked to your account.');
-            setLoading(false);
-            return;
-        }
+        if (!auth.linkedGrainId) { setLoading(false); return; }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getOpportunities(auth.linkedGrainId);
@@ -249,8 +420,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     useEffect(() => { load(); }, [load]);
 
     const handleCreate = async () => {
-        if (!auth.linkedGrainId) { setError('No organization linked to your account.'); return; }
-        if (!createForm.title) { setError('Title is required.'); return; }
+        if (!auth.linkedGrainId || !createForm.title) { setError('Title is required.'); return; }
         setCreating(true); setError('');
         try {
             const res = await organizationService.createOpportunity(auth.linkedGrainId, {
@@ -310,8 +480,11 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-extrabold text-stone-800">Manage Events</h1>
-                <button onClick={() => { setShowCreate(!showCreate); setError(''); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
+                {isOrgApproved && (
+                    <button onClick={() => { setShowCreate(!showCreate); setError(''); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
+                )}
             </div>
+            <OrgPendingBanner />
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
                     <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
@@ -382,11 +555,7 @@ export function CoordApplications() {
     const [toast, setToast] = useState('');
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) {
-            setError('No organization linked to your account.');
-            setLoading(false);
-            return;
-        }
+        if (!auth.linkedGrainId) { setLoading(false); return; }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getApplications(auth.linkedGrainId);
@@ -435,6 +604,7 @@ export function CoordApplications() {
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
+            <OrgPendingBanner />
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
                 <div className="grid gap-4">
@@ -471,6 +641,8 @@ export function CoordApplications() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function CoordMembers() {
     const auth = useAuth();
+    const orgStatus = useOrgStatus();
+    const isOrgApproved = !!auth.linkedGrainId && orgStatus === 'Approved';
     const [org, setOrg] = useState<OrgState | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -482,11 +654,7 @@ export function CoordMembers() {
     const [toast, setToast] = useState('');
 
     const load = useCallback(async () => {
-        if (!auth.linkedGrainId) {
-            setError('No organization linked to your account.');
-            setLoading(false);
-            return;
-        }
+        if (!auth.linkedGrainId) { setLoading(false); return; }
         setLoading(true); setError('');
         try {
             const data = await organizationService.getById(auth.linkedGrainId);
@@ -543,12 +711,16 @@ export function CoordMembers() {
         <div className="max-w-5xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <div><h1 className="text-3xl font-extrabold text-stone-800">Members</h1><p className="text-stone-500 mt-2 text-lg">Manage your organization's members.</p></div>
-                <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
-                    <Plus className="w-5 h-5" /> Invite Member
-                </button>
+                {isOrgApproved && (
+                    <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
+                        <Plus className="w-5 h-5" /> Invite Member
+                    </button>
+                )}
             </div>
 
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
+            <OrgPendingBanner />
 
             {showInvite && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
@@ -585,31 +757,34 @@ export function CoordMembers() {
                 {(['members', 'blocked'] as const).map(t => (
                     <button key={t} onClick={() => setTab(t)}
                         className={`px-5 py-2 rounded-xl font-bold text-sm transition-all capitalize ${tab === t ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                        {t === 'members' ? `Members (${org?.members?.length ?? 0})` : `Blocked (${org?.blockedVolunteerIds?.length ?? 0})`}
+                        {t === 'members' ? `Members (${(org?.members?.filter(m => m.userId !== auth.userId)?.length ?? 0)})` : `Blocked (${org?.blockedVolunteerIds?.length ?? 0})`}
                     </button>
                 ))}
             </div>
 
             {loading ? <Spinner /> : tab === 'members' ? (
-                org?.members?.length ? (
-                    <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
-                                <tr><th className="p-5 font-bold">Email</th><th className="p-5 font-bold">Role</th><th className="p-5 font-bold">Joined</th><th className="p-5 font-bold text-right">Actions</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-stone-100">
-                                {org.members.map(m => (
-                                    <tr key={m.userId} className="hover:bg-orange-50/30">
-                                        <td className="p-5 text-stone-800 font-bold">{m.email}</td>
-                                        <td className="p-5"><span className={`px-2 py-0.5 rounded text-xs font-bold ${roleColors[m.role] || 'bg-stone-100 text-stone-600'}`}>{m.role}</span></td>
-                                        <td className="p-5 text-stone-400 text-sm">{new Date(m.joinedAt).toLocaleDateString()}</td>
-                                        <td className="p-5 text-right">{m.userId !== auth.userId ? <button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button> : <span className="text-stone-300 text-sm">You</span>}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : <Empty msg="No members yet. Use the Invite button to add some." />
+                (() => {
+                    const visibleMembers = org?.members?.filter(m => m.userId !== auth.userId) ?? [];
+                    return visibleMembers.length ? (
+                        <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
+                                    <tr><th className="p-5 font-bold">Email</th><th className="p-5 font-bold">Role</th><th className="p-5 font-bold">Joined</th><th className="p-5 font-bold text-right">Actions</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-100">
+                                    {visibleMembers.map(m => (
+                                        <tr key={m.userId} className="hover:bg-orange-50/30">
+                                            <td className="p-5 text-stone-800 font-bold">{m.email}</td>
+                                            <td className="p-5"><span className={`px-2 py-0.5 rounded text-xs font-bold ${roleColors[m.role] || 'bg-stone-100 text-stone-600'}`}>{m.role}</span></td>
+                                            <td className="p-5 text-stone-400 text-sm">{new Date(m.joinedAt).toLocaleDateString()}</td>
+                                            <td className="p-5 text-right"><button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : <Empty msg="No other members yet. Use the Invite button to add some." />;
+                })()
             ) : (
                 org?.blockedVolunteerIds?.length ? (
                     <div className="space-y-3">
@@ -634,6 +809,8 @@ export function CoordMembers() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function CoordCertTemplates() {
     const auth = useAuth();
+    const orgStatus = useOrgStatus();
+    const isOrgApproved = !!auth.linkedGrainId && orgStatus === 'Approved';
     const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -713,12 +890,16 @@ export function CoordCertTemplates() {
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
 
+            <OrgPendingBanner />
+
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-extrabold text-stone-800">Certificate Templates</h1>
                     <p className="text-stone-500 mt-2 text-lg">Click any template to edit. Manage your certificate designs.</p>
                 </div>
-                <button onClick={() => { setShowCreate(!showCreate); setEditingTemplate(null); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> New Template</button>
+                {isOrgApproved && (
+                    <button onClick={() => { setShowCreate(!showCreate); setEditingTemplate(null); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> New Template</button>
+                )}
             </div>
 
             {showCreate && (

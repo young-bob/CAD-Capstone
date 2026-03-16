@@ -16,7 +16,7 @@ public class OrganizationGrain(
     IEventBus eventBus,
     ILogger<OrganizationGrain> logger) : Grain, IOrganizationGrain
 {
-    public async Task Initialize(string name, string description, Guid creatorUserId, string creatorEmail)
+    public async Task Initialize(string name, string description, Guid creatorUserId, string creatorEmail, string? proofUrl = null)
     {
         if (state.State.IsInitialized)
             throw new InvalidOperationException("Organization already initialized.");
@@ -24,6 +24,7 @@ public class OrganizationGrain(
         state.State.Name = name;
         state.State.Description = description;
         state.State.Status = OrgStatus.PendingApproval;
+        state.State.ProofUrl = proofUrl;
         state.State.Members.Add(new OrgMember
         {
             UserId = creatorUserId,
@@ -95,6 +96,20 @@ public class OrganizationGrain(
         state.State.Description = description;
         await state.WriteStateAsync();
         logger.LogInformation("Organization {OrgId} updated name to {Name}", this.GetPrimaryKey(), name);
+    }
+
+    public async Task Resubmit(string name, string description, string? proofUrl)
+    {
+        state.State.Name = name;
+        state.State.Description = description;
+        if (proofUrl != null)
+            state.State.ProofUrl = proofUrl;
+        state.State.Status = OrgStatus.PendingApproval;
+        await state.WriteStateAsync();
+
+        await eventBus.PublishAsync(new OrganizationStatusChangedEvent(this.GetPrimaryKey(), OrgStatus.PendingApproval));
+
+        logger.LogInformation("Organization {OrgId} resubmitted with name {Name}", this.GetPrimaryKey(), name);
     }
 
     private void EnsureApproved()

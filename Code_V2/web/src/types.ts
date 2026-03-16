@@ -192,6 +192,7 @@ export interface OrgState {
     blockedVolunteerIds: string[];
     isInitialized: boolean;
     createdAt: string;
+    proofUrl?: string;
 }
 
 // ─── Volunteer ────────────────────────────────────────────────
@@ -242,6 +243,7 @@ export interface OrganizationSummary {
     description: string;
     status: string;
     createdAt: string;
+    proofUrl?: string;
 }
 
 export interface UserRecord {

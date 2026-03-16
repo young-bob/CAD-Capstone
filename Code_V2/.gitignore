@@ -92,6 +92,7 @@ data/
 # Local dev secrets — never commit these
 appsettings.Development.json
 appsettings.Local.json
+appsettings.json
 
 # ====================
 # Other

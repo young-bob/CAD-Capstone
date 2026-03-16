@@ -15,4 +15,5 @@ public sealed class OrganizationState
     [Id(5)] public List<Guid> OpportunityIds { get; set; } = [];
     [Id(6)] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     [Id(7)] public bool IsInitialized { get; set; }
+    [Id(8)] public string? ProofUrl { get; set; }
 }

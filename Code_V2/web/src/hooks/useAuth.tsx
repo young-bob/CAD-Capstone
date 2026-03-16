@@ -14,7 +14,8 @@ interface AuthState {
 type AuthAction =
     | { type: 'LOGIN'; payload: { token: string; userId: string; email: string; role: UserRole; linkedGrainId: string | null } }
     | { type: 'LOGOUT' }
-    | { type: 'SET_LOADING'; payload: boolean };
+    | { type: 'SET_LOADING'; payload: boolean }
+    | { type: 'SET_LINKED_GRAIN'; payload: string };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
     switch (action.type) {
@@ -24,6 +25,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
             return { token: null, userId: null, email: null, role: null, linkedGrainId: null, loading: false };
         case 'SET_LOADING':
             return { ...state, loading: action.payload };
+        case 'SET_LINKED_GRAIN':
+            return { ...state, linkedGrainId: action.payload };
         default:
             return state;
     }
@@ -33,6 +36,7 @@ interface AuthContextValue extends AuthState {
     login: (data: LoginRequest) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     logout: () => void;
+    setLinkedGrainId: (id: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -100,8 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'LOGOUT' });
     };
 
+    const setLinkedGrainId = (id: string) => {
+        const stored = localStorage.getItem('vsms_user');
+        if (stored) {
+            try {
+                const user = JSON.parse(stored);
+                localStorage.setItem('vsms_user', JSON.stringify({ ...user, linkedGrainId: id }));
+            } catch { /* ignore */ }
+        }
+        dispatch({ type: 'SET_LINKED_GRAIN', payload: id });
+    };
+
     return (
-        <AuthContext.Provider value={{ ...state, login, register, logout }}>
+        <AuthContext.Provider value={{ ...state, login, register, logout, setLinkedGrainId }}>
             {children}
         </AuthContext.Provider>
     );

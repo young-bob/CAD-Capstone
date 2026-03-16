@@ -5,7 +5,7 @@ namespace VSMS.Abstractions.Grains;
 
 public interface IOrganizationGrain : IGrainWithGuidKey
 {
-    Task Initialize(string name, string description, Guid creatorUserId, string creatorEmail);
+    Task Initialize(string name, string description, Guid creatorUserId, string creatorEmail, string? proofUrl = null);
     Task<Guid> CreateOpportunity(string title, string description, string category);
     Task InviteMember(string email, OrgRole role);
     Task BlockVolunteer(Guid volunteerId);
@@ -15,4 +15,5 @@ public interface IOrganizationGrain : IGrainWithGuidKey
     Task<List<Guid>> GetOpportunities();
     Task<States.OrganizationState> GetState();
     Task UpdateInfo(string name, string description);
+    Task Resubmit(string name, string description, string? proofUrl);
 }

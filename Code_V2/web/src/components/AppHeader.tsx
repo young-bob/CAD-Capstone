@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Heart, Menu, Bell, CheckCheck } from 'lucide-react';
+import { Heart, Menu, Bell, CheckCheck, Check } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { attendanceService } from '../services/attendance';
+import { applicationService } from '../services/applications';
+import { organizationService } from '../services/organizations';
+import { useAuth } from '../hooks/useAuth';
 import type { ViewName } from '../types';
 
 type DisplayRole = 'volunteer' | 'coordinator' | 'admin';
@@ -21,6 +24,7 @@ interface Props {
 }
 
 export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Props) {
+    const auth = useAuth();
     const [showNotif, setShowNotif] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [readIds, setReadIds] = useState<Set<string>>(new Set());
@@ -37,26 +41,51 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
     }, []);
 
     const fetchNotifications = useCallback(async () => {
-        if (userRole !== 'admin') return;
         try {
-            const [orgs, disputes] = await Promise.all([
-                adminService.getPendingOrganizations(),
-                attendanceService.getPendingDisputes(),
-            ]);
-            const notifs: Notification[] = [
-                ...(Array.isArray(orgs) ? orgs : []).map(o => ({
-                    id: `org-${o.orgId}`,
-                    title: 'New Organization Application',
-                    subtitle: o.name,
-                    view: 'admin_orgs' as const,
-                })),
-                ...(Array.isArray(disputes) ? disputes : []).map(d => ({
-                    id: `dispute-${d.attendanceId}`,
-                    title: 'Attendance Dispute',
-                    subtitle: `${d.volunteerName} — ${d.opportunityTitle}`,
-                    view: 'admin_disputes' as const,
-                })),
-            ];
+            let notifs: Notification[] = [];
+
+            if (userRole === 'admin') {
+                const [orgs, disputes] = await Promise.all([
+                    adminService.getPendingOrganizations(),
+                    attendanceService.getPendingDisputes(),
+                ]);
+                notifs = [
+                    ...(Array.isArray(orgs) ? orgs : []).map(o => ({
+                        id: `org-${o.orgId}`,
+                        title: 'New Organization Application',
+                        subtitle: o.name,
+                        view: 'admin_orgs' as const,
+                    })),
+                    ...(Array.isArray(disputes) ? disputes : []).map(d => ({
+                        id: `dispute-${d.attendanceId}`,
+                        title: 'Attendance Dispute',
+                        subtitle: `${d.volunteerName} — ${d.opportunityTitle}`,
+                        view: 'admin_disputes' as const,
+                    })),
+                ];
+            } else if (userRole === 'volunteer' && auth.linkedGrainId) {
+                const apps = await applicationService.getForVolunteer(auth.linkedGrainId);
+                const actionable = ['Approved', 'Rejected', 'Waitlisted', 'Promoted'];
+                notifs = (Array.isArray(apps) ? apps : [])
+                    .filter(a => actionable.includes(a.status))
+                    .map(a => ({
+                        id: `app-${a.applicationId}`,
+                        title: `Application ${a.status}`,
+                        subtitle: `${a.opportunityTitle} — ${a.shiftName}`,
+                        view: 'applications' as const,
+                    }));
+            } else if (userRole === 'coordinator' && auth.linkedGrainId) {
+                const apps = await organizationService.getApplications(auth.linkedGrainId);
+                notifs = (Array.isArray(apps) ? apps : [])
+                    .filter(a => a.status === 'Pending')
+                    .map(a => ({
+                        id: `pending-${a.applicationId}`,
+                        title: 'New Volunteer Application',
+                        subtitle: `${a.volunteerName} — ${a.opportunityTitle}`,
+                        view: 'org_applications' as const,
+                    }));
+            }
+
             setNotifications(notifs);
             // Prune stale read IDs that no longer exist
             setReadIds(prev => {
@@ -64,7 +93,7 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                 return new Set([...prev].filter(id => existing.has(id)));
             });
         } catch { /* silent */ }
-    }, [userRole]);
+    }, [userRole, auth.linkedGrainId]);
 
     useEffect(() => {
         fetchNotifications();
@@ -78,6 +107,11 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
         setReadIds(prev => new Set([...prev, notif.id]));
         setShowNotif(false);
         onNavigate(notif.view);
+    };
+
+    const handleMarkOneRead = (e: React.MouseEvent, notifId: string) => {
+        e.stopPropagation();
+        setReadIds(prev => new Set([...prev, notifId]));
     };
 
     const handleMarkAllRead = () => {
@@ -137,10 +171,19 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                                                 className={`px-5 py-3.5 cursor-pointer hover:bg-orange-50 flex gap-3 items-start transition-colors ${isUnread ? 'bg-orange-50/40' : ''}`}
                                             >
                                                 <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? 'bg-rose-500' : 'bg-transparent'}`} />
-                                                <div className="min-w-0">
+                                                <div className="min-w-0 flex-1">
                                                     <p className={`text-sm ${isUnread ? 'font-bold text-stone-800' : 'font-medium text-stone-500'}`}>{n.title}</p>
                                                     <p className="text-xs text-stone-400 truncate mt-0.5">{n.subtitle}</p>
                                                 </div>
+                                                {isUnread && (
+                                                    <button
+                                                        onClick={e => handleMarkOneRead(e, n.id)}
+                                                        className="shrink-0 p-1 mt-0.5 text-stone-300 hover:text-orange-500 hover:bg-orange-100 rounded-lg transition-colors"
+                                                        title="Mark as read"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                             </li>
                                         );
                                     })}
