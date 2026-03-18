@@ -83,7 +83,7 @@ android/*.iml
 # Docker / Podman / Local Data
 # ====================
 # Local persistence data
-data/
+/data/
 # Environment files
 .env
 .env.local
