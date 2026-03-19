@@ -744,7 +744,15 @@ export function AdminOrgs() {
         setLoadingMembers(true);
         try {
             const state = await organizationService.getById(org.orgId);
-            setOrgMembers(state.members || []);
+            const grainMembers = state.members || [];
+            // Merge: DB coordinators for this org that are missing from grain state
+            const dbCoords = coordinators.filter(c => c.organizationId === org.orgId);
+            const merged = [...grainMembers];
+            for (const c of dbCoords) {
+                if (!grainMembers.find(m => m.userId === c.id))
+                    merged.push({ userId: c.id, email: c.email ?? '', role: OrgRole.Coordinator, joinedAt: '' });
+            }
+            setOrgMembers(merged);
             setEditingOrg(prev => prev ? { ...prev, proofUrl: state.proofUrl } : null);
         } catch { /* silent */ }
         finally { setLoadingMembers(false); }
