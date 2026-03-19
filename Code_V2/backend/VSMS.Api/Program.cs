@@ -23,6 +23,17 @@ builder.AddOrleansCluster();
 builder.AddApplicationServices();
 builder.AddSwagger();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+        policy.WithOrigins(
+                "http://localhost:3000",
+                "http://localhost:8081")
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
+});
+
 // Serialize enums as strings (e.g. "Approved" instead of 1)
 builder.Services.ConfigureHttpJsonOptions(opts =>
     opts.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -34,6 +45,8 @@ app.UseExceptionHandler(); // Uses GlobalExceptionHandler
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
