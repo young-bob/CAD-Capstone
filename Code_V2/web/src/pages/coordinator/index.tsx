@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
-import type { OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
+import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
@@ -46,7 +46,8 @@ function getErr(err: any, fallback: string): string { const d = err?.response?.d
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR DASHBOARD
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function CoordDashboard() {
+interface CoordDashboardProps { onNavigate: (view: ViewName) => void; }
+export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     const auth = useAuth();
     const [org, setOrg] = useState<OrgState | null>(null);
     const [orgNotFound, setOrgNotFound] = useState(false);
@@ -222,6 +223,36 @@ export function CoordDashboard() {
     const isApproved = org.status === 'Approved';
     const isPrimaryCoord = org.members?.some(m => m.userId === auth.userId && m.role === OrgRole.Admin) ?? false;
     const pendingApps = apps.filter(a => a.status === 'Pending').length;
+    const oppStatusCounts = [
+        { key: 'Draft', label: 'Draft', count: opps.filter(o => o.status === 'Draft').length, color: 'bg-stone-500' },
+        { key: 'Published', label: 'Published', count: opps.filter(o => o.status === 'Published').length, color: 'bg-emerald-500' },
+        { key: 'Completed', label: 'Completed', count: opps.filter(o => o.status === 'Completed').length, color: 'bg-blue-500' },
+        { key: 'Cancelled', label: 'Cancelled', count: opps.filter(o => o.status === 'Cancelled').length, color: 'bg-rose-500' },
+    ];
+    const appStatusCounts = [
+        { key: 'Pending', label: 'Pending', count: apps.filter(a => a.status === 'Pending').length, color: 'bg-amber-400' },
+        { key: 'Approved', label: 'Approved', count: apps.filter(a => a.status === 'Approved').length, color: 'bg-emerald-500' },
+        { key: 'Waitlisted', label: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, color: 'bg-blue-500' },
+        { key: 'Rejected', label: 'Rejected', count: apps.filter(a => a.status === 'Rejected').length, color: 'bg-rose-500' },
+    ];
+    const totalOpps = oppStatusCounts.reduce((sum, s) => sum + s.count, 0);
+    const totalApps = appStatusCounts.reduce((sum, s) => sum + s.count, 0);
+    const categoryCounts = Object.entries(
+        opps.reduce<Record<string, number>>((acc, opp) => {
+            const key = opp.category || 'Uncategorized';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {})
+    )
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+    const upcomingWorkload = apps
+        .filter(a => a.shiftStartTime && new Date(a.shiftStartTime).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.shiftStartTime).getTime() - new Date(b.shiftStartTime).getTime())
+        .slice(0, 6);
+    const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -302,16 +333,16 @@ export function CoordDashboard() {
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         {[
-                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50' },
-                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50' },
-                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50' },
+                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50', target: 'manage_events' as ViewName },
+                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50', target: 'org_applications' as ViewName },
+                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50', target: 'org_applications' as ViewName },
+                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50', target: 'org_members' as ViewName },
                         ].map((s, i) => (
-                            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-shadow">
                                 <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
                                 <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
                                 <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
-                            </div>
+                            </button>
                         ))}
                     </div>
 
@@ -326,6 +357,83 @@ export function CoordDashboard() {
                         </div>
                         <div className="w-full lg:w-80 shrink-0">
                             <MiniCalendar eventDates={apps.map(a => new Date(a.shiftStartTime))} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Event Pipeline</h3>
+                            <div className="space-y-4">
+                                {oppStatusCounts.map(s => {
+                                    const pct = totalOpps === 0 ? 0 : Math.round((s.count / totalOpps) * 100);
+                                    return (
+                                        <div key={s.key}>
+                                            <div className="flex justify-between text-sm mb-1.5">
+                                                <span className="font-semibold text-stone-700">{s.label}</span>
+                                                <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                                <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Application Funnel</h3>
+                            <div className="space-y-4">
+                                {appStatusCounts.map(s => {
+                                    const pct = totalApps === 0 ? 0 : Math.round((s.count / totalApps) * 100);
+                                    return (
+                                        <div key={s.key}>
+                                            <div className="flex justify-between text-sm mb-1.5">
+                                                <span className="font-semibold text-stone-700">{s.label}</span>
+                                                <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                                <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Top Categories</h3>
+                            {categoryCounts.length === 0 ? (
+                                <p className="text-sm text-stone-400">No event categories yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {categoryCounts.map(([category, count]) => (
+                                        <div key={category} className="flex items-center justify-between p-3 rounded-xl bg-stone-50">
+                                            <span className="text-sm font-semibold text-stone-700">{category}</span>
+                                            <span className="text-xs font-bold text-stone-500">{count} event{count > 1 ? 's' : ''}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Upcoming Workload</h3>
+                            {upcomingWorkload.length === 0 ? (
+                                <p className="text-sm text-stone-400">No upcoming volunteer shifts yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {upcomingWorkload.map(app => (
+                                        <div key={app.applicationId} className="border border-stone-100 rounded-2xl p-4">
+                                            <p className="font-semibold text-stone-800">{app.opportunityTitle}</p>
+                                            <p className="text-xs text-stone-500 mt-1">{app.shiftName} · {formatDateTime(app.shiftStartTime)}</p>
+                                            <p className="text-xs text-stone-400 mt-1">Volunteer: {app.volunteerName}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
@@ -405,6 +513,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [showCreate, setShowCreate] = useState(false);
     const [createForm, setCreateForm] = useState({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
     const [creating, setCreating] = useState(false);
+    const [publishingId, setPublishingId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -451,12 +560,13 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     };
 
     const handlePublish = async (id: string) => {
+        setPublishingId(id);
         try {
             await opportunityService.publish(id);
             load();
         } catch (err: any) {
             setError(getErr(err, 'Failed to publish'));
-        }
+        } finally { setPublishingId(null); }
     };
 
     const handleGetLocation = () => {
@@ -516,7 +626,18 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                 </div>
             )}
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
-            {loading ? <Spinner /> : opps.length === 0 ? <Empty msg="No opportunities yet. Create your first one!" /> : (
+            {loading ? <Spinner /> : opps.length === 0 ? (
+                <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
+                    <p className="text-stone-400 font-medium mb-5">No opportunities yet.</p>
+                    {isOrgApproved ? (
+                        <button onClick={() => setShowCreate(true)} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600">
+                            Create First Opportunity
+                        </button>
+                    ) : (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 inline-block">Organization approval is required before creating opportunities.</p>
+                    )}
+                </div>
+            ) : (
                 <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
@@ -524,13 +645,18 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                         </thead>
                         <tbody className="divide-y divide-stone-100">
                             {opps.map(o => (
-                                <tr key={o.opportunityId} className="hover:bg-orange-50/30 cursor-pointer" onClick={() => onViewDetail?.(o.opportunityId)}>
+                                <tr key={o.opportunityId} className={`hover:bg-orange-50/30 cursor-pointer ${publishingId === o.opportunityId ? 'opacity-70' : ''}`} onClick={() => onViewDetail?.(o.opportunityId)}>
                                     <td className="p-5 text-stone-800 font-bold text-orange-700 hover:underline">{o.title} →</td>
                                     <td className="p-5 text-stone-500 font-medium">{o.category}</td>
                                     <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[o.status] || 'bg-stone-100 text-stone-600'}`}>{o.status}</span></td>
                                     <td className="p-5 text-stone-800 font-bold">{o.availableSpots} / {o.totalSpots}</td>
                                     <td className="p-5">
-                                        {o.status === 'Draft' && <button onClick={() => handlePublish(o.opportunityId)} className="text-orange-500 font-bold text-sm hover:underline">Publish</button>}
+                                        {o.status === 'Draft' && (
+                                            <button onClick={(e) => { e.stopPropagation(); handlePublish(o.opportunityId); }} disabled={publishingId === o.opportunityId} className="text-orange-500 font-bold text-sm hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                                                {publishingId === o.opportunityId && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                Publish
+                                            </button>
+                                        )}
                                         {o.status === 'Published' && <span className="text-emerald-500 font-bold text-sm">Active</span>}
                                     </td>
                                 </tr>
@@ -609,13 +735,14 @@ export function CoordApplications() {
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
                 <div className="grid gap-4">
                     {apps.map(app => (
-                        <div key={app.applicationId} className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 flex items-center justify-between">
+                        <div key={app.applicationId} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center justify-between ${actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500">{app.volunteerName?.charAt(0) || '?'}</div>
                                 <div>
                                     <h3 className="font-bold text-stone-800">{app.volunteerName} <span className="text-sm font-medium text-stone-400">applied for</span> {app.opportunityTitle}</h3>
                                     <p className="text-sm text-stone-400 mt-1">Shift: {app.shiftName} · Applied {new Date(app.appliedAt).toLocaleDateString()}</p>
                                     <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded ${statusColors[app.status] || 'bg-stone-100 text-stone-600'}`}>{app.status}</span>
+                                    {actionId === app.applicationId && <p className="text-xs text-orange-600 font-semibold mt-2">Processing review...</p>}
                                 </div>
                             </div>
                             {app.status === 'Pending' && (

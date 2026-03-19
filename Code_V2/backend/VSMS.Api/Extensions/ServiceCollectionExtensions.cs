@@ -56,6 +56,8 @@ public static class ServiceCollectionExtensions
 
     public static WebApplicationBuilder AddApplicationServices(this WebApplicationBuilder builder)
     {
+        builder.Services.AddMemoryCache();
+
         // Infrastructure
         // Infrastructure - MinIO File Storage
         builder.Services.Configure<VSMS.Infrastructure.Storage.MinioSettings>(

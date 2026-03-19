@@ -9,6 +9,8 @@ import { attendanceService } from '../../services/attendance';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
+import ActionToast from '../../components/ActionToast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 const MapView = lazy(() => import('../../components/MapView'));
 
 // ─── Shared loading / error / empty states ────────────────────
@@ -28,6 +30,10 @@ function Empty({ msg }: { msg: string }) {
     return <div className="text-center py-16 text-stone-400 font-medium">{msg}</div>;
 }
 function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
+function formatEventTitle(opportunityTitle: string, shiftName?: string | null): string {
+    const cleanedShift = shiftName?.trim();
+    return cleanedShift ? `${opportunityTitle} · ${cleanedShift}` : opportunityTitle;
+}
 
 // ─── GPS Check-In Button ──────────────────────────────────────
 function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone }: {
@@ -171,6 +177,36 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 
     const name = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || auth.email : auth.email;
     const approvedShiftDates = apps.filter(a => a.status === 'Approved' && a.shiftStartTime).map(a => new Date(a.shiftStartTime));
+    const appStatusCounts = [
+        { label: 'Pending', key: 'Pending', count: apps.filter(a => a.status === 'Pending').length, color: 'bg-amber-400' },
+        { label: 'Approved', key: 'Approved', count: apps.filter(a => a.status === 'Approved').length, color: 'bg-emerald-500' },
+        { label: 'Waitlisted', key: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, color: 'bg-blue-500' },
+        { label: 'Closed', key: 'Closed', count: apps.filter(a => ['Rejected', 'Withdrawn', 'NoShow', 'Completed'].includes(a.status)).length, color: 'bg-stone-500' },
+    ];
+    const totalStatusCount = appStatusCounts.reduce((sum, s) => sum + s.count, 0);
+    const upcomingApps = apps
+        .filter(a => a.shiftStartTime && new Date(a.shiftStartTime).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.shiftStartTime).getTime() - new Date(b.shiftStartTime).getTime())
+        .slice(0, 5);
+    const recentApps = [...apps]
+        .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
+        .slice(0, 5);
+    const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const statusBadgeClass = (status: string) => {
+        if (status === 'Approved') return 'bg-emerald-100 text-emerald-700';
+        if (status === 'Pending') return 'bg-amber-100 text-amber-700';
+        if (status === 'Waitlisted' || status === 'Promoted') return 'bg-blue-100 text-blue-700';
+        if (status === 'Rejected' || status === 'NoShow') return 'bg-rose-100 text-rose-700';
+        return 'bg-stone-100 text-stone-700';
+    };
+    const statCards = [
+        { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50', hoverBg: 'group-hover:bg-blue-500', target: 'attendance' as ViewName },
+        { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', hoverBg: 'group-hover:bg-emerald-500', target: 'attendance' as ViewName },
+        { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50', hoverBg: 'group-hover:bg-amber-500', target: 'profile' as ViewName },
+        { label: 'Applications', val: String(apps.length), unit: 'total', icon: BadgeCheck, color: 'text-violet-500', bg: 'bg-violet-50', hoverBg: 'group-hover:bg-violet-500', target: 'applications' as ViewName },
+    ];
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -187,19 +223,15 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                         <Heart className="absolute -right-4 -bottom-4 w-56 h-56 text-white opacity-10" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                            { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-                            { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                            { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50' },
-                        ].map((s, i) => (
-                            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
-                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 group-hover:bg-${s.color.split('-')[1]}-500 group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                        {statCards.map((s, i) => (
+                            <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 ${s.hoverBg} group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
                                 <div>
                                     <h3 className="text-2xl font-extrabold text-stone-800">{s.val} <span className="text-sm font-medium text-stone-400">{s.unit}</span></h3>
                                     <p className="text-xs font-semibold text-stone-400 tracking-wide uppercase mt-1">{s.label}</p>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -218,6 +250,75 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-xl font-extrabold text-stone-800">Application Snapshot</h2>
+                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                    </div>
+                    <div className="space-y-4">
+                        {appStatusCounts.map((s) => {
+                            const pct = totalStatusCount === 0 ? 0 : Math.round((s.count / totalStatusCount) * 100);
+                            return (
+                                <div key={s.key}>
+                                    <div className="flex justify-between items-center text-sm mb-1.5">
+                                        <span className="font-semibold text-stone-700">{s.label}</span>
+                                        <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <h2 className="text-xl font-extrabold text-stone-800 mb-5">Upcoming Commitments</h2>
+                    {upcomingApps.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-8 text-center">No upcoming shifts yet.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {upcomingApps.map(app => (
+                                <div key={app.applicationId} className="border border-stone-100 rounded-2xl p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                            <p className="text-xs text-stone-500 mt-1">{formatDateTime(app.shiftStartTime)}</p>
+                                        </div>
+                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
+                                            {app.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                <h2 className="text-xl font-extrabold text-stone-800 mb-5">Recent Application Activity</h2>
+                {recentApps.length === 0 ? (
+                    <p className="text-sm text-stone-400 py-4">No activity yet.</p>
+                ) : (
+                    <div className="space-y-3">
+                        {recentApps.map(app => (
+                            <div key={app.applicationId} className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-b-0">
+                                <div>
+                                    <p className="font-medium text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                    <p className="text-xs text-stone-500">Applied {formatDateTime(app.appliedAt)}</p>
+                                </div>
+                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
+                                    {app.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -402,13 +503,15 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER APPLICATIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function VolApplications() {
+interface VolApplicationsProps { onNavigate?: (view: ViewName) => void; }
+export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const auth = useAuth();
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [toast, setToast] = useState('');
+    const [toast, setToast] = useState<{ message: string; actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[] } | null>(null);
     const [actionId, setActionId] = useState<string | null>(null);
+    const [confirmWithdrawApp, setConfirmWithdrawApp] = useState<ApplicationSummary | null>(null);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -423,14 +526,37 @@ export function VolApplications() {
 
     useEffect(() => { load(); }, [load]);
 
-    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+    const showToast = (message: string, actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[]) => {
+        setToast({ message, actions });
+    };
 
-    const handleWithdraw = async (app: ApplicationSummary) => {
-        if (!window.confirm(`Withdraw application for "${app.opportunityTitle}"?`)) return;
+    const handleUndoWithdraw = async (app: ApplicationSummary) => {
+        if (!auth.linkedGrainId) return;
+        setActionId(app.applicationId);
+        try {
+            await opportunityService.apply(app.opportunityId, {
+                volunteerId: auth.linkedGrainId,
+                shiftId: app.shiftId,
+                idempotencyKey: `undo-${app.applicationId}-${Date.now()}`
+            });
+            showToast('Withdrawal undone');
+            load();
+        } catch (err: any) {
+            showToast(err.response?.data?.toString() || 'Failed to undo withdrawal');
+        } finally { setActionId(null); }
+    };
+
+    const handleWithdrawConfirm = async () => {
+        if (!confirmWithdrawApp) return;
+        const app = confirmWithdrawApp;
+        setConfirmWithdrawApp(null);
         setActionId(app.applicationId);
         try {
             await opportunityService.withdrawApplication(app.opportunityId, app.applicationId);
-            showToast('Application withdrawn');
+            showToast('Application withdrawn', [
+                { label: 'Undo', tone: 'default', onClick: () => handleUndoWithdraw(app) },
+                { label: 'Browse Events', tone: 'primary', onClick: () => onNavigate?.('opportunities') },
+            ]);
             load();
         } catch (err: any) {
             showToast(err.response?.data?.toString() || 'Failed to withdraw');
@@ -441,7 +567,9 @@ export function VolApplications() {
         setActionId(app.applicationId);
         try {
             await applicationService.accept(app.applicationId);
-            showToast('Invitation accepted! 🎉');
+            showToast('Invitation accepted! 🎉', [
+                { label: 'Go To Attendance', tone: 'primary', onClick: () => onNavigate?.('attendance') }
+            ]);
             load();
         } catch (err: any) {
             showToast(err.response?.data?.toString() || 'Failed to accept');
@@ -464,15 +592,37 @@ export function VolApplications() {
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             <div><h1 className="text-3xl font-extrabold text-stone-800">My Applications</h1><p className="text-stone-500 mt-2 text-lg">Track the status of your applications.</p></div>
-            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? <Empty msg="No applications yet." /> : (
+            {toast && <ActionToast message={toast.message} actions={toast.actions} onClose={() => setToast(null)} />}
+            <ConfirmDialog
+                open={!!confirmWithdrawApp}
+                title="Withdraw Application"
+                message={confirmWithdrawApp ? `Withdraw "${formatEventTitle(confirmWithdrawApp.opportunityTitle, confirmWithdrawApp.shiftName)}"?` : ''}
+                confirmText="Withdraw"
+                loading={!!confirmWithdrawApp && actionId === confirmWithdrawApp.applicationId}
+                onCancel={() => setConfirmWithdrawApp(null)}
+                onConfirm={handleWithdrawConfirm}
+            />
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? (
+                <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
+                    <p className="text-stone-400 font-medium mb-5">No applications yet.</p>
+                    <button
+                        onClick={() => onNavigate?.('opportunities')}
+                        className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600"
+                    >
+                        Find Opportunities
+                    </button>
+                </div>
+            ) : (
                 <div className="space-y-4">
                     {apps.map(a => (
-                        <div key={a.applicationId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
                             <div className="flex-1 min-w-0">
-                                <p className="font-bold text-stone-800 truncate">{a.opportunityTitle}</p>
-                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftName} · {a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
+                                <p className="font-bold text-stone-800 truncate">{formatEventTitle(a.opportunityTitle, a.shiftName)}</p>
+                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
                                 <p className="text-xs text-stone-400 mt-1">Applied: {new Date(a.appliedAt).toLocaleDateString()}</p>
+                                {actionId === a.applicationId && (
+                                    <p className="text-xs text-orange-600 font-semibold mt-2">Processing your request...</p>
+                                )}
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
@@ -483,7 +633,7 @@ export function VolApplications() {
                                     </button>
                                 )}
                                 {canWithdraw(a.status) && (
-                                    <button onClick={() => handleWithdraw(a)} disabled={actionId === a.applicationId}
+                                    <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
                                         className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
                                         {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
                                     </button>

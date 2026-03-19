@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink } from 'lucide-react';
-import type { OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState } from '../../types';
+import type { ViewName, OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState } from '../../types';
 import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { adminService } from '../../services/admin';
@@ -19,9 +19,11 @@ function getErrWithStatus(err: any, fallback: string): string { const status = e
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ADMIN DASHBOARD
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function AdminDashboard() {
+interface AdminDashboardProps { onNavigate: (view: ViewName) => void; }
+export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     const [users, setUsers] = useState<UserRecord[]>([]);
     const [pendingOrgs, setPendingOrgs] = useState<OrganizationSummary[]>([]);
+    const [allOrgs, setAllOrgs] = useState<OrganizationSummary[]>([]);
     const [disputes, setDisputes] = useState<DisputeSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -29,14 +31,16 @@ export function AdminDashboard() {
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const [u, o, d] = await Promise.all([
+            const [u, o, d, all] = await Promise.all([
                 adminService.getUsers(),
                 adminService.getPendingOrganizations(),
                 attendanceService.getPendingDisputes(),
+                adminService.getAllOrganizations(),
             ]);
             setUsers(u || []);
             setPendingOrgs(o || []);
             setDisputes(d || []);
+            setAllOrgs(all || []);
         } catch (err: any) {
             setError(getErr(err, 'Failed to load dashboard data'));
         } finally { setLoading(false); }
@@ -46,39 +50,143 @@ export function AdminDashboard() {
 
     if (loading) return <Spinner />;
     if (error) return <ErrorBox msg={error} onRetry={load} />;
+    const bannedUsers = users.filter(u => u.isBanned).length;
+    const roleCounts = [
+        { key: 'Volunteer', label: 'Volunteers', count: users.filter(u => u.role === 'Volunteer').length, color: 'bg-blue-500' },
+        { key: 'Coordinator', label: 'Coordinators', count: users.filter(u => u.role === 'Coordinator').length, color: 'bg-emerald-500' },
+        { key: 'SystemAdmin', label: 'Admins', count: users.filter(u => u.role === 'SystemAdmin').length, color: 'bg-violet-500' },
+    ];
+    const approvedOrgs = allOrgs.filter(o => o.status === 'Approved').length;
+    const pendingRatio = allOrgs.length === 0 ? 0 : Math.round((pendingOrgs.length / allOrgs.length) * 100);
+    const approvalRatio = allOrgs.length === 0 ? 0 : Math.round((approvedOrgs / allOrgs.length) * 100);
+    const queueItems = pendingOrgs.length + disputes.length;
+    const oldestDisputeHours = disputes.length === 0
+        ? 0
+        : Math.max(...disputes.map(d => Math.floor((Date.now() - new Date(d.raisedAt).getTime()) / (1000 * 60 * 60))));
+    const recentDisputes = [...disputes]
+        .sort((a, b) => new Date(b.raisedAt).getTime() - new Date(a.raisedAt).getTime())
+        .slice(0, 5);
+    const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             <div><h1 className="text-3xl font-extrabold text-stone-800">Platform Overview</h1><p className="text-stone-500 mt-2 text-lg">System-wide monitoring and controls.</p></div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Users', val: String(users.length), icon: Users, color: 'text-blue-500' },
-                    { label: 'Pending Orgs', val: String(pendingOrgs.length), icon: Building, color: 'text-amber-500' },
-                    { label: 'Active Disputes', val: String(disputes.length), icon: AlertTriangle, color: 'text-rose-500' },
-                    { label: 'Banned Users', val: String(users.filter(u => u.isBanned).length), icon: Calendar, color: 'text-emerald-500' },
+                    { label: 'Total Users', val: String(users.length), icon: Users, color: 'text-blue-500', target: 'admin_users' as ViewName },
+                    { label: 'Pending Orgs', val: String(pendingOrgs.length), icon: Building, color: 'text-amber-500', target: 'admin_orgs' as ViewName },
+                    { label: 'Active Disputes', val: String(disputes.length), icon: AlertTriangle, color: 'text-rose-500', target: 'admin_disputes' as ViewName },
+                    { label: 'Banned Users', val: String(bannedUsers), icon: Calendar, color: 'text-emerald-500', target: 'admin_users' as ViewName },
                 ].map((s, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                    <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex items-center gap-4 hover:shadow-md transition-shadow text-left">
                         <div className={`w-12 h-12 rounded-2xl bg-stone-50 ${s.color} flex items-center justify-center`}><s.icon className="w-6 h-6" /></div>
                         <div>
                             <h3 className="text-2xl font-extrabold text-stone-800">{s.val}</h3>
                             <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">{s.label}</p>
                         </div>
-                    </div>
+                    </button>
                 ))}
             </div>
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
-                <h2 className="text-xl font-bold text-stone-800 mb-6">Recent Users</h2>
-                <div className="space-y-4">
-                    {users.slice(0, 5).map(u => (
-                        <div key={u.id} className="flex items-center gap-4 py-3 border-b border-stone-50 last:border-0">
-                            <div className={`w-2.5 h-2.5 rounded-full ${u.isBanned ? 'bg-rose-500' : 'bg-emerald-500'} shrink-0`}></div>
-                            <div className="flex-1">
-                                <p className="text-stone-800 font-medium">{u.email}</p>
-                                <p className="text-sm text-stone-400">{u.role} · {u.isBanned ? 'Banned' : 'Active'}</p>
-                            </div>
-                            <span className="text-xs text-stone-400 shrink-0">{new Date(u.createdAt).toLocaleDateString()}</span>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
+                    <h2 className="text-xl font-bold text-stone-800 mb-5">User Role Mix</h2>
+                    <div className="space-y-4">
+                        {roleCounts.map(role => {
+                            const pct = users.length === 0 ? 0 : Math.round((role.count / users.length) * 100);
+                            return (
+                                <div key={role.key}>
+                                    <div className="flex justify-between text-sm mb-1.5">
+                                        <span className="font-semibold text-stone-700">{role.label}</span>
+                                        <span className="text-stone-500">{role.count} ({pct}%)</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className={`h-full ${role.color}`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
+                    <h2 className="text-xl font-bold text-stone-800 mb-5">Org Approval Health</h2>
+                    <div className="space-y-4 text-sm">
+                        <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
+                            <p className="text-emerald-700 font-semibold">Approved Ratio</p>
+                            <p className="text-2xl font-extrabold text-emerald-800 mt-1">{approvalRatio}%</p>
+                            <p className="text-xs text-emerald-700 mt-1">{approvedOrgs} of {allOrgs.length || 0} organizations approved</p>
                         </div>
-                    ))}
+                        <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
+                            <p className="text-amber-700 font-semibold">Pending Ratio</p>
+                            <p className="text-2xl font-extrabold text-amber-800 mt-1">{pendingRatio}%</p>
+                            <p className="text-xs text-amber-700 mt-1">{pendingOrgs.length} organizations waiting review</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
+                    <h2 className="text-xl font-bold text-stone-800 mb-5">Moderation Queue</h2>
+                    <div className="space-y-4">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-stone-500">Items waiting action</span>
+                            <span className="font-bold text-stone-800">{queueItems}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-stone-500">Open disputes</span>
+                            <span className="font-bold text-rose-600">{disputes.length}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-stone-500">Oldest dispute age</span>
+                            <span className="font-bold text-stone-800">{oldestDisputeHours}h</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-stone-500">Banned users</span>
+                            <span className="font-bold text-stone-800">{bannedUsers}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                    <h2 className="text-xl font-bold text-stone-800 mb-6">Recent Users</h2>
+                    <div className="space-y-4">
+                        {users.slice(0, 5).map(u => (
+                            <div key={u.id} className="flex items-center gap-4 py-3 border-b border-stone-50 last:border-0">
+                                <div className={`w-2.5 h-2.5 rounded-full ${u.isBanned ? 'bg-rose-500' : 'bg-emerald-500'} shrink-0`}></div>
+                                <div className="flex-1">
+                                    <p className="text-stone-800 font-medium">{u.email}</p>
+                                    <p className="text-sm text-stone-400">{u.role} · {u.isBanned ? 'Banned' : 'Active'}</p>
+                                </div>
+                                <span className="text-xs text-stone-400 shrink-0">{new Date(u.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                    <h2 className="text-xl font-bold text-stone-800 mb-6">Recent Disputes</h2>
+                    {recentDisputes.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-6">No pending disputes.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {recentDisputes.map(d => (
+                                <div key={d.attendanceId} className="rounded-2xl border border-stone-100 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-stone-800">{d.opportunityTitle}</p>
+                                            <p className="text-xs text-stone-500 mt-1">{d.volunteerName} · {formatDateTime(d.raisedAt)}</p>
+                                        </div>
+                                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">Open</span>
+                                    </div>
+                                    <p className="text-sm text-stone-600 mt-2 line-clamp-2">{d.reason}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -147,6 +255,8 @@ function CoordCombobox({ coordinators, selectedId, onSelectId, placeholder }: {
 // ADMIN ORGS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function AdminOrgs() {
+    const ORG_FILTER_KEY = 'vsms_admin_orgs_filter';
+    const ORG_SORT_KEY = 'vsms_admin_orgs_sort';
     const [orgs, setOrgs] = useState<OrganizationSummary[]>([]);
     const [coordinators, setCoordinators] = useState<UserRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -163,6 +273,7 @@ export function AdminOrgs() {
     const [addCoordId, setAddCoordId] = useState('');
     const [coordAction, setCoordAction] = useState(false);
     const [orgFilter, setOrgFilter] = useState({ search: '', status: '', dateFrom: '', dateTo: '' });
+    const [orgSort, setOrgSort] = useState<'newest' | 'oldest' | 'name_asc' | 'name_desc'>('newest');
     const [orgMembers, setOrgMembers] = useState<OrgState['members']>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
     const [removingCoordId, setRemovingCoordId] = useState<string | null>(null);
@@ -186,6 +297,24 @@ export function AdminOrgs() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        try {
+            const savedFilter = localStorage.getItem(ORG_FILTER_KEY);
+            const savedSort = localStorage.getItem(ORG_SORT_KEY);
+            if (savedFilter) setOrgFilter(JSON.parse(savedFilter));
+            if (savedSort === 'newest' || savedSort === 'oldest' || savedSort === 'name_asc' || savedSort === 'name_desc') {
+                setOrgSort(savedSort);
+            }
+        } catch {
+            // ignore malformed persisted state
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem(ORG_FILTER_KEY, JSON.stringify(orgFilter));
+        localStorage.setItem(ORG_SORT_KEY, orgSort);
+    }, [orgFilter, orgSort]);
 
     useEffect(() => {
         if (orgs.length === 0) { setOrgMembersMap({}); setOrgProofUrlMap({}); return; }
@@ -328,6 +457,12 @@ export function AdminOrgs() {
         if (orgFilter.dateFrom && new Date(org.createdAt) < new Date(orgFilter.dateFrom)) return false;
         if (orgFilter.dateTo && new Date(org.createdAt) > new Date(orgFilter.dateTo + 'T23:59:59')) return false;
         return true;
+    });
+    const sortedOrgs = [...filteredOrgs].sort((a, b) => {
+        if (orgSort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (orgSort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (orgSort === 'name_asc') return a.name.localeCompare(b.name);
+        return b.name.localeCompare(a.name);
     });
 
     return (
@@ -503,6 +638,15 @@ export function AdminOrgs() {
                     <label className="block text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">To</label>
                     <input type="date" value={orgFilter.dateTo} onChange={e => setOrgFilter(p => ({ ...p, dateTo: e.target.value }))} className="px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                 </div>
+                <div>
+                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">Sort</label>
+                    <select value={orgSort} onChange={e => setOrgSort(e.target.value as 'newest' | 'oldest' | 'name_asc' | 'name_desc')} className="px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="name_asc">Name A-Z</option>
+                        <option value="name_desc">Name Z-A</option>
+                    </select>
+                </div>
                 {(orgFilter.search || orgFilter.status || orgFilter.dateFrom || orgFilter.dateTo) && (
                     <button onClick={() => setOrgFilter({ search: '', status: '', dateFrom: '', dateTo: '' })} className="px-3 py-2 text-sm text-stone-400 hover:text-stone-600 font-medium flex items-center gap-1">
                         <X className="w-4 h-4" /> Clear
@@ -511,10 +655,17 @@ export function AdminOrgs() {
             </div>
 
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
-            {loading ? <Spinner /> : orgs.length === 0 ? <Empty msg="No organizations yet." /> : filteredOrgs.length === 0 ? <Empty msg="No organizations match the filter." /> : (
+            {loading ? <Spinner /> : orgs.length === 0 ? (
+                <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
+                    <p className="text-stone-400 font-medium mb-5">No organizations yet.</p>
+                    <button onClick={() => setShowCreate(true)} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600">
+                        Create Organization
+                    </button>
+                </div>
+            ) : sortedOrgs.length === 0 ? <Empty msg="No organizations match the filter." /> : (
                 <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                     <div className="px-5 py-3 bg-stone-50 border-b border-stone-100 text-xs text-stone-400 font-medium">
-                        Showing {filteredOrgs.length} of {orgs.length} organizations
+                        Showing {sortedOrgs.length} of {orgs.length} organizations
                     </div>
                     <table className="w-full text-left">
                         <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
@@ -527,7 +678,7 @@ export function AdminOrgs() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100">
-                            {filteredOrgs.map(org => (
+                            {sortedOrgs.map(org => (
                                 <tr key={org.orgId} className="hover:bg-orange-50/30">
                                     <td className="p-5 text-stone-800 font-bold">{org.name}</td>
                                     <td className="p-5 text-stone-500 text-sm">
@@ -950,6 +1101,8 @@ export function AdminDisputes() {
 // ADMIN USERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export function AdminUsers() {
+    const USER_FILTER_KEY = 'vsms_admin_users_filter';
+    const USER_SORT_KEY = 'vsms_admin_users_sort';
     const auth = useAuth();
     const [users, setUsers] = useState<UserRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -957,6 +1110,7 @@ export function AdminUsers() {
     const [actionPending, setActionPending] = useState<string | null>(null);
     const [toast, setToast] = useState('');
     const [filter, setFilter] = useState({ search: '', role: '', status: '', dateFrom: '', dateTo: '' });
+    const [sort, setSort] = useState<'newest' | 'oldest' | 'email_asc' | 'email_desc'>('newest');
     const [resetPwdUserId, setResetPwdUserId] = useState<string | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [resetting, setResetting] = useState(false);
@@ -980,6 +1134,24 @@ export function AdminUsers() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        try {
+            const savedFilter = localStorage.getItem(USER_FILTER_KEY);
+            const savedSort = localStorage.getItem(USER_SORT_KEY);
+            if (savedFilter) setFilter(JSON.parse(savedFilter));
+            if (savedSort === 'newest' || savedSort === 'oldest' || savedSort === 'email_asc' || savedSort === 'email_desc') {
+                setSort(savedSort);
+            }
+        } catch {
+            // ignore malformed persisted state
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem(USER_FILTER_KEY, JSON.stringify(filter));
+        localStorage.setItem(USER_SORT_KEY, sort);
+    }, [filter, sort]);
 
     const handleBan = async (userId: string) => {
         setActionPending(userId);
@@ -1063,6 +1235,12 @@ export function AdminUsers() {
         if (filter.dateTo && new Date(u.createdAt) > new Date(filter.dateTo + 'T23:59:59')) return false;
         return true;
     });
+    const sortedUsers = [...filtered].sort((a, b) => {
+        if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (sort === 'email_asc') return a.email.localeCompare(b.email);
+        return b.email.localeCompare(a.email);
+    });
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -1105,6 +1283,15 @@ export function AdminUsers() {
                     <label className="block text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">To</label>
                     <input type="date" value={filter.dateTo} onChange={e => setFilter(p => ({ ...p, dateTo: e.target.value }))} className="px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                 </div>
+                <div>
+                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-wide mb-1">Sort</label>
+                    <select value={sort} onChange={e => setSort(e.target.value as 'newest' | 'oldest' | 'email_asc' | 'email_desc')} className="px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="email_asc">Email A-Z</option>
+                        <option value="email_desc">Email Z-A</option>
+                    </select>
+                </div>
                 {(filter.search || filter.role || filter.status || filter.dateFrom || filter.dateTo) && (
                     <button type="button" onClick={() => setFilter({ search: '', role: '', status: '', dateFrom: '', dateTo: '' })} className="px-3 py-2 text-sm text-stone-400 hover:text-stone-600 font-medium flex items-center gap-1">
                         <X className="w-4 h-4" /> Clear
@@ -1113,10 +1300,10 @@ export function AdminUsers() {
             </form>
 
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
-            {loading ? <Spinner /> : filtered.length === 0 ? <Empty msg="No users match the filter." /> : (
+            {loading ? <Spinner /> : sortedUsers.length === 0 ? <Empty msg="No users match the filter." /> : (
                 <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                     <div className="px-5 py-3 bg-stone-50 border-b border-stone-100 text-xs text-stone-400 font-medium">
-                        Showing {filtered.length} of {nonAdminUsers.length} users
+                        Showing {sortedUsers.length} of {nonAdminUsers.length} users
                     </div>
                     <table className="w-full text-left">
                         <thead className="border-b border-stone-100 text-stone-500 text-sm">
@@ -1130,8 +1317,8 @@ export function AdminUsers() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100">
-                            {filtered.map(u => (
-                                <tr key={u.id} className="hover:bg-orange-50/30">
+                            {sortedUsers.map(u => (
+                                <tr key={u.id} className={`hover:bg-orange-50/30 ${actionPending === u.id ? 'opacity-70 bg-orange-50/40' : ''}`}>
                                     <td className="p-5 font-medium text-stone-800 flex items-center gap-3">
                                         <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center shrink-0"><User className="w-4 h-4 text-stone-400" /></div>
                                         {u.email}
@@ -1140,6 +1327,7 @@ export function AdminUsers() {
                                     <td className="p-5 text-stone-500 text-sm">{u.organizationName ?? <span className="text-stone-300">—</span>}</td>
                                     <td className="p-5">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${u.isBanned ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{u.isBanned ? 'Banned' : 'Active'}</span>
+                                        {actionPending === u.id && <p className="text-xs text-orange-600 font-semibold mt-2">Updating user status...</p>}
                                     </td>
                                     <td className="p-5 text-stone-400 text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
                                     <td className="p-5">

@@ -1,5 +1,7 @@
 using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
+using VSMS.Api.Extensions;
+using VSMS.Infrastructure.Data.EfCoreQuery;
 
 namespace VSMS.Api.Features.Attendance;
 
@@ -9,66 +11,100 @@ public static class AttendanceEndpoints
     {
         var group = app.MapGroup("/api/attendance").WithTags("Attendance").RequireAuthorization();
 
-        group.MapGet("/{id:guid}", async (Guid id, IGrainFactory grains) =>
+        group.MapGet("/{id:guid}", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
-            return Results.Ok(await grain.GetState());
+            var state = await grain.GetState();
+            var canView = http.IsSystemAdmin()
+                || http.IsSelfByGrainId(state.VolunteerId)
+                || await http.CanManageOpportunityAsync(db, state.OpportunityId);
+            if (!canView) return Results.Forbid();
+            return Results.Ok(state);
         });
 
-        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, IAttendanceQueryService queryService) =>
-            Results.Ok(await queryService.GetByOpportunityAsync(opportunityId)));
-
-        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, IAttendanceQueryService queryService) =>
-            Results.Ok(await queryService.GetByVolunteerAsync(volunteerId)));
-
-        group.MapGet("/disputes/pending", async (IAttendanceQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingDisputesAsync()));
-
-        group.MapPost("/{id:guid}/init", async (Guid id, InitAttendanceRequest req, IGrainFactory grains) =>
+        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, int skip, int take, HttpContext http, AppDbContext db, IAttendanceQueryService queryService) =>
         {
+            if (!await http.CanManageOpportunityAsync(db, opportunityId))
+                return Results.Forbid();
+            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip, take));
+        });
+
+        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int skip, int take, HttpContext http, IAttendanceQueryService queryService) =>
+        {
+            if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(volunteerId))
+                return Results.Forbid();
+            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip, take));
+        });
+
+        group.MapGet("/disputes/pending", async (int skip, int take, IAttendanceQueryService queryService) =>
+            Results.Ok(await queryService.GetPendingDisputesAsync(skip, take)))
+            .RequireAuthorization(p => p.RequireRole("SystemAdmin"));
+
+        group.MapPost("/{id:guid}/init", async (Guid id, InitAttendanceRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, req.OpportunityId))
+                return Results.Forbid();
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             await grain.Initialize(req.VolunteerId, req.ApplicationId, req.OpportunityId, req.ShiftId);
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/checkin", async (Guid id, CheckInRequest req, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/checkin", async (Guid id, CheckInRequest req, HttpContext http, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!http.IsSelfByGrainId(state.VolunteerId))
+                return Results.Forbid();
             await grain.CheckIn(req.Lat, req.Lon, req.ProofPhotoUrl);
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/web-checkin", async (Guid id, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/web-checkin", async (Guid id, HttpContext http, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!http.IsSelfByGrainId(state.VolunteerId))
+                return Results.Forbid();
             await grain.WebCheckIn();
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/checkout", async (Guid id, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/checkout", async (Guid id, HttpContext http, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!http.IsSelfByGrainId(state.VolunteerId))
+                return Results.Forbid();
             await grain.CheckOut();
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/dispute", async (Guid id, DisputeRequest req, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/dispute", async (Guid id, DisputeRequest req, HttpContext http, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!http.IsSelfByGrainId(state.VolunteerId))
+                return Results.Forbid();
             await grain.RaiseDispute(req.Reason, req.EvidenceUrl);
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmRequest req, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+                return Results.Forbid();
             await grain.Confirm(req.SupervisorId, req.Rating);
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/adjust", async (Guid id, ManualAdjustRequest req, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/adjust", async (Guid id, ManualAdjustRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+                return Results.Forbid();
             await grain.ManualAdjustment(req.CoordinatorId, req.NewCheckIn, req.NewCheckOut, req.Reason);
             return Results.NoContent();
         });

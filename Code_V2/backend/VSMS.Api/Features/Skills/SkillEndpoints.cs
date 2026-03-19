@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VSMS.Abstractions.Enums;
 using VSMS.Abstractions.Grains;
+using VSMS.Api.Extensions;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
@@ -66,6 +67,19 @@ public static class SkillEndpoints
         group.MapPost("/bulk", async (List<CreateSkillRequest> reqs, AppDbContext db) =>
         {
             var results = new List<object>();
+            var normalizedNames = reqs
+                .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+                .Select(r => r.Name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var existing = await db.Skills
+                .AsNoTracking()
+                .Where(s => normalizedNames.Contains(s.Name))
+                .Select(s => s.Name)
+                .ToListAsync();
+            var existingNames = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
+            var toCreate = new List<SkillEntity>();
+
             foreach (var req in reqs)
             {
                 if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Category))
@@ -73,13 +87,18 @@ public static class SkillEndpoints
                     results.Add(new { Name = req.Name ?? "", Status = "Skipped", Reason = "Missing name or category" });
                     continue;
                 }
-                if (await db.Skills.AnyAsync(s => s.Name == req.Name))
+                if (existingNames.Contains(req.Name.Trim()))
                 {
                     results.Add(new { req.Name, Status = "Skipped", Reason = "Already exists" });
                     continue;
                 }
-                db.Skills.Add(new SkillEntity { Name = req.Name, Category = req.Category, Description = req.Description });
+                existingNames.Add(req.Name.Trim());
+                toCreate.Add(new SkillEntity { Name = req.Name, Category = req.Category, Description = req.Description });
                 results.Add(new { req.Name, Status = "Created" });
+            }
+            if (toCreate.Count > 0)
+            {
+                db.Skills.AddRange(toCreate);
             }
             await db.SaveChangesAsync();
             return Results.Ok(results);
@@ -90,8 +109,10 @@ public static class SkillEndpoints
 
         // Add a skill to a volunteer (grain is write target)
         app.MapPost("/api/volunteers/{userId:guid}/skills/{skillId:guid}",
-            async (Guid userId, Guid skillId, AppDbContext db, IGrainFactory grains) =>
+            async (Guid userId, Guid skillId, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
+                if (!http.IsSystemAdmin() && !http.IsSelfByUserId(userId))
+                    return Results.Forbid();
                 var volunteer = await db.Volunteers.FindAsync(userId);
                 if (volunteer is null) return Results.NotFound(new { Error = "Volunteer not found." });
 
@@ -106,8 +127,10 @@ public static class SkillEndpoints
 
         // Remove a skill from a volunteer
         app.MapDelete("/api/volunteers/{userId:guid}/skills/{skillId:guid}",
-            async (Guid userId, Guid skillId, AppDbContext db, IGrainFactory grains) =>
+            async (Guid userId, Guid skillId, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
+                if (!http.IsSystemAdmin() && !http.IsSelfByUserId(userId))
+                    return Results.Forbid();
                 var volunteer = await db.Volunteers.FindAsync(userId);
                 if (volunteer is null) return Results.NotFound(new { Error = "Volunteer not found." });
 
@@ -118,8 +141,10 @@ public static class SkillEndpoints
 
         // List a volunteer's skills — read from grain, enrich names from SkillEntity catalogue
         app.MapGet("/api/volunteers/{userId:guid}/skills",
-            async (Guid userId, AppDbContext db, IGrainFactory grains) =>
+            async (Guid userId, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
+                if (!http.IsSystemAdmin() && !http.IsSelfByUserId(userId))
+                    return Results.Forbid();
                 var volunteer = await db.Volunteers.FindAsync(userId);
                 if (volunteer is null) return Results.NotFound(new { Error = "Volunteer not found." });
 
@@ -139,8 +164,10 @@ public static class SkillEndpoints
 
         // Set required skills on an opportunity (grain is write target)
         app.MapPut("/api/opportunities/{id:guid}/required-skills",
-            async (Guid id, SetRequiredSkillsRequest req, IGrainFactory grains) =>
+            async (Guid id, SetRequiredSkillsRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
+                if (!await http.CanManageOpportunityAsync(db, id))
+                    return Results.Forbid();
                 var grain = grains.GetGrain<IOpportunityGrain>(id);
                 await grain.SetRequiredSkills(req.SkillIds);
                 return Results.NoContent();
@@ -153,8 +180,14 @@ public static class SkillEndpoints
         // Opportunity skill requirements come from OpportunityGrain.
         // Published opportunities are listed from the EF Core read model.
         app.MapGet("/api/opportunities/match",
-            async (Guid volunteerId, AppDbContext db, IGrainFactory grains) =>
+            async (Guid volunteerId, int skip, int take, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
+                if (!http.IsSystemAdmin() && !http.IsCoordinator() && !http.IsSelfByUserId(volunteerId))
+                    return Results.Forbid();
+                if (skip < 0) skip = 0;
+                if (take <= 0) take = 200;
+                if (take > 500) take = 500;
+
                 var volunteer = await db.Volunteers.FindAsync(volunteerId);
                 if (volunteer is null) return Results.NotFound(new { Error = "Volunteer not found." });
 
@@ -164,6 +197,7 @@ public static class SkillEndpoints
 
                 // 2. All published opportunities from read model (zero grain activations)
                 var opportunities = await db.OpportunityReadModels
+                    .AsNoTracking()
                     .Where(o => o.Status == OpportunityStatus.Published && o.AvailableSpots > 0)
                     .ToListAsync();
 
@@ -181,6 +215,8 @@ public static class SkillEndpoints
                         MatchedSkillCount = o.RequiredSkillIds.Count(id => volunteerSkillIds.Contains(id))
                     })
                     .OrderByDescending(o => o.MatchedSkillCount) // best match first
+                    .Skip(skip)
+                    .Take(take)
                     .ToList();
 
                 return Results.Ok(new { VolunteerSkillIds = volunteerSkillIds, Opportunities = matched });

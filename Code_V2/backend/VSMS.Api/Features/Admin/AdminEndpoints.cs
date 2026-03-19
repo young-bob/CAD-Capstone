@@ -8,6 +8,14 @@ namespace VSMS.Api.Features.Admin;
 
 public static class AdminEndpoints
 {
+    private static (int Skip, int Take) NormalizePaging(int skip, int take)
+    {
+        if (skip < 0) skip = 0;
+        if (take <= 0) take = 500;
+        if (take > 500) take = 500;
+        return (skip, take);
+    }
+
     public static void MapAdminEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/admin").WithTags("Admin")
@@ -55,15 +63,35 @@ public static class AdminEndpoints
         });
 
         // List all users excluding SystemAdmin (with optional filter by role or email search)
-        group.MapGet("/users", async (string? role, string? search, AppDbContext db) =>
+        group.MapGet("/users", async (string? role, string? search, string? status, DateTime? dateFrom, DateTime? dateTo, string? sort, int skip, int take, AppDbContext db) =>
         {
-            var q = db.Users.Where(u => u.Role != "SystemAdmin").AsQueryable();
+            var (safeSkip, safeTake) = NormalizePaging(skip, take);
+            var q = db.Users.AsNoTracking().Where(u => u.Role != "SystemAdmin").AsQueryable();
             if (!string.IsNullOrWhiteSpace(role))
                 q = q.Where(u => u.Role == role);
             if (!string.IsNullOrWhiteSpace(search))
                 q = q.Where(u => u.Email.Contains(search));
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (status.Equals("active", StringComparison.OrdinalIgnoreCase)) q = q.Where(u => !u.IsBanned);
+                if (status.Equals("banned", StringComparison.OrdinalIgnoreCase)) q = q.Where(u => u.IsBanned);
+            }
+            if (dateFrom.HasValue)
+                q = q.Where(u => u.CreatedAt >= dateFrom.Value);
+            if (dateTo.HasValue)
+                q = q.Where(u => u.CreatedAt <= dateTo.Value);
+
+            q = sort?.ToLowerInvariant() switch
+            {
+                "oldest" => q.OrderBy(u => u.CreatedAt),
+                "email_asc" => q.OrderBy(u => u.Email),
+                "email_desc" => q.OrderByDescending(u => u.Email),
+                _ => q.OrderByDescending(u => u.CreatedAt),
+            };
+
             var users = await q
-                .OrderBy(u => u.CreatedAt)
+                .Skip(safeSkip)
+                .Take(safeTake)
                 .Select(u => new { u.Id, u.Email, u.Role, u.IsBanned, u.CreatedAt })
                 .ToListAsync();
 
@@ -73,6 +101,7 @@ public static class AdminEndpoints
             if (coordUserIds.Count > 0)
             {
                 var entries = await db.Coordinators
+                    .AsNoTracking()
                     .Where(c => coordUserIds.Contains(c.UserId) && c.OrganizationId != Guid.Empty)
                     .Join(db.OrganizationReadModels,
                         c => c.OrganizationId,
@@ -125,8 +154,8 @@ public static class AdminEndpoints
         });
 
         // Convenience: list pending organizations
-        group.MapGet("/pending-organizations", async (IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingOrganizationsAsync()));
+        group.MapGet("/pending-organizations", async (int skip, int take, IOrganizationQueryService queryService) =>
+            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip, take)));
 
         // Delete a user (cannot delete SystemAdmin or self; requires email confirmation)
         group.MapDelete("/users/{userId:guid}", async (Guid userId, [FromBody] DeleteUserRequest req, HttpContext http, AppDbContext db) =>

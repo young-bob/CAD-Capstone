@@ -83,7 +83,7 @@ function AppInner() {
                 case 'opportunities': return selectedOppId
                     ? <VolOpportunityDetail oppId={selectedOppId} onBack={() => setSelectedOppId(null)} />
                     : <VolOpportunities onViewDetail={(id) => setSelectedOppId(id)} />;
-                case 'applications': return <VolApplications />;
+                case 'applications': return <VolApplications onNavigate={navigateTo} />;
                 case 'attendance': return <VolAttendance />;
                 case 'certificates': return <VolCertificates />;
                 case 'profile': return <VolProfile onNavigate={setCurrentView} />;
@@ -93,24 +93,24 @@ function AppInner() {
         }
         if (displayRole === 'coordinator') {
             switch (currentView) {
-                case 'dashboard': return <CoordDashboard />;
+                case 'dashboard': return <CoordDashboard onNavigate={navigateTo} />;
                 case 'manage_events': return selectedOppId
                     ? <CoordOpportunityDetail oppId={selectedOppId} onBack={() => setSelectedOppId(null)} />
                     : <CoordManageEvents onViewDetail={(id) => setSelectedOppId(id)} />;
                 case 'org_applications': return <CoordApplications />;
                 case 'manage_templates': return <CoordCertTemplates />;
                 case 'org_members': return <CoordMembers />;
-                default: return <CoordDashboard />;
+                default: return <CoordDashboard onNavigate={navigateTo} />;
             }
         }
         if (displayRole === 'admin') {
             switch (currentView) {
-                case 'dashboard': return <AdminDashboard />;
+                case 'dashboard': return <AdminDashboard onNavigate={navigateTo} />;
                 case 'admin_orgs': return <AdminOrgs />;
                 case 'admin_disputes': return <AdminDisputes />;
                 case 'admin_users': return <AdminUsers />;
                 case 'admin_skills': return <AdminSkills />;
-                default: return <AdminDashboard />;
+                default: return <AdminDashboard onNavigate={navigateTo} />;
             }
         }
         return null;

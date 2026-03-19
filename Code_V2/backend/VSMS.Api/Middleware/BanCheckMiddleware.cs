@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 
 namespace VSMS.Api.Middleware;
@@ -11,12 +12,10 @@ namespace VSMS.Api.Middleware;
 /// </summary>
 public class BanCheckMiddleware(RequestDelegate next)
 {
-    // In-memory cache to avoid hitting the DB on every single request.
-    // Key: userId, Value: (isBanned, cachedAt)
-    private static readonly Dictionary<Guid, (bool IsBanned, DateTime CachedAt)> _cache = new();
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
+    private static string CacheKey(Guid userId) => $"ban:{userId}";
 
-    public async Task InvokeAsync(HttpContext context, AppDbContext db)
+    public async Task InvokeAsync(HttpContext context, AppDbContext db, IMemoryCache cache)
     {
         // Skip for unauthenticated requests (login, register, etc.)
         if (context.User.Identity?.IsAuthenticated != true)
@@ -32,28 +31,15 @@ public class BanCheckMiddleware(RequestDelegate next)
             return;
         }
 
-        // Check cache first
-        if (_cache.TryGetValue(userId, out var cached) && DateTime.UtcNow - cached.CachedAt < CacheDuration)
+        var isBanned = await cache.GetOrCreateAsync(CacheKey(userId), async entry =>
         {
-            if (cached.IsBanned)
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsJsonAsync(new { error = "Your account has been suspended." });
-                return;
-            }
-
-            await next(context);
-            return;
-        }
-
-        // Query DB for ban status
-        var isBanned = await db.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.IsBanned)
-            .FirstOrDefaultAsync();
-
-        // Update cache
-        _cache[userId] = (isBanned, DateTime.UtcNow);
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+            return await db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.IsBanned)
+                .FirstOrDefaultAsync();
+        });
 
         if (isBanned)
         {
@@ -65,11 +51,4 @@ public class BanCheckMiddleware(RequestDelegate next)
         await next(context);
     }
 
-    /// <summary>
-    /// Call this when a user is banned or unbanned to immediately invalidate the cache entry.
-    /// </summary>
-    public static void InvalidateCache(Guid userId)
-    {
-        _cache.Remove(userId);
-    }
 }

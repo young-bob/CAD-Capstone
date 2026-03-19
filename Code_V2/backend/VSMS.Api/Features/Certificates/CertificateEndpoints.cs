@@ -18,6 +18,7 @@ public static class CertificateEndpoints
         group.MapGet("/templates", async (Guid? organizationId, AppDbContext db) =>
         {
             var templates = await db.CertificateTemplates
+                .AsNoTracking()
                 .Where(t => t.IsActive && (t.OrganizationId == null || t.OrganizationId == organizationId))
                 .OrderBy(t => t.OrganizationId == null ? 0 : 1) // System presets first
                 .ThenBy(t => t.Name)
@@ -32,7 +33,9 @@ public static class CertificateEndpoints
         // Get a single template by ID
         group.MapGet("/templates/{templateId:guid}", async (Guid templateId, AppDbContext db) =>
         {
-            var t = await db.CertificateTemplates.FindAsync(templateId);
+            var t = await db.CertificateTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == templateId);
             if (t is null) return Results.NotFound();
             return Results.Ok(t);
         });
@@ -112,7 +115,9 @@ public static class CertificateEndpoints
                 return Results.BadRequest("Volunteer profile not initialized");
 
             // 2. Load template
-            var templateEntity = await db.CertificateTemplates.FindAsync(req.TemplateId);
+            var templateEntity = await db.CertificateTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == req.TemplateId);
             if (templateEntity is null)
                 return Results.BadRequest("Template not found");
 
