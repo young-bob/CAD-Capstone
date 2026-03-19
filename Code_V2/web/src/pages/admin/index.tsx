@@ -694,7 +694,8 @@ export function AdminOrgs() {
             setDeleteConfirm(null);
             setDeleteConfirmName('');
             showToast('Organization removed');
-            // Optimistically clear org association for coordinators in this org
+            setOrgs(prev => prev.filter(o => o.orgId !== orgId));
+            setOrgMembersMap(prev => { const next = { ...prev }; delete next[orgId]; return next; });
             setCoordinators(prev => prev.map(c =>
                 c.organizationId === orgId ? { ...c, organizationId: undefined, organizationName: undefined } : c
             ));
@@ -723,6 +724,10 @@ export function AdminOrgs() {
         try {
             await adminService.addCoordinatorToOrg(editingOrg.id, addCoordId);
             showToast('Coordinator added');
+            // Optimistically update coordinators table source
+            setCoordinators(prev => prev.map(c =>
+                c.id === addCoordId ? { ...c, organizationId: editingOrg.id } : c
+            ));
             setAddCoordId('');
             const updated = await organizationService.getById(editingOrg.id);
             setOrgMembers(updated.members || []);
@@ -753,6 +758,10 @@ export function AdminOrgs() {
             showToast('Coordinator removed');
             setOrgMembers(prev => prev.filter(m => m.userId !== userId));
             setOrgMembersMap(prev => ({ ...prev, [editingOrg.id]: (prev[editingOrg.id] || []).filter(m => m.userId !== userId) }));
+            // Optimistically clear org from coordinators table source
+            setCoordinators(prev => prev.map(c =>
+                c.id === userId ? { ...c, organizationId: undefined, organizationName: undefined } : c
+            ));
             load();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to remove coordinator'));
@@ -995,21 +1004,21 @@ export function AdminOrgs() {
                                     <td className="p-5 text-stone-800 font-bold">{org.name}</td>
                                     <td className="p-5 text-stone-500 text-sm">
                                         {(() => {
-                                            const membersList = orgMembersMap[org.orgId];
-                                            if (membersList !== undefined) {
-                                                const members = membersList.filter(m => m.role === OrgRole.Admin || m.role === OrgRole.Coordinator);
-                                                if (!members.length) return <span className="text-stone-300">—</span>;
-                                                return <div className="space-y-0.5">{members.map(m => (
-                                                    <div key={m.userId} className="flex items-baseline gap-1 flex-wrap">
-                                                        <span className="text-sm">{m.email}</span>
-                                                        <span className={`text-xs font-bold ${m.role === OrgRole.Admin ? 'text-amber-500' : 'text-stone-400'}`}>{m.role === OrgRole.Admin ? '(Primary)' : '(Extra)'}</span>
+                                            // Use DB coordinators as source of truth — includes additional coords not yet in grain
+                                            const dbCoords = coordinators.filter(c => c.organizationId === org.orgId);
+                                            if (!dbCoords.length) return <span className="text-stone-300">—</span>;
+                                            const grainMembers = orgMembersMap[org.orgId];
+                                            return <div className="space-y-0.5">{dbCoords.map(c => {
+                                                const isPrimary = grainMembers?.find(m => m.userId === c.id)?.role === OrgRole.Admin;
+                                                return (
+                                                    <div key={c.id} className="flex items-baseline gap-1 flex-wrap">
+                                                        <span className="text-sm">{c.email}</span>
+                                                        <span className={`text-xs font-bold ${isPrimary ? 'text-amber-500' : 'text-stone-400'}`}>
+                                                            {isPrimary ? '(Primary)' : '(Coordinator)'}
+                                                        </span>
                                                     </div>
-                                                ))}</div>;
-                                            }
-                                            // Fallback: show primary coordinator from users list while orgMembersMap loads
-                                            const primaryCoord = coordinators.find(c => c.organizationId === org.orgId);
-                                            if (primaryCoord) return <span className="text-sm">{primaryCoord.email} <span className="text-xs text-amber-500 font-bold">(Primary)</span></span>;
-                                            return <span className="text-stone-300 text-xs">—</span>;
+                                                );
+                                            })}</div>;
                                         })()}
                                     </td>
                                     <td className="p-5"><OrgStatusBadge status={org.status} /></td>

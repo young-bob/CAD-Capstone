@@ -8,6 +8,8 @@ public interface IOrganizationGrain : IGrainWithGuidKey
     Task Initialize(string name, string description, Guid creatorUserId, string creatorEmail, string? proofUrl = null);
     Task<Guid> CreateOpportunity(string title, string description, string category);
     Task InviteMember(string email, OrgRole role);
+    Task AddCoordinator(Guid userId, string email);
+    Task RemoveCoordinator(Guid userId);
     Task BlockVolunteer(Guid volunteerId);
     Task UnblockVolunteer(Guid volunteerId);
     Task<bool> IsVolunteerBlocked(Guid volunteerId);

@@ -60,6 +60,20 @@ public class OrganizationGrain(
         await state.WriteStateAsync();
     }
 
+    public async Task AddCoordinator(Guid userId, string email)
+    {
+        if (state.State.Members.Any(m => m.UserId == userId))
+            return;
+        state.State.Members.Add(new OrgMember { UserId = userId, Email = email, Role = OrgRole.Coordinator });
+        await state.WriteStateAsync();
+    }
+
+    public async Task RemoveCoordinator(Guid userId)
+    {
+        state.State.Members.RemoveAll(m => m.UserId == userId && m.Role == OrgRole.Coordinator);
+        await state.WriteStateAsync();
+    }
+
     public async Task BlockVolunteer(Guid volunteerId)
     {
         state.State.BlockedVolunteerIds.Add(volunteerId);

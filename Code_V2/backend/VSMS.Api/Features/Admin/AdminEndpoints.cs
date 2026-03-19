@@ -118,10 +118,14 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/organizations/{orgId:guid}/reject", async (Guid orgId, RejectOrgRequest req, IGrainFactory grains) =>
+        group.MapPost("/organizations/{orgId:guid}/reject", async (Guid orgId, RejectOrgRequest req, IGrainFactory grains, AppDbContext db) =>
         {
             var grain = grains.GetGrain<IAdminGrain>(Guid.Empty);
             await grain.RejectOrganization(orgId, req.Reason);
+            // Clear org association from all coordinators of this org
+            var coords = await db.Coordinators.Where(c => c.OrganizationId == orgId).ToListAsync();
+            foreach (var c in coords) c.OrganizationId = null;
+            await db.SaveChangesAsync();
             return Results.NoContent();
         });
 
@@ -443,6 +447,7 @@ public static class AdminEndpoints
             if (coordUserIds.Count > 0)
             {
                 var entries = await db.Coordinators
+                    .Where(c => coordUserIds.Contains(c.UserId) && c.OrganizationId != null)
                     .AsNoTracking()
                     .Where(c => coordUserIds.Contains(c.UserId) && c.OrganizationId != Guid.Empty)
                     .Join(db.OrganizationReadModels,
@@ -474,7 +479,7 @@ public static class AdminEndpoints
             // Clear existing primary coordinator for this org
             var oldCoords = await db.Coordinators.Where(c => c.OrganizationId == orgId).ToListAsync();
             foreach (var old in oldCoords)
-                old.OrganizationId = Guid.Empty;
+                old.OrganizationId = null;
 
             // Assign new coordinator
             newCoord.OrganizationId = orgId;
@@ -548,13 +553,38 @@ public static class AdminEndpoints
         });
 
         // Add a coordinator to an org directly (does not clear existing coordinator)
-        group.MapPost("/organizations/{orgId:guid}/add-coordinator", async (Guid orgId, ReassignCoordinatorRequest req, AppDbContext db) =>
+        group.MapPost("/organizations/{orgId:guid}/add-coordinator", async (Guid orgId, ReassignCoordinatorRequest req, AppDbContext db, IGrainFactory grains) =>
+        {
+            var coord = await db.Coordinators
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.UserId == req.CoordinatorUserId);
+            if (coord is null)
+                return Results.BadRequest(new { Error = "Coordinator profile not found." });
+
+            // Update read-side DB
+            coord.OrganizationId = orgId;
+            await db.SaveChangesAsync();
+
+            // Update grain state
+            var orgGrain = grains.GetGrain<IOrganizationGrain>(orgId);
+            await orgGrain.AddCoordinator(req.CoordinatorUserId, coord.User.Email);
+            return Results.NoContent();
+        });
+
+        // Remove an additional coordinator from an org
+        group.MapPost("/organizations/{orgId:guid}/remove-coordinator", async (Guid orgId, ReassignCoordinatorRequest req, AppDbContext db, IGrainFactory grains) =>
         {
             var coord = await db.Coordinators.FirstOrDefaultAsync(c => c.UserId == req.CoordinatorUserId);
             if (coord is null)
                 return Results.BadRequest(new { Error = "Coordinator profile not found." });
-            coord.OrganizationId = orgId;
+
+            // Clear read-side DB org association
+            coord.OrganizationId = null;
             await db.SaveChangesAsync();
+
+            // Update grain state
+            var orgGrain = grains.GetGrain<IOrganizationGrain>(orgId);
+            await orgGrain.RemoveCoordinator(req.CoordinatorUserId);
             return Results.NoContent();
         });
     }
