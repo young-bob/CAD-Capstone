@@ -166,7 +166,7 @@ public static class SkillEndpoints
         app.MapPut("/api/opportunities/{id:guid}/required-skills",
             async (Guid id, SetRequiredSkillsRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
-                if (!await http.CanManageOpportunityAsync(db, id))
+                if (!await http.CanManageOpportunityAsync(db, id, grains))
                     return Results.Forbid();
                 var grain = grains.GetGrain<IOpportunityGrain>(id);
                 await grain.SetRequiredSkills(req.SkillIds);
@@ -180,13 +180,15 @@ public static class SkillEndpoints
         // Opportunity skill requirements come from OpportunityGrain.
         // Published opportunities are listed from the EF Core read model.
         app.MapGet("/api/opportunities/match",
-            async (Guid volunteerId, int skip, int take, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+            async (Guid volunteerId, int? skip, int? take, HttpContext http, AppDbContext db, IGrainFactory grains) =>
             {
                 if (!http.IsSystemAdmin() && !http.IsCoordinator() && !http.IsSelfByUserId(volunteerId))
                     return Results.Forbid();
-                if (skip < 0) skip = 0;
-                if (take <= 0) take = 200;
-                if (take > 500) take = 500;
+                var safeSkip = skip.GetValueOrDefault();
+                var safeTake = take.GetValueOrDefault(200);
+                if (safeSkip < 0) safeSkip = 0;
+                if (safeTake <= 0) safeTake = 200;
+                if (safeTake > 500) safeTake = 500;
 
                 var volunteer = await db.Volunteers.FindAsync(volunteerId);
                 if (volunteer is null) return Results.NotFound(new { Error = "Volunteer not found." });
@@ -215,8 +217,8 @@ public static class SkillEndpoints
                         MatchedSkillCount = o.RequiredSkillIds.Count(id => volunteerSkillIds.Contains(id))
                     })
                     .OrderByDescending(o => o.MatchedSkillCount) // best match first
-                    .Skip(skip)
-                    .Take(take)
+                    .Skip(safeSkip)
+                    .Take(safeTake)
                     .ToList();
 
                 return Results.Ok(new { VolunteerSkillIds = volunteerSkillIds, Opportunities = matched });

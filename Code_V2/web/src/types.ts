@@ -125,6 +125,19 @@ export interface OpportunitySummary {
     longitude: number | null;
 }
 
+export interface OpportunityRecommendation extends OpportunitySummary {
+    matchedSkillCount: number;
+    requiredSkillCount: number;
+    skillMatchRatio: number;
+    distanceKm: number | null;
+    recommendationScore: number;
+}
+
+export interface OpportunityRecommendationResult {
+    volunteerSkillCount: number;
+    opportunities: OpportunityRecommendation[];
+}
+
 // ─── Application ──────────────────────────────────────────────
 export interface ApplicationState {
     volunteerId: string;

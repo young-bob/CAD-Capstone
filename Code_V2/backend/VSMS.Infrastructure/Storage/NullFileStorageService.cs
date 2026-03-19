@@ -21,4 +21,10 @@ public class NullFileStorageService(ILogger<NullFileStorageService> logger) : IF
     {
         return Task.FromResult($"/stub/{fileKey}");
     }
+
+    public Task<(byte[] Content, string ContentType)> DownloadAsync(string fileKey)
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes($"stub file: {fileKey}");
+        return Task.FromResult<(byte[] Content, string ContentType)>((payload, "text/plain"));
+    }
 }

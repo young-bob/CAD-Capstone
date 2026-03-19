@@ -833,6 +833,7 @@ export function CoordMembers() {
         Coordinator: 'bg-blue-100 text-blue-700',
         Member: 'bg-stone-100 text-stone-600',
     };
+    const canBlockMember = (userId: string) => !!userId && userId !== auth.userId && userId !== '00000000-0000-0000-0000-000000000000';
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -884,14 +885,14 @@ export function CoordMembers() {
                 {(['members', 'blocked'] as const).map(t => (
                     <button key={t} onClick={() => setTab(t)}
                         className={`px-5 py-2 rounded-xl font-bold text-sm transition-all capitalize ${tab === t ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
-                        {t === 'members' ? `Members (${(org?.members?.filter(m => m.userId !== auth.userId)?.length ?? 0)})` : `Blocked (${org?.blockedVolunteerIds?.length ?? 0})`}
+                        {t === 'members' ? `Members (${(org?.members?.length ?? 0)})` : `Blocked (${org?.blockedVolunteerIds?.length ?? 0})`}
                     </button>
                 ))}
             </div>
 
             {loading ? <Spinner /> : tab === 'members' ? (
                 (() => {
-                    const visibleMembers = org?.members?.filter(m => m.userId !== auth.userId) ?? [];
+                    const visibleMembers = org?.members ?? [];
                     return visibleMembers.length ? (
                         <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                             <table className="w-full text-left">
@@ -899,18 +900,27 @@ export function CoordMembers() {
                                     <tr><th className="p-5 font-bold">Email</th><th className="p-5 font-bold">Role</th><th className="p-5 font-bold">Joined</th><th className="p-5 font-bold text-right">Actions</th></tr>
                                 </thead>
                                 <tbody className="divide-y divide-stone-100">
-                                    {visibleMembers.map(m => (
-                                        <tr key={m.userId} className="hover:bg-orange-50/30">
-                                            <td className="p-5 text-stone-800 font-bold">{m.email}</td>
+                                    {visibleMembers.map((m, idx) => (
+                                        <tr key={`${m.userId}-${m.email}-${m.joinedAt}-${idx}`} className="hover:bg-orange-50/30">
+                                            <td className="p-5 text-stone-800 font-bold">
+                                                {m.email}
+                                                {m.userId === auth.userId && <span className="ml-2 px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">You</span>}
+                                            </td>
                                             <td className="p-5"><span className={`px-2 py-0.5 rounded text-xs font-bold ${roleColors[m.role] || 'bg-stone-100 text-stone-600'}`}>{m.role}</span></td>
                                             <td className="p-5 text-stone-400 text-sm">{new Date(m.joinedAt).toLocaleDateString()}</td>
-                                            <td className="p-5 text-right"><button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button></td>
+                                            <td className="p-5 text-right">
+                                                {canBlockMember(m.userId) ? (
+                                                    <button onClick={() => handleBlock(m.userId)} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100">Block</button>
+                                                ) : (
+                                                    <span className="text-stone-300 text-sm">—</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    ) : <Empty msg="No other members yet. Use the Invite button to add some." />;
+                    ) : <Empty msg="No members yet. Use the Invite button to add some." />;
                 })()
             ) : (
                 org?.blockedVolunteerIds?.length ? (
@@ -1266,7 +1276,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             setShowCert(false); 
             showToast(`Certificate issued: ${r.fileName}`); 
             setIssuedCerts(prev => new Set(prev).add(certTargetId));
-            window.open(r.downloadUrl, '_blank'); 
+            await certificateService.openGeneratedFile(r.fileKey, r.fileName);
         }
         catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setIssuingCert(false); }

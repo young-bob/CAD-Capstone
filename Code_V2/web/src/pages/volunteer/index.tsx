@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
-import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
+import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
 import { opportunityService } from '../../services/opportunities';
@@ -12,6 +12,7 @@ import { MiniCalendar } from '../../components/MiniCalendar';
 import ActionToast from '../../components/ActionToast';
 import ConfirmDialog from '../../components/ConfirmDialog';
 const MapView = lazy(() => import('../../components/MapView'));
+const OpportunityHeatMap = lazy(() => import('../../components/OpportunityHeatMap'));
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {
@@ -152,6 +153,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
+    const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -159,12 +161,14 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const [p, a] = await Promise.all([
+            const [p, a, at] = await Promise.all([
                 volunteerService.getProfile(auth.linkedGrainId),
-                applicationService.getForVolunteer(auth.linkedGrainId)
+                applicationService.getForVolunteer(auth.linkedGrainId),
+                attendanceService.getByVolunteer(auth.linkedGrainId),
             ]);
             setProfile(p);
             setApps(a);
+            setAttendance(at);
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
@@ -191,6 +195,19 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const recentApps = [...apps]
         .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
         .slice(0, 5);
+    const reviewedApps = apps.filter(a => a.status !== 'Pending').length;
+    const approvedTrackApps = apps.filter(a => ['Approved', 'Promoted', 'Completed', 'NoShow'].includes(a.status)).length;
+    const checkedInSessions = attendance.filter(a => ['CheckedIn', 'CheckedOut', 'Confirmed', 'Resolved', 'Disputed'].includes(a.status)).length;
+    const completedSessions = attendance.filter(a => ['CheckedOut', 'Confirmed', 'Resolved'].includes(a.status)).length;
+    const rejectedOrWithdrawn = apps.filter(a => ['Rejected', 'Withdrawn'].includes(a.status)).length;
+    const funnelSteps = [
+        { key: 'applied', label: 'Applied', count: apps.length, color: 'bg-sky-500' },
+        { key: 'reviewed', label: 'Reviewed', count: reviewedApps, color: 'bg-violet-500' },
+        { key: 'approved', label: 'Approved Track', count: approvedTrackApps, color: 'bg-emerald-500' },
+        { key: 'checkedin', label: 'Checked In', count: checkedInSessions, color: 'bg-amber-500' },
+        { key: 'completed', label: 'Completed', count: completedSessions, color: 'bg-orange-500' },
+    ];
+    const funnelMax = Math.max(1, ...funnelSteps.map(s => s.count));
     const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
@@ -252,7 +269,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                     <div className="flex items-center justify-between mb-5">
                         <h2 className="text-xl font-extrabold text-stone-800">Application Snapshot</h2>
@@ -297,6 +314,32 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                             ))}
                         </div>
                     )}
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-xl font-extrabold text-stone-800">Application Funnel</h2>
+                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                    </div>
+                    <div className="space-y-4">
+                        {funnelSteps.map((step, idx) => {
+                            const pctOfTop = Math.round((step.count / funnelMax) * 100);
+                            return (
+                                <div key={step.key}>
+                                    <div className="flex justify-between items-center text-sm mb-1.5">
+                                        <span className="font-semibold text-stone-700">{idx + 1}. {step.label}</span>
+                                        <span className="text-stone-500">{step.count}</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className={`h-full ${step.color}`} style={{ width: `${Math.max(6, pctOfTop)}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-stone-100 text-xs text-stone-500">
+                        Drop-off (Rejected/Withdrawn): <span className="font-bold text-rose-600">{rejectedOrWithdrawn}</span>
+                    </div>
                 </div>
             </div>
 
@@ -358,6 +401,32 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         'Health': 'text-blue-600 bg-blue-50',
         'Technology': 'text-violet-600 bg-violet-50',
     };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
+    };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
+    };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -412,11 +481,24 @@ function saveFavorites(ids: Set<string>) {
 }
 
 export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
-    const [opps, setOpps] = useState<OpportunitySummary[]>([]);
+    const auth = useAuth();
+    const [opps, setOpps] = useState<OpportunityRecommendation[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
+    const [smartMatch, setSmartMatch] = useState(true);
+    const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+    const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'ready' | 'denied' | 'unsupported'>('idle');
     const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+
+    const asRecommendation = (opp: OpportunitySummary): OpportunityRecommendation => ({
+        ...opp,
+        matchedSkillCount: 0,
+        requiredSkillCount: 0,
+        skillMatchRatio: 0,
+        distanceKm: null,
+        recommendationScore: 0,
+    });
 
     const toggleFavorite = (id: string) => {
         setFavorites(prev => {
@@ -430,14 +512,42 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const load = useCallback(async (q?: string) => {
         setLoading(true); setError('');
         try {
+            if (smartMatch && auth.userId) {
+                const ranked = await opportunityService.recommendForVolunteer({
+                    volunteerId: auth.userId,
+                    query: q,
+                    lat: coords?.lat,
+                    lon: coords?.lon,
+                    take: 500,
+                });
+                setOpps(ranked.opportunities);
+                return;
+            }
             const data = await opportunityService.search(q);
-            setOpps(data);
+            setOpps(data.map(asRecommendation));
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunities'));
         } finally { setLoading(false); }
-    }, []);
+    }, [auth.userId, coords?.lat, coords?.lon, smartMatch]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!smartMatch) return;
+        if (!navigator.geolocation) {
+            setLocationStatus('unsupported');
+            return;
+        }
+        setLocationStatus('locating');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+                setLocationStatus('ready');
+            },
+            () => setLocationStatus('denied'),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 },
+        );
+    }, [smartMatch]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -450,6 +560,19 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         'Education': 'text-amber-600 bg-amber-50',
         'Health': 'text-blue-600 bg-blue-50',
         'Technology': 'text-violet-600 bg-violet-50',
+    };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
     };
 
     return (
@@ -464,6 +587,40 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                     <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded-full font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/20">Search</button>
                 </form>
             </div>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => setSmartMatch(v => !v)}
+                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${smartMatch
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                        }`}
+                >
+                    {smartMatch ? 'Smart Match: ON' : 'Smart Match: OFF'}
+                </button>
+                {smartMatch && (
+                    <span className="text-xs text-stone-500">
+                        {locationStatus === 'ready' && 'Using your location + skills'}
+                        {locationStatus === 'locating' && 'Getting your location for distance scoring...'}
+                        {locationStatus === 'denied' && 'Location denied: using skill-only ranking'}
+                        {locationStatus === 'unsupported' && 'No geolocation: using skill-only ranking'}
+                        {locationStatus === 'idle' && 'Using skill-based ranking'}
+                    </span>
+                )}
+            </div>
+            {mappableOpps.length > 0 && (
+                <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-stone-100 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-lg font-extrabold text-stone-800">Opportunity Heat Layer</h2>
+                        <span className="text-xs font-semibold text-stone-500">
+                            {mappableOpps.length} mappable opportunities
+                            {coords ? ' · centered on your location' : ''}
+                        </span>
+                    </div>
+                    <Suspense fallback={<div className="h-80 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-400 text-sm">Loading map layer...</div>}>
+                        <OpportunityHeatMap opportunities={opps} userLocation={coords} height={320} />
+                    </Suspense>
+                </div>
+            )}
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : opps.length === 0 ? <Empty msg="No opportunities found." /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {opps.map(opp => (
@@ -483,6 +640,25 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                             <div className="mt-auto space-y-3 mb-8">
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
+                                {smartMatch && (
+                                    <div className={`rounded-2xl border p-3 space-y-1.5 ${recommendationTone(opp.recommendationScore || 0)}`}>
+                                        <div className="text-[11px] uppercase tracking-wide font-extrabold">Why This Match</div>
+                                        <div className="text-xs font-semibold">
+                                            {opp.requiredSkillCount > 0
+                                                ? `Skills: ${opp.matchedSkillCount}/${opp.requiredSkillCount} matched`
+                                                : 'Skills: open to all volunteers'}
+                                        </div>
+                                        <div className="text-xs font-semibold">
+                                            Recommendation: {Math.round((opp.recommendationScore || 0) * 100)}% · {recommendationTier(opp.recommendationScore || 0)}
+                                        </div>
+                                        {opp.distanceKm !== null && (
+                                            <div className="flex items-center gap-1 text-xs font-semibold">
+                                                <MapPin className="w-3.5 h-3.5" />
+                                                <span>Distance: {opp.distanceKm.toFixed(1)} km</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <button
                                 disabled={opp.availableSpots === 0}
@@ -804,7 +980,7 @@ export function VolCertificates() {
             const result = await certificateService.generate(auth.linkedGrainId, selTemplate);
             setShowGenerate(false);
             showToast(`Certificate ready: ${result.fileName}`);
-            window.open(result.downloadUrl, '_blank');
+            await certificateService.openGeneratedFile(result.fileKey, result.fileName);
         } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to generate certificate'); }
         finally { setGenerating(false); }
     };

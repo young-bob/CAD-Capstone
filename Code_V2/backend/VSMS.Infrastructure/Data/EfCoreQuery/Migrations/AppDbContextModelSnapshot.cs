@@ -83,6 +83,12 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
 
                     b.HasIndex("VolunteerId");
 
+                    b.HasIndex("OpportunityId", "AppliedAt")
+                        .HasDatabaseName("IX_ApplicationReadModels_OpportunityId_AppliedAt");
+
+                    b.HasIndex("VolunteerId", "AppliedAt")
+                        .HasDatabaseName("IX_ApplicationReadModels_VolunteerId_AppliedAt");
+
                     b.ToTable("ApplicationReadModels");
                 });
 
@@ -126,6 +132,12 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                     b.HasKey("AttendanceId");
 
                     b.HasIndex("OpportunityId");
+
+                    b.HasIndex("OpportunityId", "ShiftStartTime")
+                        .HasDatabaseName("IX_AttendanceReadModels_OpportunityId_ShiftStartTime");
+
+                    b.HasIndex("VolunteerId", "CheckInTime")
+                        .HasDatabaseName("IX_AttendanceReadModels_VolunteerId_CheckInTime");
 
                     b.ToTable("AttendanceReadModels");
                 });
@@ -252,6 +264,9 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
 
                     b.HasKey("AttendanceId");
 
+                    b.HasIndex("RaisedAt")
+                        .HasDatabaseName("IX_DisputeReadModels_RaisedAt");
+
                     b.HasIndex("VolunteerId");
 
                     b.ToTable("DisputeReadModels");
@@ -311,6 +326,9 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("Status", "PublishDate")
+                        .HasDatabaseName("IX_OpportunityReadModels_Status_PublishDate");
+
                     b.ToTable("OpportunityReadModels");
                 });
 
@@ -339,6 +357,9 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                     b.HasKey("OrgId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("IX_OrganizationReadModels_Status_CreatedAt");
 
                     b.ToTable("OrganizationReadModels");
                 });
@@ -402,6 +423,12 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("IsBanned")
+                        .HasDatabaseName("IX_Users_IsBanned");
+
+                    b.HasIndex("Role", "CreatedAt")
+                        .HasDatabaseName("IX_Users_Role_CreatedAt");
 
                     b.ToTable("Users");
                 });

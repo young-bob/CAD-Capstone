@@ -80,11 +80,11 @@ public static class VolunteerEndpoints
             return Results.Ok(new { token });
         });
 
-        group.MapGet("/{id:guid}/attendance", async (Guid id, int skip, int take, HttpContext http, IAttendanceQueryService queryService) =>
+        group.MapGet("/{id:guid}/attendance", async (Guid id, int? skip, int? take, HttpContext http, IAttendanceQueryService queryService) =>
         {
             if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByVolunteerAsync(id, skip, take));
+            return Results.Ok(await queryService.GetByVolunteerAsync(id, skip ?? 0, take ?? 500));
         });
     }
 

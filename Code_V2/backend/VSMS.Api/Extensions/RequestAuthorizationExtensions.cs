@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Orleans;
+using VSMS.Abstractions.Grains;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 
 namespace VSMS.Api.Extensions;
@@ -45,7 +47,7 @@ public static class RequestAuthorizationExtensions
         return await context.IsCoordinatorOfOrganizationAsync(db, organizationId);
     }
 
-    public static async Task<bool> CanManageOpportunityAsync(this HttpContext context, AppDbContext db, Guid opportunityId)
+    public static async Task<bool> CanManageOpportunityAsync(this HttpContext context, AppDbContext db, Guid opportunityId, IGrainFactory? grains = null)
     {
         if (context.IsSystemAdmin()) return true;
         if (!context.IsCoordinator()) return false;
@@ -57,11 +59,25 @@ public static class RequestAuthorizationExtensions
             .Select(o => (Guid?)o.OrganizationId)
             .FirstOrDefaultAsync();
 
-        if (!orgId.HasValue) return false;
+        // Fallback to write-side grain state to avoid eventual-consistency gaps on read model projections.
+        if (!orgId.HasValue && grains is not null)
+        {
+            try
+            {
+                var oppState = await grains.GetGrain<IOpportunityGrain>(opportunityId).GetState();
+                if (oppState.OrganizationId != Guid.Empty)
+                    orgId = oppState.OrganizationId;
+            }
+            catch
+            {
+                // ignore and continue to deny if still unresolved
+            }
+        }
+
+        if (!orgId.HasValue || orgId == Guid.Empty) return false;
 
         return await db.Coordinators
             .AsNoTracking()
             .AnyAsync(c => c.UserId == callerUserId && c.OrganizationId == orgId.Value);
     }
 }
-

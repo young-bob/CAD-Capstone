@@ -17,30 +17,30 @@ public static class ApplicationEndpoints
             var state = await grain.GetState();
             var canView = http.IsSystemAdmin()
                 || http.IsSelfByGrainId(state.VolunteerId)
-                || await http.CanManageOpportunityAsync(db, state.OpportunityId);
+                || await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
             if (!canView) return Results.Forbid();
             return Results.Ok(state);
         });
 
-        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, int skip, int take, HttpContext http, AppDbContext db, IApplicationQueryService queryService) =>
+        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, int? skip, int? take, HttpContext http, AppDbContext db, IApplicationQueryService queryService, IGrainFactory grains) =>
         {
-            if (!await http.CanManageOpportunityAsync(db, opportunityId))
+            if (!await http.CanManageOpportunityAsync(db, opportunityId, grains))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip, take));
+            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip ?? 0, take ?? 500));
         });
 
-        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int skip, int take, HttpContext http, IApplicationQueryService queryService) =>
+        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int? skip, int? take, HttpContext http, IApplicationQueryService queryService) =>
         {
             if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(volunteerId))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip, take));
+            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip ?? 0, take ?? 500));
         });
 
         group.MapPost("/{id:guid}/approve", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IApplicationGrain>(id);
             var state = await grain.GetState();
-            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
                 return Results.Forbid();
 
             // Prevent coordinator from approving their own volunteer application
@@ -55,7 +55,7 @@ public static class ApplicationEndpoints
         {
             var grain = grains.GetGrain<IApplicationGrain>(id);
             var state = await grain.GetState();
-            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
                 return Results.Forbid();
             await grain.Reject(req.Reason);
             return Results.NoContent();
@@ -87,7 +87,7 @@ public static class ApplicationEndpoints
         {
             var grain = grains.GetGrain<IApplicationGrain>(id);
             var state = await grain.GetState();
-            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
                 return Results.Forbid();
             await grain.MarkAsNoShow();
             return Results.NoContent();

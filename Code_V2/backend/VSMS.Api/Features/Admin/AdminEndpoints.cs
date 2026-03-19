@@ -63,9 +63,9 @@ public static class AdminEndpoints
         });
 
         // List all users excluding SystemAdmin (with optional filter by role or email search)
-        group.MapGet("/users", async (string? role, string? search, string? status, DateTime? dateFrom, DateTime? dateTo, string? sort, int skip, int take, AppDbContext db) =>
+        group.MapGet("/users", async (string? role, string? search, string? status, DateTime? dateFrom, DateTime? dateTo, string? sort, int? skip, int? take, AppDbContext db) =>
         {
-            var (safeSkip, safeTake) = NormalizePaging(skip, take);
+            var (safeSkip, safeTake) = NormalizePaging(skip ?? 0, take ?? 500);
             var q = db.Users.AsNoTracking().Where(u => u.Role != "SystemAdmin").AsQueryable();
             if (!string.IsNullOrWhiteSpace(role))
                 q = q.Where(u => u.Role == role);
@@ -154,8 +154,8 @@ public static class AdminEndpoints
         });
 
         // Convenience: list pending organizations
-        group.MapGet("/pending-organizations", async (int skip, int take, IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip, take)));
+        group.MapGet("/pending-organizations", async (int? skip, int? take, IOrganizationQueryService queryService) =>
+            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip ?? 0, take ?? 500)));
 
         // Delete a user (cannot delete SystemAdmin or self; requires email confirmation)
         group.MapDelete("/users/{userId:guid}", async (Guid userId, [FromBody] DeleteUserRequest req, HttpContext http, AppDbContext db) =>

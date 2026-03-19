@@ -17,32 +17,32 @@ public static class AttendanceEndpoints
             var state = await grain.GetState();
             var canView = http.IsSystemAdmin()
                 || http.IsSelfByGrainId(state.VolunteerId)
-                || await http.CanManageOpportunityAsync(db, state.OpportunityId);
+                || await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
             if (!canView) return Results.Forbid();
             return Results.Ok(state);
         });
 
-        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, int skip, int take, HttpContext http, AppDbContext db, IAttendanceQueryService queryService) =>
+        group.MapGet("/opportunity/{opportunityId:guid}", async (Guid opportunityId, int? skip, int? take, HttpContext http, AppDbContext db, IAttendanceQueryService queryService, IGrainFactory grains) =>
         {
-            if (!await http.CanManageOpportunityAsync(db, opportunityId))
+            if (!await http.CanManageOpportunityAsync(db, opportunityId, grains))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip, take));
+            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip ?? 0, take ?? 500));
         });
 
-        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int skip, int take, HttpContext http, IAttendanceQueryService queryService) =>
+        group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int? skip, int? take, HttpContext http, IAttendanceQueryService queryService) =>
         {
             if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(volunteerId))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip, take));
+            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip ?? 0, take ?? 500));
         });
 
-        group.MapGet("/disputes/pending", async (int skip, int take, IAttendanceQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingDisputesAsync(skip, take)))
+        group.MapGet("/disputes/pending", async (int? skip, int? take, IAttendanceQueryService queryService) =>
+            Results.Ok(await queryService.GetPendingDisputesAsync(skip ?? 0, take ?? 500)))
             .RequireAuthorization(p => p.RequireRole("SystemAdmin"));
 
         group.MapPost("/{id:guid}/init", async (Guid id, InitAttendanceRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
-            if (!await http.CanManageOpportunityAsync(db, req.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, req.OpportunityId, grains))
                 return Results.Forbid();
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             await grain.Initialize(req.VolunteerId, req.ApplicationId, req.OpportunityId, req.ShiftId);
@@ -93,7 +93,7 @@ public static class AttendanceEndpoints
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             var state = await grain.GetState();
-            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
                 return Results.Forbid();
             await grain.Confirm(req.SupervisorId, req.Rating);
             return Results.NoContent();
@@ -103,7 +103,7 @@ public static class AttendanceEndpoints
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             var state = await grain.GetState();
-            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId))
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
                 return Results.Forbid();
             await grain.ManualAdjustment(req.CoordinatorId, req.NewCheckIn, req.NewCheckOut, req.Reason);
             return Results.NoContent();

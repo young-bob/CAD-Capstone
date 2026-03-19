@@ -49,7 +49,7 @@ public static class OrganizationEndpoints
             var coordinator = await db.Coordinators.FirstOrDefaultAsync(c => c.UserId == creatorUserId);
             if (coordinator == null)
                 return Results.BadRequest(new { Error = "Coordinator profile not found." });
-            if (coordinator.OrganizationId != Guid.Empty)
+            if (coordinator.OrganizationId.HasValue && coordinator.OrganizationId.Value != Guid.Empty)
                 return Results.Conflict(new { Error = "Coordinator already belongs to an organization." });
 
             var orgId = coordinator.GrainId;
@@ -77,14 +77,14 @@ public static class OrganizationEndpoints
             return Results.Ok(await grain.GetState());
         });
 
-        group.MapGet("/pending", async (int skip, int take, IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip, take)));
+        group.MapGet("/pending", async (int? skip, int? take, IOrganizationQueryService queryService) =>
+            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip ?? 0, take ?? 500)));
 
-        group.MapGet("/approved", async (int skip, int take, IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetApprovedOrganizationsAsync(skip, take)));
+        group.MapGet("/approved", async (int? skip, int? take, IOrganizationQueryService queryService) =>
+            Results.Ok(await queryService.GetApprovedOrganizationsAsync(skip ?? 0, take ?? 500)));
 
-        group.MapGet("/", async (OrgStatus? status, int skip, int take, IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetAllOrganizationsAsync(status, skip, take)))
+        group.MapGet("/", async (OrgStatus? status, int? skip, int? take, IOrganizationQueryService queryService) =>
+            Results.Ok(await queryService.GetAllOrganizationsAsync(status, skip ?? 0, take ?? 500)))
             .RequireAuthorization(p => p.RequireRole("SystemAdmin"));
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateOrgRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
@@ -141,18 +141,18 @@ public static class OrganizationEndpoints
             return Results.NoContent();
         });
 
-        group.MapGet("/{id:guid}/opportunities", async (Guid id, int skip, int take, HttpContext http, AppDbContext db, IOpportunityQueryService queryService) =>
+        group.MapGet("/{id:guid}/opportunities", async (Guid id, int? skip, int? take, HttpContext http, AppDbContext db, IOpportunityQueryService queryService) =>
         {
             if (!await http.CanManageOrganizationAsync(db, id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip, take));
+            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
         });
 
-        group.MapGet("/{id:guid}/applications", async (Guid id, int skip, int take, HttpContext http, AppDbContext db, IApplicationQueryService queryService) =>
+        group.MapGet("/{id:guid}/applications", async (Guid id, int? skip, int? take, HttpContext http, AppDbContext db, IApplicationQueryService queryService) =>
         {
             if (!await http.CanManageOrganizationAsync(db, id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip, take));
+            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
         });
     }
 
