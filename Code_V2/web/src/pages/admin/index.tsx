@@ -468,14 +468,19 @@ export function AdminSystemInfo() {
                                     <div className="space-y-2">
                                         {visible.map((g, idx) => (
                                             <div key={`${silo.silo}-${g.grainType}-${idx}`} className="grid grid-cols-12 items-center gap-3 text-sm">
-                                                <div className="col-span-8 text-stone-700 font-medium truncate" title={g.grainType}>{g.grainType}</div>
+                                                <div className="col-span-8 font-medium truncate text-stone-700" title={g.grainType}>
+                                                    {g.grainType}
+                                                </div>
                                                 <div className="col-span-4">
                                                     <div className="flex items-center justify-between mb-1">
                                                         <span className="text-xs text-stone-500">Activations</span>
                                                         <span className="text-xs font-bold text-stone-700">{g.activations}</span>
                                                     </div>
                                                     <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
-                                                        <div className="h-full bg-orange-400" style={{ width: `${Math.max(8, Math.min(100, Math.round((g.activations / top) * 100)))}%` }} />
+                                                        <div
+                                                            className={`h-full ${g.grainType.toLowerCase().startsWith('orleans.') ? 'bg-blue-500' : 'bg-orange-400'}`}
+                                                            style={{ width: `${Math.max(8, Math.min(100, Math.round((g.activations / top) * 100)))}%` }}
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
