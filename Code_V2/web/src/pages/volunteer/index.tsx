@@ -226,7 +226,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER OPPORTUNITIES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
+{/* interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
 export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -297,6 +297,107 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         </div>
     );
 }
+*/}
+
+
+interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
+const FAVORITES_KEY = 'vsms_favorites';
+function loadFavorites(): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); }
+    catch { return new Set(); }
+}
+function saveFavorites(ids: Set<string>) {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
+}
+
+export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
+    const [opps, setOpps] = useState<OpportunitySummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [query, setQuery] = useState('');
+    const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+
+    const toggleFavorite = (id: string) => {
+        setFavorites(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            saveFavorites(next);
+            return next;
+        });
+    };
+
+    const load = useCallback(async (q?: string) => {
+        setLoading(true); setError('');
+        try {
+            const data = await opportunityService.search(q);
+            setOpps(data);
+        } catch (err: any) {
+            setError(getErr(err, 'Failed to load opportunities'));
+        } finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        load(query);
+    };
+
+    const tagColors: Record<string, string> = {
+        'Community': 'text-rose-600 bg-rose-50',
+        'Environment': 'text-emerald-600 bg-emerald-50',
+        'Education': 'text-amber-600 bg-amber-50',
+        'Health': 'text-blue-600 bg-blue-50',
+        'Technology': 'text-violet-600 bg-violet-50',
+    };
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Opportunities</h1><p className="text-stone-500 mt-2 text-lg">Discover meaningful projects.</p></div>
+                <form onSubmit={handleSearch} className="flex w-full sm:w-auto gap-3">
+                    <div className="relative w-full sm:w-72">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+                        <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search..." className="w-full pl-12 pr-4 py-3 rounded-full border border-stone-200 focus:ring-2 focus:ring-orange-500 outline-none shadow-sm" />
+                    </div>
+                    <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded-full font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/20">Search</button>
+                </form>
+            </div>
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : opps.length === 0 ? <Empty msg="No opportunities found." /> : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {opps.map(opp => (
+                        <div key={opp.opportunityId} className="bg-white rounded-3xl p-7 shadow-sm border border-stone-100 hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col group">
+                            <div className="flex justify-between items-start mb-5">
+                                <span className={`inline-block px-4 py-1.5 text-xs font-bold rounded-full ${tagColors[opp.category] || 'text-stone-600 bg-stone-50'}`}>{opp.category}</span>
+                                <Heart
+                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(opp.opportunityId); }}
+                                    className={`w-6 h-6 cursor-pointer transition-colors ${favorites.has(opp.opportunityId)
+                                        ? 'text-rose-500 fill-rose-500'
+                                        : 'text-stone-200 group-hover:text-rose-400 hover:!text-rose-500 hover:!fill-rose-500'
+                                        }`}
+                                />
+                            </div>
+                            <h3 className="text-xl font-bold text-stone-800 mb-2">{opp.title}</h3>
+                            <p className="text-sm font-medium text-stone-500 mb-6">{opp.organizationName}</p>
+                            <div className="mt-auto space-y-3 mb-8">
+                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
+                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
+                            </div>
+                            <button
+                                disabled={opp.availableSpots === 0}
+                                onClick={() => onViewDetail?.(opp.opportunityId)}
+                                className={`w-full py-3.5 rounded-2xl font-bold transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
+                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details →'}
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER APPLICATIONS
