@@ -57,7 +57,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile_Api
     container_name: vsms-api
     image: vsms-api
     restart: unless-stopped
