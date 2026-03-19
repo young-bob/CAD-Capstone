@@ -738,6 +738,18 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                         + Add Skill
                     </button>
                 </div>
+                {/* 
+<div className="flex flex-wrap gap-3">
+                    {skills.map(s => (
+                        <span key={s.id} className="px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 flex items-center gap-2">
+                            {s.name}
+                            <button onClick={() => handleRemoveSkill(s.id)} className="text-orange-300 hover:text-orange-600 transition-colors text-lg leading-none">×</button>
+                        </span>
+                    ))}
+                    {skills.length === 0 && <span className="text-stone-400 text-sm">No skills added yet.</span>}
+                </div>
+                */}
+
                 <div className="flex flex-wrap gap-3">
                     {skills.map(s => (
                         <span key={s.id} className="px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 flex items-center gap-2">
@@ -747,7 +759,30 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                     ))}
                     {skills.length === 0 && <span className="text-stone-400 text-sm">No skills added yet.</span>}
                 </div>
+                {/* Add Skill picker */}
+                {showAddSkill && (
+                    <div className="mt-4 border-t border-stone-100 pt-4">
+                        <p className="text-sm font-medium text-stone-500 mb-3">Select a skill to add:</p>
+                        {availableToAdd.length === 0 ? (
+                            <p className="text-sm text-stone-400">All available skills have been added.</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {availableToAdd.map(skill => (
+                                    <button
+                                        key={skill.id}
+                                        onClick={() => handleAddSkill(skill)}
+                                        title={skill.description}
+                                        className="px-4 py-2 bg-stone-50 text-stone-600 font-bold rounded-full text-sm border border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:bg-orange-50 transition-all"
+                                    >
+                                        + {skill.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
+         
             {/* Upload Credential */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h3 className="text-xl font-bold text-stone-800 mb-2">Credentials</h3>
