@@ -23,7 +23,7 @@ services:
       - vsms-net
     volumes:
       - ./data/postgres:/var/lib/postgresql/data:Z
-      - ./src/VSMS.SQL:/docker-entrypoint-initdb.d
+      - ./backend/VSMS.SQL:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vsms -d vsms"]
       interval: 5s
