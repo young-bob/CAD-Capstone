@@ -9,6 +9,7 @@ public interface IOpportunityGrain : IGrainWithGuidKey
     Task Initialize(Guid organizationId, string title, string description, string category);
     Task Publish();
     Task Cancel(string reason);
+    Task Recover();
     Task UpdateInfo(string title, string description, string category, double lat, double lon, double radiusMeters);
 
     // Applications
@@ -22,6 +23,8 @@ public interface IOpportunityGrain : IGrainWithGuidKey
 
     // Shifts
     Task AddShift(string name, DateTime startTime, DateTime endTime, int maxCapacity);
+    Task RemoveShift(Guid shiftId);
+    Task UpdateShift(Guid shiftId, string name, DateTime startTime, DateTime endTime, int maxCapacity);
 
     // Skills
     Task SetRequiredSkills(List<Guid> skillIds);

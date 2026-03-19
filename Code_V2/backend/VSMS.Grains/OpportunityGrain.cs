@@ -218,6 +218,37 @@ public class OpportunityGrain(
         await PublishSpotsUpdatedEvent();
     }
 
+    public async Task RemoveShift(Guid shiftId)
+    {
+        var shift = state.State.Shifts.FirstOrDefault(s => s.ShiftId == shiftId);
+        if (shift == null) return;
+        state.State.Shifts.Remove(shift);
+        await state.WriteStateAsync();
+        await PublishSpotsUpdatedEvent();
+    }
+
+    public async Task UpdateShift(Guid shiftId, string name, DateTime startTime, DateTime endTime, int maxCapacity)
+    {
+        var idx = state.State.Shifts.FindIndex(s => s.ShiftId == shiftId);
+        if (idx < 0) throw new ArgumentException($"Shift {shiftId} not found.");
+        var existing = state.State.Shifts[idx];
+        state.State.Shifts[idx] = existing with { Name = name, StartTime = startTime, EndTime = endTime, MaxCapacity = maxCapacity };
+        await state.WriteStateAsync();
+        await PublishSpotsUpdatedEvent();
+    }
+
+    public async Task Recover()
+    {
+        if (state.State.Status == OpportunityStatus.Draft)
+            return; // Already Draft — nothing to do
+        if (state.State.Status == OpportunityStatus.Completed)
+            throw new InvalidOperationException("Completed opportunities cannot be recovered.");
+        state.State.Status = OpportunityStatus.Draft;
+        await state.WriteStateAsync();
+        await eventBus.PublishAsync(new OpportunityStatusChangedEvent(this.GetPrimaryKey(), OpportunityStatus.Draft));
+        logger.LogInformation("Opportunity {Id} recovered to Draft", this.GetPrimaryKey());
+    }
+
     public Task<OpportunityState> GetState() => Task.FromResult(state.State);
 
     public Task ReceiveReminder(string reminderName, TickStatus status)

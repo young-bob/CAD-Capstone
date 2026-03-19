@@ -515,6 +515,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [createForm, setCreateForm] = useState({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
     const [creating, setCreating] = useState(false);
     const [publishingId, setPublishingId] = useState<string | null>(null);
+    const [recoveringId, setRecoveringId] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -572,6 +573,17 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         } finally { setPublishingId(null); }
     };
 
+    const handleRecover = async (id: string) => {
+        setRecoveringId(id);
+        try {
+            await opportunityService.recover(id);
+            setOpps(prev => prev.map(o => o.opportunityId === id ? { ...o, status: OpportunityStatus.Draft } : o));
+            refreshSoon();
+        } catch (err: any) {
+            setError(getErr(err, 'Failed to recover'));
+        } finally { setRecoveringId(null); }
+    };
+
     const handleGetLocation = () => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -601,9 +613,18 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
                     <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
-                    <input placeholder="Title *" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <input placeholder="Category (e.g. Environment)" value={createForm.category} onChange={e => setCreateForm(p => ({ ...p, category: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <textarea placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" rows={3} />
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1.5">Title <span className="text-rose-500">*</span></label>
+                        <input placeholder="e.g. Park Cleanup Drive" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1.5">Category</label>
+                        <input placeholder="e.g. Environment, Medical, Education" value={createForm.category} onChange={e => setCreateForm(p => ({ ...p, category: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1.5">Description</label>
+                        <textarea placeholder="Describe the volunteer opportunity…" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" rows={3} />
+                    </div>
                     <div className="pt-4 border-t border-stone-100">
                         <div className="flex justify-between items-center mb-3">
                             <h4 className="font-bold text-stone-700">Check-In Location (Geofence)</h4>
@@ -654,13 +675,24 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                                     <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[o.status] || 'bg-stone-100 text-stone-600'}`}>{o.status}</span></td>
                                     <td className="p-5 text-stone-800 font-bold">{o.availableSpots} / {o.totalSpots}</td>
                                     <td className="p-5">
-                                        {o.status === 'Draft' && (
-                                            <button onClick={(e) => { e.stopPropagation(); handlePublish(o.opportunityId); }} disabled={publishingId === o.opportunityId} className="text-orange-500 font-bold text-sm hover:underline disabled:opacity-50 inline-flex items-center gap-1">
-                                                {publishingId === o.opportunityId && <Loader2 className="w-3 h-3 animate-spin" />}
-                                                Publish
-                                            </button>
-                                        )}
-                                        {o.status === 'Published' && <span className="text-emerald-500 font-bold text-sm">Active</span>}
+                                        <div className="flex items-center gap-2">
+                                            {o.status === 'Draft' && (
+                                                <button onClick={(e) => { e.stopPropagation(); onViewDetail?.(o.opportunityId); }} className="text-blue-500 font-bold text-sm hover:underline inline-flex items-center gap-1"><Pencil className="w-3 h-3" /> Edit</button>
+                                            )}
+                                            {o.status === 'Draft' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handlePublish(o.opportunityId); }} disabled={publishingId === o.opportunityId} className="text-orange-500 font-bold text-sm hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                                                    {publishingId === o.opportunityId && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                    Publish
+                                                </button>
+                                            )}
+                                            {o.status === 'Published' && <span className="text-emerald-500 font-bold text-sm">Active</span>}
+                                            {o.status === 'Cancelled' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleRecover(o.opportunityId); }} disabled={recoveringId === o.opportunityId} className="text-amber-600 font-bold text-sm hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                                                    {recoveringId === o.opportunityId && <Loader2 className="w-3 h-3 animate-spin" />}
+                                                    Recover
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -1170,11 +1202,21 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [cancelReason, setCancelReason] = useState('');
     const [cancelling, setCancelling] = useState(false);
 
+    // Recover
+    const [recovering, setRecovering] = useState(false);
+
     // Skills
     const [showSkills, setShowSkills] = useState(false);
     const [allSkills, setAllSkills] = useState<Skill[]>([]);
     const [selSkillIds, setSelSkillIds] = useState<Set<string>>(new Set());
     const [savingSkills, setSavingSkills] = useState(false);
+    const [displaySkills, setDisplaySkills] = useState<Skill[]>([]);
+
+    // Shift edit / delete
+    const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+    const [editShiftForm, setEditShiftForm] = useState({ name: '', start: '', end: '', cap: '10' });
+    const [savingShift, setSavingShift] = useState(false);
+    const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
 
     // Edit Info (Draft only)
     const [showEdit, setShowEdit] = useState(false);
@@ -1268,6 +1310,53 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setSavingSkills(false); }
     };
 
+    // Load all skills for display (skill name tags)
+    useEffect(() => {
+        skillService.getAll().then(skills => setDisplaySkills(skills)).catch(() => {});
+    }, []);
+
+    const doRecover = async () => {
+        setRecovering(true);
+        try { await opportunityService.recover(oppId); showToast('Recovered to Draft ✅'); refreshSoon(); }
+        catch (err: any) { showToast(getErr(err, 'Failed to recover')); }
+        finally { setRecovering(false); }
+    };
+
+    const toLocalDatetime = (iso: string) => {
+        const d = new Date(iso);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const openEditShift = (s: Shift) => {
+        setEditingShiftId(s.shiftId);
+        setEditShiftForm({ name: s.name, start: toLocalDatetime(s.startTime), end: toLocalDatetime(s.endTime), cap: String(s.maxCapacity) });
+    };
+
+    const doUpdateShift = async () => {
+        if (!editingShiftId || !editShiftForm.name || !editShiftForm.start || !editShiftForm.end) return;
+        setSavingShift(true);
+        try {
+            await opportunityService.updateShift(oppId, editingShiftId, {
+                name: editShiftForm.name,
+                startTime: new Date(editShiftForm.start).toISOString(),
+                endTime: new Date(editShiftForm.end).toISOString(),
+                maxCapacity: parseInt(editShiftForm.cap) || 10,
+            });
+            setEditingShiftId(null);
+            showToast('Shift updated ✅');
+            refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed to update shift')); }
+        finally { setSavingShift(false); }
+    };
+
+    const doDeleteShift = async (shiftId: string) => {
+        setDeletingShiftId(shiftId);
+        try { await opportunityService.removeShift(oppId, shiftId); showToast('Shift deleted'); refreshSoon(); }
+        catch (err: any) { showToast(getErr(err, 'Failed to delete shift')); }
+        finally { setDeletingShiftId(null); }
+    };
+
     const doApprove = async (id: string) => { setActionId(id); try { await applicationService.approve(id); showToast('Approved ✅'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
     const doReject = async (id: string) => { setActionId(id); try { await applicationService.reject(id, 'Rejected'); showToast('Rejected'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
     const doNoShow = async (appId: string) => { setActionId(appId + '_ns'); try { await applicationService.markNoShow(appId); showToast('No-show marked'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
@@ -1338,7 +1427,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                 <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                     <div className="flex justify-between items-start mb-2">
                         <h1 className="text-3xl font-extrabold text-stone-800 flex-1 mr-4">{opp.info.title}</h1>
-                        <span className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full ${statusColors[opp.status] || 'bg-stone-100 text-stone-500'}`}>{opp.status}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {opp.status === 'Cancelled' && (
+                                <button onClick={doRecover} disabled={recovering} className="px-4 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-xl hover:bg-amber-100 border border-amber-200 text-sm flex items-center gap-1.5">{recovering && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Recover Event</button>
+                            )}
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${statusColors[opp.status] || 'bg-stone-100 text-stone-500'}`}>{opp.status}</span>
+                        </div>
                     </div>
                     <p className="text-orange-500 text-sm font-bold mb-4">{opp.info.category}</p>
                     <p className="text-stone-600 leading-relaxed mb-6">{opp.info.description}</p>
@@ -1346,8 +1440,17 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         {opp.status === 'Draft' && <button onClick={doPublish} disabled={actionId === 'pub'} className="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-60 flex items-center gap-2">{actionId === 'pub' && <Loader2 className="w-4 h-4 animate-spin" />} Publish</button>}
                         {opp.status === 'Draft' && <button onClick={openEdit} className="px-5 py-2.5 bg-blue-50 text-blue-600 font-bold rounded-xl hover:bg-blue-100 border border-blue-200 flex items-center gap-2"><Pencil className="w-4 h-4" /> Edit</button>}
                         {(opp.status === 'Draft' || opp.status === 'Published') && <button onClick={() => setShowCancel(true)} className="px-5 py-2.5 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 border border-rose-200">Cancel Event</button>}
-                        <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Skills ({opp.requiredSkillIds?.length || 0})</button>
+                        <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Required Skills ({opp.requiredSkillIds?.length || 0})</button>
                     </div>
+                    {opp.requiredSkillIds && opp.requiredSkillIds.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-100">
+                            <span className="text-xs font-bold text-stone-400 self-center mr-1">Required Skills:</span>
+                            {opp.requiredSkillIds.map(id => {
+                                const skill = displaySkills.find(s => s.id === id);
+                                return skill ? <span key={id} className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold border border-orange-200">{skill.name}</span> : null;
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 {/* Shifts */}
@@ -1373,8 +1476,36 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     {opp.shifts.length === 0 ? <Empty msg="No shifts yet. Add shifts before publishing." /> : (
                         <div className="space-y-3">
                             {opp.shifts.map((s: Shift) => (
-                                <div key={s.shiftId} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
-                                    <div><p className="font-bold text-stone-800">{s.name}</p><p className="text-sm text-stone-400 mt-0.5">📅 {new Date(s.startTime).toLocaleString()} — {new Date(s.endTime).toLocaleString()}</p><p className="text-sm text-stone-400">👥 {s.currentCount}/{s.maxCapacity}</p></div>
+                                <div key={s.shiftId} className="border border-stone-100 rounded-2xl overflow-hidden">
+                                    {editingShiftId === s.shiftId ? (
+                                        <div className="bg-stone-50 p-4 space-y-3">
+                                            <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Edit Shift</p>
+                                            <div className="space-y-3">
+                                                <div><label className="text-xs font-bold text-stone-500 mb-1 block">Shift Name</label><input value={editShiftForm.name} onChange={e => setEditShiftForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                                <div><label className="text-xs font-bold text-stone-500 mb-1 block">Max Capacity</label><input type="number" value={editShiftForm.cap} onChange={e => setEditShiftForm(p => ({ ...p, cap: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div><label className="text-xs font-bold text-stone-500 mb-1 block">Start Time</label><input type="datetime-local" value={editShiftForm.start} onChange={e => setEditShiftForm(p => ({ ...p, start: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                                    <div><label className="text-xs font-bold text-stone-500 mb-1 block">End Time</label><input type="datetime-local" value={editShiftForm.end} onChange={e => setEditShiftForm(p => ({ ...p, end: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => setEditingShiftId(null)} className="px-3 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
+                                                <button onClick={doUpdateShift} disabled={savingShift || !editShiftForm.name || !editShiftForm.start || !editShiftForm.end} className="px-3 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:opacity-50 flex items-center gap-1">{savingShift && <Loader2 className="w-3 h-3 animate-spin" />} Save</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between px-4 py-3">
+                                            <div>
+                                                <p className="font-bold text-stone-800">{s.name}</p>
+                                                <p className="text-sm text-stone-400 mt-0.5">📅 {new Date(s.startTime).toLocaleString()} — {new Date(s.endTime).toLocaleString()}</p>
+                                                <p className="text-sm text-stone-400">👥 {s.currentCount}/{s.maxCapacity} filled</p>
+                                            </div>
+                                            <div className="flex gap-2 shrink-0 ml-3">
+                                                <button onClick={() => openEditShift(s)} className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit shift"><Pencil className="w-4 h-4" /></button>
+                                                <button onClick={() => doDeleteShift(s.shiftId)} disabled={deletingShiftId === s.shiftId} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50" title="Delete shift">{deletingShiftId === s.shiftId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -1433,13 +1564,16 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             {/* Edit Info Modal */}
             <Modal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Opportunity">
                 <div className="space-y-3">
-                    <input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} placeholder="Title *" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="Category" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <textarea value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Description" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
-                    <div className="grid grid-cols-3 gap-2">
-                        <div><label className="text-xs font-bold text-stone-500 ml-1">Latitude</label><input type="number" step="any" value={editForm.lat} onChange={e => setEditForm(p => ({ ...p, lat: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
-                        <div><label className="text-xs font-bold text-stone-500 ml-1">Longitude</label><input type="number" step="any" value={editForm.lon} onChange={e => setEditForm(p => ({ ...p, lon: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
-                        <div><label className="text-xs font-bold text-stone-500 ml-1">Radius (m)</label><input type="number" value={editForm.radius} onChange={e => setEditForm(p => ({ ...p, radius: parseInt(e.target.value) || 200 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none mt-1" /></div>
+                    <div><label className="block text-xs font-bold text-stone-500 mb-1">Title <span className="text-rose-500">*</span></label><input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} placeholder="Event title" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+                    <div><label className="block text-xs font-bold text-stone-500 mb-1">Category</label><input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Environment, Medical" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+                    <div><label className="block text-xs font-bold text-stone-500 mb-1">Description</label><textarea value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} placeholder="Describe this opportunity" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none resize-none" /></div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 mb-1">Check-In Location (Geofence)</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <div><label className="text-xs text-stone-400 mb-1 block">Latitude</label><input type="number" step="any" value={editForm.lat} onChange={e => setEditForm(p => ({ ...p, lat: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+                            <div><label className="text-xs text-stone-400 mb-1 block">Longitude</label><input type="number" step="any" value={editForm.lon} onChange={e => setEditForm(p => ({ ...p, lon: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+                            <div><label className="text-xs text-stone-400 mb-1 block">Radius (m)</label><input type="number" value={editForm.radius} onChange={e => setEditForm(p => ({ ...p, radius: parseInt(e.target.value) || 200 }))} className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+                        </div>
                     </div>
                 </div>
                 <div className="flex gap-3 justify-end pt-2">

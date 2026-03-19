@@ -65,4 +65,13 @@ export const opportunityService = {
     updateInfo: async (id: string, data: { title: string; description: string; category: string; lat: number; lon: number; radiusMeters: number }): Promise<void> => {
         await api.put(`/api/opportunities/${id}/info`, data);
     },
+    recover: async (id: string): Promise<void> => {
+        await api.post(`/api/opportunities/${id}/recover`);
+    },
+    removeShift: async (id: string, shiftId: string): Promise<void> => {
+        await api.delete(`/api/opportunities/${id}/shifts/${shiftId}`);
+    },
+    updateShift: async (id: string, shiftId: string, data: { name: string; startTime: string; endTime: string; maxCapacity: number }): Promise<void> => {
+        await api.put(`/api/opportunities/${id}/shifts/${shiftId}`, data);
+    },
 };

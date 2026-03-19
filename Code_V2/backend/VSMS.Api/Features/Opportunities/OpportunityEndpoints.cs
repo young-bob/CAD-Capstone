@@ -162,6 +162,33 @@ public static class OpportunityEndpoints
             return Results.NoContent();
         });
 
+        group.MapPut("/{id:guid}/shifts/{shiftId:guid}", async (Guid id, Guid shiftId, UpdateShiftRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, id, grains))
+                return Results.Forbid();
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.UpdateShift(shiftId, req.Name, req.StartTime, req.EndTime, req.MaxCapacity);
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/{id:guid}/shifts/{shiftId:guid}", async (Guid id, Guid shiftId, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, id, grains))
+                return Results.Forbid();
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.RemoveShift(shiftId);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:guid}/recover", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, id, grains))
+                return Results.Forbid();
+            var grain = grains.GetGrain<IOpportunityGrain>(id);
+            await grain.Recover();
+            return Results.NoContent();
+        });
+
         group.MapPost("/{id:guid}/apply", async (Guid id, ApplyRequest req, HttpContext http, IGrainFactory grains) =>
         {
             if (!http.IsSelfByGrainId(req.VolunteerId))
