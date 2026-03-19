@@ -1104,6 +1104,8 @@ export function AdminSkills() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [skillSearch, setSkillSearch] = useState('');
     const [skillCategoryFilter, setSkillCategoryFilter] = useState('');
+    const [showCreateCatDrop, setShowCreateCatDrop] = useState(false);
+    const [showEditCatDrop, setShowEditCatDrop] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
@@ -1228,10 +1230,16 @@ export function AdminSkills() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Category</label>
-                            <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} list="skill-categories" placeholder="e.g. Medical, IT" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
-                            <datalist id="skill-categories">
-                                {allCategories.map(cat => <option key={cat} value={cat} />)}
-                            </datalist>
+                            <div className="relative">
+                                <input value={form.category} onChange={e => { setForm(p => ({ ...p, category: e.target.value })); setShowCreateCatDrop(true); }} onFocus={() => setShowCreateCatDrop(true)} onBlur={() => setTimeout(() => setShowCreateCatDrop(false), 150)} placeholder="e.g. Medical, IT" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                                {showCreateCatDrop && allCategories.filter(c => c.toLowerCase().includes(form.category.toLowerCase())).length > 0 && (
+                                    <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                        {allCategories.filter(c => c.toLowerCase().includes(form.category.toLowerCase())).map(cat => (
+                                            <li key={cat} onMouseDown={() => { setForm(p => ({ ...p, category: cat })); setShowCreateCatDrop(false); }} className="px-4 py-2.5 hover:bg-orange-50 cursor-pointer text-sm text-stone-700">{cat}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Skill Name</label>
@@ -1301,7 +1309,16 @@ export function AdminSkills() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Category</label>
-                            <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} list="skill-categories" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                            <div className="relative">
+                                <input value={editForm.category} onChange={e => { setEditForm(p => ({ ...p, category: e.target.value })); setShowEditCatDrop(true); }} onFocus={() => setShowEditCatDrop(true)} onBlur={() => setTimeout(() => setShowEditCatDrop(false), 150)} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                                {showEditCatDrop && allCategories.filter(c => c.toLowerCase().includes(editForm.category.toLowerCase())).length > 0 && (
+                                    <ul className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                                        {allCategories.filter(c => c.toLowerCase().includes(editForm.category.toLowerCase())).map(cat => (
+                                            <li key={cat} onMouseDown={() => { setEditForm(p => ({ ...p, category: cat })); setShowEditCatDrop(false); }} className="px-4 py-2.5 hover:bg-orange-50 cursor-pointer text-sm text-stone-700">{cat}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-1">Skill Name</label>
