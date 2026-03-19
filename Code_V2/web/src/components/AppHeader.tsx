@@ -43,7 +43,12 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
     // ── Notification state ──────────────────────────────────────
     const [showNotif, setShowNotif] = useState(false);           // Controls dropdown visibility
     const [notifications, setNotifications] = useState<Notification[]>([]); // Current notification list
-    const [readIds, setReadIds] = useState<Set<string>>(new Set()); // IDs the user has marked as read
+    const [readIds, setReadIds] = useState<Set<string>>(() => {
+        try {
+            const stored = localStorage.getItem('vsms_read_notif_ids');
+            return stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
+        } catch { return new Set<string>(); }
+    });
     const notifRef = useRef<HTMLDivElement>(null);                // Ref for click-outside detection
 
     /**
@@ -60,6 +65,11 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // Persist readIds to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem('vsms_read_notif_ids', JSON.stringify([...readIds]));
+    }, [readIds]);
 
     /**
      * Fetches notifications from the backend based on the current user role:

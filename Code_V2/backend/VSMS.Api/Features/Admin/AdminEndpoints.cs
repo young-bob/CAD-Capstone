@@ -500,9 +500,41 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
-        // Convenience: list pending organizations
-        group.MapGet("/pending-organizations", async (int? skip, int? take, IOrganizationQueryService queryService) =>
-            Results.Ok(await queryService.GetPendingOrganizationsAsync(skip ?? 0, take ?? 500)));
+        // Convenience: list pending organizations — reconciles grain state to fix any stale read-model entries
+        group.MapGet("/pending-organizations", async (int? skip, int? take, IOrganizationQueryService queryService, IGrainFactory grains, AppDbContext db) =>
+        {
+            var candidates = await queryService.GetPendingOrganizationsAsync(skip ?? 0, take ?? 500);
+
+            var stale = new List<Guid>();
+            var confirmed = new List<VSMS.Abstractions.DTOs.OrganizationSummary>();
+            foreach (var org in candidates)
+            {
+                var grain = grains.GetGrain<IOrganizationGrain>(org.OrgId);
+                var state = await grain.GetState();
+                if (state.Status == VSMS.Abstractions.Enums.OrgStatus.PendingApproval)
+                    confirmed.Add(org);
+                else
+                    stale.Add(org.OrgId);
+            }
+
+            if (stale.Count > 0)
+            {
+                var staleModels = await db.OrganizationReadModels
+                    .Where(o => stale.Contains(o.OrgId))
+                    .ToListAsync();
+                foreach (var model in staleModels)
+                {
+                    var grain = grains.GetGrain<IOrganizationGrain>(model.OrgId);
+                    var state = await grain.GetState();
+                    model.Status = state.Status;
+                    if (!string.IsNullOrEmpty(state.Name)) model.Name = state.Name;
+                    if (!string.IsNullOrEmpty(state.Description)) model.Description = state.Description;
+                }
+                await db.SaveChangesAsync();
+            }
+
+            return Results.Ok(confirmed);
+        });
 
         // Delete a user (cannot delete SystemAdmin or self; requires email confirmation)
         group.MapDelete("/users/{userId:guid}", async (Guid userId, [FromBody] DeleteUserRequest req, HttpContext http, AppDbContext db) =>

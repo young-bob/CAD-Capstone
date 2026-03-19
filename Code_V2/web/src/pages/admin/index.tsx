@@ -57,8 +57,9 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         { key: 'SystemAdmin', label: 'Admins', count: users.filter(u => u.role === 'SystemAdmin').length, color: 'bg-violet-500' },
     ];
     const approvedOrgs = allOrgs.filter(o => o.status === 'Approved').length;
-    const pendingRatio = allOrgs.length === 0 ? 0 : Math.round((pendingOrgs.length / allOrgs.length) * 100);
-    const approvalRatio = allOrgs.length === 0 ? 0 : Math.round((approvedOrgs / allOrgs.length) * 100);
+    const activeOrgsTotal = allOrgs.filter(o => o.status === 'PendingApproval' || o.status === 'Approved').length;
+    const pendingRatio = activeOrgsTotal === 0 ? 0 : Math.round((pendingOrgs.length / activeOrgsTotal) * 100);
+    const approvalRatio = activeOrgsTotal === 0 ? 0 : Math.round((approvedOrgs / activeOrgsTotal) * 100);
     const queueItems = pendingOrgs.length + disputes.length;
     const oldestDisputeHours = disputes.length === 0
         ? 0

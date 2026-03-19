@@ -7,19 +7,31 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery;
 
 public class EfCoreOrganizationQueryService(AppDbContext db) : IOrganizationQueryService
 {
-    public async Task<List<OrganizationSummary>> GetPendingOrganizationsAsync() =>
+    public async Task<List<OrganizationSummary>> GetPendingOrganizationsAsync(int skip = 0, int take = 500) =>
         await db.OrganizationReadModels
             .Where(o => o.Status == OrgStatus.PendingApproval)
             .OrderBy(o => o.CreatedAt)
+            .Skip(skip).Take(take)
             .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
             .ToListAsync();
 
-    public async Task<List<OrganizationSummary>> GetApprovedOrganizationsAsync() =>
+    public async Task<List<OrganizationSummary>> GetApprovedOrganizationsAsync(int skip = 0, int take = 500) =>
         await db.OrganizationReadModels
             .Where(o => o.Status == OrgStatus.Approved)
             .OrderBy(o => o.Name)
+            .Skip(skip).Take(take)
             .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
             .ToListAsync();
+
+    public async Task<List<OrganizationSummary>> GetAllOrganizationsAsync(OrgStatus? status = null, int skip = 0, int take = 500)
+    {
+        var q = db.OrganizationReadModels.AsQueryable();
+        if (status.HasValue)
+            q = q.Where(o => o.Status == status.Value);
+        return await q.OrderBy(o => o.CreatedAt).Skip(skip).Take(take)
+            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
+            .ToListAsync();
+    }
 
     public async Task<OrganizationSummary?> GetOrganizationAsync(Guid orgId)
     {
