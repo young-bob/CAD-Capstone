@@ -34,6 +34,16 @@ public static class FileEndpoints
             return Results.Ok(new { url });
         });
 
+        // Download file content through API (avoids exposing internal storage endpoint to web clients)
+        group.MapGet("/download/{*fileKey}", async (string fileKey, HttpResponse response, IFileStorageService storage) =>
+        {
+            var normalizedKey = Uri.UnescapeDataString(fileKey).TrimStart('/');
+            var (content, contentType) = await storage.DownloadAsync(normalizedKey);
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            return Results.File(content, contentType, enableRangeProcessing: true);
+        });
+
         // Delete a file
         group.MapDelete("/{*fileKey}", async (string fileKey, IFileStorageService storage) =>
         {

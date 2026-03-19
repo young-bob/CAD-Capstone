@@ -1,5 +1,5 @@
 import api from './api';
-import type { OpportunityState, OpportunitySummary } from '../types';
+import type { OpportunityState, OpportunitySummary, OpportunityRecommendationResult } from '../types';
 
 export const opportunityService = {
     getById: async (id: string): Promise<OpportunityState> => {
@@ -11,6 +11,26 @@ export const opportunityService = {
         if (query) params.append('query', query);
         if (category) params.append('category', category);
         const res = await api.get<OpportunitySummary[]>(`/api/opportunities/?${params.toString()}`);
+        return res.data;
+    },
+    recommendForVolunteer: async (data: {
+        volunteerId: string;
+        query?: string;
+        category?: string;
+        lat?: number;
+        lon?: number;
+        skip?: number;
+        take?: number;
+    }): Promise<OpportunityRecommendationResult> => {
+        const params = new URLSearchParams();
+        params.append('volunteerId', data.volunteerId);
+        if (data.query) params.append('query', data.query);
+        if (data.category) params.append('category', data.category);
+        if (typeof data.lat === 'number') params.append('lat', String(data.lat));
+        if (typeof data.lon === 'number') params.append('lon', String(data.lon));
+        if (typeof data.skip === 'number') params.append('skip', String(data.skip));
+        if (typeof data.take === 'number') params.append('take', String(data.take));
+        const res = await api.get<OpportunityRecommendationResult>(`/api/opportunities/recommend?${params.toString()}`);
         return res.data;
     },
     getByIds: async (ids: string[]): Promise<OpportunitySummary[]> => {

@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrganizationSummary, UserRecord } from '../types';
+import type { OrganizationSummary, UserRecord, GrainDistributionSummary, SystemInfoSummary } from '../types';
 
 export const adminService = {
     approveOrg: async (orgId: string): Promise<void> => {
@@ -26,11 +26,8 @@ export const adminService = {
         return res.data;
     },
     getAllOrganizations: async (): Promise<OrganizationSummary[]> => {
-        const [pending, approved] = await Promise.all([
-            api.get<OrganizationSummary[]>('/api/organizations/pending'),
-            api.get<OrganizationSummary[]>('/api/organizations/approved'),
-        ]);
-        return [...(pending.data || []), ...(approved.data || [])];
+        const res = await api.get<OrganizationSummary[]>('/api/organizations');
+        return res.data;
     },
     resetPassword: async (userId: string, newPassword: string): Promise<void> => {
         await api.post(`/api/admin/users/${userId}/reset-password`, { newPassword });
@@ -49,5 +46,13 @@ export const adminService = {
     },
     removeCoordinatorFromOrg: async (orgId: string, coordinatorUserId: string): Promise<void> => {
         await api.post(`/api/admin/organizations/${orgId}/remove-coordinator`, { coordinatorUserId });
+    },
+    getGrainDistribution: async (): Promise<GrainDistributionSummary> => {
+        const res = await api.get<GrainDistributionSummary>('/api/admin/runtime/grain-distribution');
+        return res.data;
+    },
+    getSystemInfo: async (): Promise<SystemInfoSummary> => {
+        const res = await api.get<SystemInfoSummary>('/api/admin/runtime/system-info');
+        return res.data;
     },
 };

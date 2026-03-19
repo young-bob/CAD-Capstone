@@ -93,6 +93,31 @@ public class MinioFileStorageService : IFileStorageService
         return url;
     }
 
+    public async Task<(byte[] Content, string ContentType)> DownloadAsync(string fileKey)
+    {
+        await EnsureBucketAsync();
+        var stat = await _client.StatObjectAsync(new StatObjectArgs()
+            .WithBucket(_settings.BucketName)
+            .WithObject(fileKey));
+
+        await using var ms = new MemoryStream();
+        await _client.GetObjectAsync(new GetObjectArgs()
+            .WithBucket(_settings.BucketName)
+            .WithObject(fileKey)
+            .WithCallbackStream(stream => stream.CopyTo(ms)));
+
+        if (ms.Length == 0)
+            throw new InvalidOperationException($"Downloaded file is empty: {fileKey}");
+
+        var contentType = string.IsNullOrWhiteSpace(stat.ContentType)
+            ? GetContentType(fileKey)
+            : stat.ContentType;
+
+        _logger.LogInformation("Downloaded file from MinIO: {FileKey}, bytes={Size}, contentType={ContentType}",
+            fileKey, ms.Length, contentType);
+        return (ms.ToArray(), contentType);
+    }
+
     private static string GetContentType(string fileName)
     {
         var ext = Path.GetExtension(fileName)?.ToLowerInvariant();

@@ -2,7 +2,7 @@ export type ViewName =
     | 'landing' | 'login' | 'register'
     | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills'
     | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members'
-    | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills';
+    | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills' | 'admin_system_info';
 
 
 // ─── Enums (mirrors backend VSMS.Abstractions.Models.Enums) ──
@@ -123,6 +123,19 @@ export interface OpportunitySummary {
     availableSpots: number;
     latitude: number | null;
     longitude: number | null;
+}
+
+export interface OpportunityRecommendation extends OpportunitySummary {
+    matchedSkillCount: number;
+    requiredSkillCount: number;
+    skillMatchRatio: number;
+    distanceKm: number | null;
+    recommendationScore: number;
+}
+
+export interface OpportunityRecommendationResult {
+    volunteerSkillCount: number;
+    opportunities: OpportunityRecommendation[];
 }
 
 // ─── Application ──────────────────────────────────────────────
@@ -265,4 +278,89 @@ export interface DisputeSummary {
     reason: string;
     evidenceUrl: string;
     raisedAt: string;
+}
+
+export interface GrainTypeActivation {
+    grainType: string;
+    activations: number;
+}
+
+export interface SiloGrainDistribution {
+    silo: string;
+    totalActivations: number;
+    grainTypes: GrainTypeActivation[];
+}
+
+export interface GrainDistributionSummary {
+    generatedAtUtc: string;
+    totalSilos: number;
+    totalActivations: number;
+    silos: SiloGrainDistribution[];
+}
+
+export interface SiloLoadSkew {
+    mostBusySilo: string | null;
+    leastBusySilo: string | null;
+    maxActivations: number;
+    minActivations: number;
+    avgActivations: number;
+    stdDevActivations: number;
+    skewRatio: number | null;
+}
+
+export interface SiloRuntimeMetrics {
+    cpuUsage: number;
+    availableMemoryBytes: number;
+    memoryUsageBytes: number;
+    totalPhysicalMemoryBytes: number;
+    memoryUsageRatio: number | null;
+    isOverloaded: boolean;
+    clientCount: number;
+    receivedMessages: number;
+    sentMessages: number;
+    runtimeCollectedAtUtc: string | null;
+    activationCount: number;
+    recentlyUsedActivationCount: number;
+}
+
+export interface RuntimeOverview {
+    sampledSilos: number;
+    overloadedSilos: number;
+    avgCpuUsage: number | null;
+    avgMemoryUsageRatio: number | null;
+    totalClients: number;
+    totalReceivedMessages: number;
+    totalSentMessages: number;
+}
+
+export interface SiloSystemInfo {
+    silo: string;
+    status: string;
+    isAlive: boolean;
+    hostName: string | null;
+    siloName: string | null;
+    version: string | null;
+    startTimeUtc: string | null;
+    lastHeartbeatUtc: string | null;
+    uptimeMinutes: number | null;
+    totalActivations: number;
+    systemActivations: number;
+    businessActivations: number;
+    systemRatio: number;
+    businessRatio: number;
+    runtime: SiloRuntimeMetrics | null;
+    grainTypes: GrainTypeActivation[];
+}
+
+export interface SystemInfoSummary {
+    generatedAtUtc: string;
+    totalSilos: number;
+    totalActivations: number;
+    overallSystemActivations: number;
+    overallBusinessActivations: number;
+    overallSystemRatio: number;
+    overallBusinessRatio: number;
+    skew: SiloLoadSkew;
+    runtimeOverview: RuntimeOverview;
+    silos: SiloSystemInfo[];
 }

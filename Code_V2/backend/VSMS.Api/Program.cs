@@ -70,6 +70,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
+    await ApplyPerformanceIndexesAsync(db);
 
     // Seed default SystemAdmin if none exists
     if (!await db.Users.AnyAsync(u => u.Role == "SystemAdmin"))
@@ -89,6 +90,29 @@ using (var scope = app.Services.CreateScope())
         });
         await db.SaveChangesAsync();
         app.Logger.LogInformation("Default SystemAdmin seeded: admin@vsms.com / Admin@123");
+    }
+}
+
+static async Task ApplyPerformanceIndexesAsync(AppDbContext db)
+{
+    if (!db.Database.IsNpgsql()) return;
+
+    var statements = new[]
+    {
+        """CREATE INDEX IF NOT EXISTS "IX_Users_Role_CreatedAt" ON "Users" ("Role", "CreatedAt");""",
+        """CREATE INDEX IF NOT EXISTS "IX_Users_IsBanned" ON "Users" ("IsBanned");""",
+        """CREATE INDEX IF NOT EXISTS "IX_OrganizationReadModels_Status_CreatedAt" ON "OrganizationReadModels" ("Status", "CreatedAt");""",
+        """CREATE INDEX IF NOT EXISTS "IX_OpportunityReadModels_Status_PublishDate" ON "OpportunityReadModels" ("Status", "PublishDate");""",
+        """CREATE INDEX IF NOT EXISTS "IX_ApplicationReadModels_OpportunityId_AppliedAt" ON "ApplicationReadModels" ("OpportunityId", "AppliedAt");""",
+        """CREATE INDEX IF NOT EXISTS "IX_ApplicationReadModels_VolunteerId_AppliedAt" ON "ApplicationReadModels" ("VolunteerId", "AppliedAt");""",
+        """CREATE INDEX IF NOT EXISTS "IX_AttendanceReadModels_VolunteerId_CheckInTime" ON "AttendanceReadModels" ("VolunteerId", "CheckInTime");""",
+        """CREATE INDEX IF NOT EXISTS "IX_AttendanceReadModels_OpportunityId_ShiftStartTime" ON "AttendanceReadModels" ("OpportunityId", "ShiftStartTime");""",
+        """CREATE INDEX IF NOT EXISTS "IX_DisputeReadModels_RaisedAt" ON "DisputeReadModels" ("RaisedAt");""",
+    };
+
+    foreach (var sql in statements)
+    {
+        await db.Database.ExecuteSqlRawAsync(sql);
     }
 }
 

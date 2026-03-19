@@ -10,3 +10,22 @@ public record ValidateGeoRequest(double Lat, double Lon);
 public record SetGeoFenceRequest(double Lat, double Lon, double RadiusMeters);
 public record SetRequiredSkillsRequest(List<Guid> SkillIds);
 public record UpdateInfoRequest(string Title, string Description, string Category, double Lat, double Lon, double RadiusMeters);
+
+public record OpportunityRecommendation(
+    Guid OpportunityId,
+    Guid OrganizationId,
+    string OrganizationName,
+    string Title,
+    string Category,
+    VSMS.Abstractions.Enums.OpportunityStatus Status,
+    DateTime PublishDate,
+    int TotalSpots,
+    int AvailableSpots,
+    double? Latitude,
+    double? Longitude,
+    int MatchedSkillCount,
+    int RequiredSkillCount,
+    double SkillMatchRatio,
+    double? DistanceKm,
+    double RecommendationScore
+);

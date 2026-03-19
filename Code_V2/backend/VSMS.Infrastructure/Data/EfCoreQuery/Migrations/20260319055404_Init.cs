@@ -42,6 +42,7 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                     VolunteerName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     OpportunityTitle = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
+                    ShiftStartTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CheckInTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CheckOutTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     TotalHours = table.Column<double>(type: "double precision", nullable: false)
@@ -221,14 +222,34 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                 column: "OpportunityId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApplicationReadModels_OpportunityId_AppliedAt",
+                table: "ApplicationReadModels",
+                columns: new[] { "OpportunityId", "AppliedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ApplicationReadModels_VolunteerId",
                 table: "ApplicationReadModels",
                 column: "VolunteerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApplicationReadModels_VolunteerId_AppliedAt",
+                table: "ApplicationReadModels",
+                columns: new[] { "VolunteerId", "AppliedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AttendanceReadModels_OpportunityId",
                 table: "AttendanceReadModels",
                 column: "OpportunityId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AttendanceReadModels_OpportunityId_ShiftStartTime",
+                table: "AttendanceReadModels",
+                columns: new[] { "OpportunityId", "ShiftStartTime" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AttendanceReadModels_VolunteerId_CheckInTime",
+                table: "AttendanceReadModels",
+                columns: new[] { "VolunteerId", "CheckInTime" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_CertificateTemplates_OrganizationId",
@@ -239,6 +260,11 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                 name: "IX_Coordinators_OrganizationId",
                 table: "Coordinators",
                 column: "OrganizationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DisputeReadModels_RaisedAt",
+                table: "DisputeReadModels",
+                column: "RaisedAt");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DisputeReadModels_VolunteerId",
@@ -261,9 +287,19 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
+                name: "IX_OpportunityReadModels_Status_PublishDate",
+                table: "OpportunityReadModels",
+                columns: new[] { "Status", "PublishDate" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrganizationReadModels_Status",
                 table: "OrganizationReadModels",
                 column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrganizationReadModels_Status_CreatedAt",
+                table: "OrganizationReadModels",
+                columns: new[] { "Status", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Skills_Name",
@@ -276,6 +312,16 @@ namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
                 table: "Users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_IsBanned",
+                table: "Users",
+                column: "IsBanned");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Role_CreatedAt",
+                table: "Users",
+                columns: new[] { "Role", "CreatedAt" });
         }
 
         /// <inheritdoc />

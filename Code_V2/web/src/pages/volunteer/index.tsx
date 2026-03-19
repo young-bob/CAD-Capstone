@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
-import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
+import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
+import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
 import { opportunityService } from '../../services/opportunities';
@@ -9,7 +10,10 @@ import { attendanceService } from '../../services/attendance';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
+import ActionToast from '../../components/ActionToast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 const MapView = lazy(() => import('../../components/MapView'));
+const OpportunityHeatMap = lazy(() => import('../../components/OpportunityHeatMap'));
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {
@@ -28,6 +32,10 @@ function Empty({ msg }: { msg: string }) {
     return <div className="text-center py-16 text-stone-400 font-medium">{msg}</div>;
 }
 function getErr(err: any, fallback: string): string { const d = err?.response?.data; if (!d) return fallback; if (typeof d === 'string') return d || fallback; return String(d.error || d.message || d.title || fallback); }
+function formatEventTitle(opportunityTitle: string, shiftName?: string | null): string {
+    const cleanedShift = shiftName?.trim();
+    return cleanedShift ? `${opportunityTitle} · ${cleanedShift}` : opportunityTitle;
+}
 
 // ─── GPS Check-In Button ──────────────────────────────────────
 function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone }: {
@@ -146,6 +154,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
+    const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -153,12 +162,14 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const [p, a] = await Promise.all([
+            const [p, a, at] = await Promise.all([
                 volunteerService.getProfile(auth.linkedGrainId),
-                applicationService.getForVolunteer(auth.linkedGrainId)
+                applicationService.getForVolunteer(auth.linkedGrainId),
+                attendanceService.getByVolunteer(auth.linkedGrainId),
             ]);
             setProfile(p);
             setApps(a);
+            setAttendance(at);
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
@@ -171,6 +182,49 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 
     const name = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || auth.email : auth.email;
     const approvedShiftDates = apps.filter(a => a.status === 'Approved' && a.shiftStartTime).map(a => new Date(a.shiftStartTime));
+    const appStatusCounts = [
+        { label: 'Pending', key: 'Pending', count: apps.filter(a => a.status === 'Pending').length, color: 'bg-amber-400' },
+        { label: 'Approved', key: 'Approved', count: apps.filter(a => a.status === 'Approved').length, color: 'bg-emerald-500' },
+        { label: 'Waitlisted', key: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, color: 'bg-blue-500' },
+        { label: 'Closed', key: 'Closed', count: apps.filter(a => ['Rejected', 'Withdrawn', 'NoShow', 'Completed'].includes(a.status)).length, color: 'bg-stone-500' },
+    ];
+    const totalStatusCount = appStatusCounts.reduce((sum, s) => sum + s.count, 0);
+    const upcomingApps = apps
+        .filter(a => a.shiftStartTime && new Date(a.shiftStartTime).getTime() >= Date.now())
+        .sort((a, b) => new Date(a.shiftStartTime).getTime() - new Date(b.shiftStartTime).getTime())
+        .slice(0, 5);
+    const recentApps = [...apps]
+        .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())
+        .slice(0, 5);
+    const reviewedApps = apps.filter(a => a.status !== 'Pending').length;
+    const approvedTrackApps = apps.filter(a => ['Approved', 'Promoted', 'Completed', 'NoShow'].includes(a.status)).length;
+    const checkedInSessions = attendance.filter(a => ['CheckedIn', 'CheckedOut', 'Confirmed', 'Resolved', 'Disputed'].includes(a.status)).length;
+    const completedSessions = attendance.filter(a => ['CheckedOut', 'Confirmed', 'Resolved'].includes(a.status)).length;
+    const rejectedOrWithdrawn = apps.filter(a => ['Rejected', 'Withdrawn'].includes(a.status)).length;
+    const funnelSteps = [
+        { key: 'applied', label: 'Applied', count: apps.length, color: 'bg-sky-500' },
+        { key: 'reviewed', label: 'Reviewed', count: reviewedApps, color: 'bg-violet-500' },
+        { key: 'approved', label: 'Approved Track', count: approvedTrackApps, color: 'bg-emerald-500' },
+        { key: 'checkedin', label: 'Checked In', count: checkedInSessions, color: 'bg-amber-500' },
+        { key: 'completed', label: 'Completed', count: completedSessions, color: 'bg-orange-500' },
+    ];
+    const funnelMax = Math.max(1, ...funnelSteps.map(s => s.count));
+    const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const statusBadgeClass = (status: string) => {
+        if (status === 'Approved') return 'bg-emerald-100 text-emerald-700';
+        if (status === 'Pending') return 'bg-amber-100 text-amber-700';
+        if (status === 'Waitlisted' || status === 'Promoted') return 'bg-blue-100 text-blue-700';
+        if (status === 'Rejected' || status === 'NoShow') return 'bg-rose-100 text-rose-700';
+        return 'bg-stone-100 text-stone-700';
+    };
+    const statCards = [
+        { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50', hoverBg: 'group-hover:bg-blue-500', target: 'attendance' as ViewName },
+        { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', hoverBg: 'group-hover:bg-emerald-500', target: 'attendance' as ViewName },
+        { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50', hoverBg: 'group-hover:bg-amber-500', target: 'profile' as ViewName },
+        { label: 'Applications', val: String(apps.length), unit: 'total', icon: BadgeCheck, color: 'text-violet-500', bg: 'bg-violet-50', hoverBg: 'group-hover:bg-violet-500', target: 'applications' as ViewName },
+    ];
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -187,19 +241,15 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                         <Heart className="absolute -right-4 -bottom-4 w-56 h-56 text-white opacity-10" />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                            { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-                            { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                            { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50' },
-                        ].map((s, i) => (
-                            <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
-                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 group-hover:bg-${s.color.split('-')[1]}-500 group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                        {statCards.map((s, i) => (
+                            <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
+                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 ${s.hoverBg} group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
                                 <div>
                                     <h3 className="text-2xl font-extrabold text-stone-800">{s.val} <span className="text-sm font-medium text-stone-400">{s.unit}</span></h3>
                                     <p className="text-xs font-semibold text-stone-400 tracking-wide uppercase mt-1">{s.label}</p>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -218,6 +268,101 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-xl font-extrabold text-stone-800">Application Snapshot</h2>
+                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                    </div>
+                    <div className="space-y-4">
+                        {appStatusCounts.map((s) => {
+                            const pct = totalStatusCount === 0 ? 0 : Math.round((s.count / totalStatusCount) * 100);
+                            return (
+                                <div key={s.key}>
+                                    <div className="flex justify-between items-center text-sm mb-1.5">
+                                        <span className="font-semibold text-stone-700">{s.label}</span>
+                                        <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <h2 className="text-xl font-extrabold text-stone-800 mb-5">Upcoming Commitments</h2>
+                    {upcomingApps.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-8 text-center">No upcoming shifts yet.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {upcomingApps.map(app => (
+                                <div key={app.applicationId} className="border border-stone-100 rounded-2xl p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                            <p className="text-xs text-stone-500 mt-1">{formatDateTime(app.shiftStartTime)}</p>
+                                        </div>
+                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
+                                            {app.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-xl font-extrabold text-stone-800">Application Funnel</h2>
+                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                    </div>
+                    <div className="space-y-4">
+                        {funnelSteps.map((step, idx) => {
+                            const pctOfTop = Math.round((step.count / funnelMax) * 100);
+                            return (
+                                <div key={step.key}>
+                                    <div className="flex justify-between items-center text-sm mb-1.5">
+                                        <span className="font-semibold text-stone-700">{idx + 1}. {step.label}</span>
+                                        <span className="text-stone-500">{step.count}</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                                        <div className={`h-full ${step.color}`} style={{ width: `${Math.max(6, pctOfTop)}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-stone-100 text-xs text-stone-500">
+                        Drop-off (Rejected/Withdrawn): <span className="font-bold text-rose-600">{rejectedOrWithdrawn}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                <h2 className="text-xl font-extrabold text-stone-800 mb-5">Recent Application Activity</h2>
+                {recentApps.length === 0 ? (
+                    <p className="text-sm text-stone-400 py-4">No activity yet.</p>
+                ) : (
+                    <div className="space-y-3">
+                        {recentApps.map(app => (
+                            <div key={app.applicationId} className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-b-0">
+                                <div>
+                                    <p className="font-medium text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                    <p className="text-xs text-stone-500">Applied {formatDateTime(app.appliedAt)}</p>
+                                </div>
+                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
+                                    {app.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -256,6 +401,32 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         'Education': 'text-amber-600 bg-amber-50',
         'Health': 'text-blue-600 bg-blue-50',
         'Technology': 'text-violet-600 bg-violet-50',
+    };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
+    };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
     };
 
     return (
@@ -311,11 +482,24 @@ function saveFavorites(ids: Set<string>) {
 }
 
 export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
-    const [opps, setOpps] = useState<OpportunitySummary[]>([]);
+    const auth = useAuth();
+    const [opps, setOpps] = useState<OpportunityRecommendation[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
+    const [smartMatch, setSmartMatch] = useState(true);
+    const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+    const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'ready' | 'denied' | 'unsupported'>('idle');
     const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+
+    const asRecommendation = (opp: OpportunitySummary): OpportunityRecommendation => ({
+        ...opp,
+        matchedSkillCount: 0,
+        requiredSkillCount: 0,
+        skillMatchRatio: 0,
+        distanceKm: null,
+        recommendationScore: 0,
+    });
 
     const toggleFavorite = (id: string) => {
         setFavorites(prev => {
@@ -329,14 +513,42 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const load = useCallback(async (q?: string) => {
         setLoading(true); setError('');
         try {
+            if (smartMatch && auth.userId) {
+                const ranked = await opportunityService.recommendForVolunteer({
+                    volunteerId: auth.userId,
+                    query: q,
+                    lat: coords?.lat,
+                    lon: coords?.lon,
+                    take: 500,
+                });
+                setOpps(ranked.opportunities);
+                return;
+            }
             const data = await opportunityService.search(q);
-            setOpps(data);
+            setOpps(data.map(asRecommendation));
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunities'));
         } finally { setLoading(false); }
-    }, []);
+    }, [auth.userId, coords?.lat, coords?.lon, smartMatch]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!smartMatch) return;
+        if (!navigator.geolocation) {
+            setLocationStatus('unsupported');
+            return;
+        }
+        setLocationStatus('locating');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+                setLocationStatus('ready');
+            },
+            () => setLocationStatus('denied'),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 },
+        );
+    }, [smartMatch]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -349,6 +561,19 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         'Education': 'text-amber-600 bg-amber-50',
         'Health': 'text-blue-600 bg-blue-50',
         'Technology': 'text-violet-600 bg-violet-50',
+    };
+    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
+    const recommendationTier = (score: number): string => {
+        if (score >= 0.8) return 'Excellent Match';
+        if (score >= 0.6) return 'Strong Match';
+        if (score >= 0.45) return 'Good Match';
+        return 'Possible Match';
+    };
+    const recommendationTone = (score: number): string => {
+        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
+        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-stone-700 bg-stone-50 border-stone-200';
     };
 
     return (
@@ -363,6 +588,40 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                     <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded-full font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/20">Search</button>
                 </form>
             </div>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => setSmartMatch(v => !v)}
+                    className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${smartMatch
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                        }`}
+                >
+                    {smartMatch ? 'Smart Match: ON' : 'Smart Match: OFF'}
+                </button>
+                {smartMatch && (
+                    <span className="text-xs text-stone-500">
+                        {locationStatus === 'ready' && 'Using your location + skills'}
+                        {locationStatus === 'locating' && 'Getting your location for distance scoring...'}
+                        {locationStatus === 'denied' && 'Location denied: using skill-only ranking'}
+                        {locationStatus === 'unsupported' && 'No geolocation: using skill-only ranking'}
+                        {locationStatus === 'idle' && 'Using skill-based ranking'}
+                    </span>
+                )}
+            </div>
+            {mappableOpps.length > 0 && (
+                <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-stone-100 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-lg font-extrabold text-stone-800">Opportunity Heat Layer</h2>
+                        <span className="text-xs font-semibold text-stone-500">
+                            {mappableOpps.length} mappable opportunities
+                            {coords ? ' · centered on your location' : ''}
+                        </span>
+                    </div>
+                    <Suspense fallback={<div className="h-80 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-400 text-sm">Loading map layer...</div>}>
+                        <OpportunityHeatMap opportunities={opps} userLocation={coords} height={320} />
+                    </Suspense>
+                </div>
+            )}
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : opps.length === 0 ? <Empty msg="No opportunities found." /> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {opps.map(opp => (
@@ -382,6 +641,25 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                             <div className="mt-auto space-y-3 mb-8">
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
                                 <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
+                                {smartMatch && (
+                                    <div className={`rounded-2xl border p-3 space-y-1.5 ${recommendationTone(opp.recommendationScore || 0)}`}>
+                                        <div className="text-[11px] uppercase tracking-wide font-extrabold">Why This Match</div>
+                                        <div className="text-xs font-semibold">
+                                            {opp.requiredSkillCount > 0
+                                                ? `Skills: ${opp.matchedSkillCount}/${opp.requiredSkillCount} matched`
+                                                : 'Skills: open to all volunteers'}
+                                        </div>
+                                        <div className="text-xs font-semibold">
+                                            Recommendation: {Math.round((opp.recommendationScore || 0) * 100)}% · {recommendationTier(opp.recommendationScore || 0)}
+                                        </div>
+                                        {opp.distanceKm !== null && (
+                                            <div className="flex items-center gap-1 text-xs font-semibold">
+                                                <MapPin className="w-3.5 h-3.5" />
+                                                <span>Distance: {opp.distanceKm.toFixed(1)} km</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <button
                                 disabled={opp.availableSpots === 0}
@@ -402,13 +680,15 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER APPLICATIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-export function VolApplications() {
+interface VolApplicationsProps { onNavigate?: (view: ViewName) => void; }
+export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const auth = useAuth();
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [toast, setToast] = useState('');
+    const [toast, setToast] = useState<{ message: string; actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[] } | null>(null);
     const [actionId, setActionId] = useState<string | null>(null);
+    const [confirmWithdrawApp, setConfirmWithdrawApp] = useState<ApplicationSummary | null>(null);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -422,18 +702,47 @@ export function VolApplications() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
-    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+    const showToast = (message: string, actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[]) => {
+        setToast({ message, actions });
+    };
 
-    const handleWithdraw = async (app: ApplicationSummary) => {
-        if (!window.confirm(`Withdraw application for "${app.opportunityTitle}"?`)) return;
+    const handleUndoWithdraw = async (app: ApplicationSummary) => {
+        if (!auth.linkedGrainId) return;
+        setActionId(app.applicationId);
+        try {
+            await opportunityService.apply(app.opportunityId, {
+                volunteerId: auth.linkedGrainId,
+                shiftId: app.shiftId,
+                idempotencyKey: `undo-${app.applicationId}-${Date.now()}`
+            });
+            showToast('Withdrawal undone');
+            setApps(prev => {
+                if (prev.some(a => a.shiftId === app.shiftId && a.opportunityId === app.opportunityId)) return prev;
+                return [{ ...app, status: ApplicationStatus.Pending, appliedAt: new Date().toISOString() }, ...prev];
+            });
+            refreshSoon();
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to undo withdrawal'));
+        } finally { setActionId(null); }
+    };
+
+    const handleWithdrawConfirm = async () => {
+        if (!confirmWithdrawApp) return;
+        const app = confirmWithdrawApp;
+        setConfirmWithdrawApp(null);
         setActionId(app.applicationId);
         try {
             await opportunityService.withdrawApplication(app.opportunityId, app.applicationId);
-            showToast('Application withdrawn');
-            load();
+            setApps(prev => prev.filter(a => a.applicationId !== app.applicationId));
+            showToast('Application withdrawn', [
+                { label: 'Undo', tone: 'default', onClick: () => handleUndoWithdraw(app) },
+                { label: 'Browse Events', tone: 'primary', onClick: () => onNavigate?.('opportunities') },
+            ]);
+            refreshSoon();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to withdraw');
+            showToast(getErr(err, 'Failed to withdraw'));
         } finally { setActionId(null); }
     };
 
@@ -441,10 +750,13 @@ export function VolApplications() {
         setActionId(app.applicationId);
         try {
             await applicationService.accept(app.applicationId);
-            showToast('Invitation accepted! 🎉');
-            load();
+            setApps(prev => prev.map(a => a.applicationId === app.applicationId ? { ...a, status: ApplicationStatus.Approved } : a));
+            showToast('Invitation accepted! 🎉', [
+                { label: 'Go To Attendance', tone: 'primary', onClick: () => onNavigate?.('attendance') }
+            ]);
+            refreshSoon();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to accept');
+            showToast(getErr(err, 'Failed to accept'));
         } finally { setActionId(null); }
     };
 
@@ -464,15 +776,37 @@ export function VolApplications() {
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             <div><h1 className="text-3xl font-extrabold text-stone-800">My Applications</h1><p className="text-stone-500 mt-2 text-lg">Track the status of your applications.</p></div>
-            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? <Empty msg="No applications yet." /> : (
+            {toast && <ActionToast message={toast.message} actions={toast.actions} onClose={() => setToast(null)} />}
+            <ConfirmDialog
+                open={!!confirmWithdrawApp}
+                title="Withdraw Application"
+                message={confirmWithdrawApp ? `Withdraw "${formatEventTitle(confirmWithdrawApp.opportunityTitle, confirmWithdrawApp.shiftName)}"?` : ''}
+                confirmText="Withdraw"
+                loading={!!confirmWithdrawApp && actionId === confirmWithdrawApp.applicationId}
+                onCancel={() => setConfirmWithdrawApp(null)}
+                onConfirm={handleWithdrawConfirm}
+            />
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? (
+                <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
+                    <p className="text-stone-400 font-medium mb-5">No applications yet.</p>
+                    <button
+                        onClick={() => onNavigate?.('opportunities')}
+                        className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600"
+                    >
+                        Find Opportunities
+                    </button>
+                </div>
+            ) : (
                 <div className="space-y-4">
                     {apps.map(a => (
-                        <div key={a.applicationId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
                             <div className="flex-1 min-w-0">
-                                <p className="font-bold text-stone-800 truncate">{a.opportunityTitle}</p>
-                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftName} · {a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
+                                <p className="font-bold text-stone-800 truncate">{formatEventTitle(a.opportunityTitle, a.shiftName)}</p>
+                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
                                 <p className="text-xs text-stone-400 mt-1">Applied: {new Date(a.appliedAt).toLocaleDateString()}</p>
+                                {actionId === a.applicationId && (
+                                    <p className="text-xs text-orange-600 font-semibold mt-2">Processing your request...</p>
+                                )}
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
@@ -483,7 +817,7 @@ export function VolApplications() {
                                     </button>
                                 )}
                                 {canWithdraw(a.status) && (
-                                    <button onClick={() => handleWithdraw(a)} disabled={actionId === a.applicationId}
+                                    <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
                                         className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
                                         {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
                                     </button>
@@ -525,6 +859,7 @@ export function VolAttendance() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -534,9 +869,11 @@ export function VolAttendance() {
         if (!disputeId || !disputeReason.trim()) return;
         setSubmitting(true);
         try {
+            const targetId = disputeId;
             await attendanceService.dispute(disputeId, { reason: disputeReason, evidenceUrl: disputeEvidence });
-            setDisputeId(null); showToast('Dispute submitted for review ✅'); load();
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to submit dispute'); }
+            setRecords(prev => prev.map(r => r.attendanceId === targetId ? { ...r, status: AttendanceStatus.Disputed } : r));
+            setDisputeId(null); showToast('Dispute submitted for review ✅'); refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed to submit dispute')); }
         finally { setSubmitting(false); }
     };
 
@@ -579,15 +916,20 @@ export function VolAttendance() {
                                 </button>
                             )}
                             {r.status === 'Pending' && (
-                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} shiftStartTime={r.shiftStartTime} onDone={() => { showToast('Checked in ✅'); load(); }} />
+                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} shiftStartTime={r.shiftStartTime} onDone={() => {
+                                    setRecords(prev => prev.map(x => x.attendanceId === r.attendanceId ? { ...x, status: AttendanceStatus.CheckedIn } : x));
+                                    showToast('Checked in ✅');
+                                    refreshSoon();
+                                }} />
                             )}
                             {r.status === 'CheckedIn' && (
                                 <button onClick={async () => {
                                     try {
                                         await attendanceService.checkOut(r.attendanceId);
+                                        setRecords(prev => prev.map(x => x.attendanceId === r.attendanceId ? { ...x, status: AttendanceStatus.CheckedOut } : x));
                                         showToast('Checked out successfully 🔚');
-                                        load();
-                                    } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to check out'); }
+                                        refreshSoon();
+                                    } catch (err: any) { showToast(getErr(err, 'Failed to check out')); }
                                 }} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 mt-2">
                                     🔚 Check Out
                                 </button>
@@ -654,7 +996,7 @@ export function VolCertificates() {
             const result = await certificateService.generate(auth.linkedGrainId, selTemplate);
             setShowGenerate(false);
             showToast(`Certificate ready: ${result.fileName}`);
-            window.open(result.downloadUrl, '_blank');
+            await certificateService.openGeneratedFile(result.fileKey, result.fileName);
         } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to generate certificate'); }
         finally { setGenerating(false); }
     };
@@ -1027,8 +1369,14 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                 opportunityService.getById(oppId),
                 auth.linkedGrainId ? applicationService.getForVolunteer(auth.linkedGrainId) : Promise.resolve([]),
             ]);
+            const serverApps = (appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId);
             setOpp(oppData);
-            setMyApps((appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId));
+            // Keep optimistic temp applications until projection/read model catches up.
+            setMyApps(prev => {
+                const serverShiftIds = new Set(serverApps.map(a => a.shiftId));
+                const optimisticOnly = prev.filter(a => a.applicationId.startsWith('temp-') && !serverShiftIds.has(a.shiftId));
+                return [...serverApps, ...optimisticOnly];
+            });
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunity'));
         } finally { setLoading(false); }
@@ -1039,23 +1387,54 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const handleApply = async (shift: Shift) => {
-        if (!auth.linkedGrainId) return;
+        const volunteerId = auth.linkedGrainId;
+        if (!volunteerId) return;
+        if (appliedShiftIds.has(shift.shiftId)) {
+            showToast('You already applied to this shift.');
+            return;
+        }
         setApplying(shift.shiftId);
         try {
             // Deterministic key: same volunteer + shift always produces the same key
             // This lets the backend reject true duplicates even across separate clicks
-            const key = `${auth.linkedGrainId}-${shift.shiftId}`;
+            const key = `${volunteerId}-${shift.shiftId}`;
             await opportunityService.apply(oppId, {
-                volunteerId: auth.linkedGrainId,
+                volunteerId,
                 shiftId: shift.shiftId,
                 idempotencyKey: key,
             });
             showToast(`Applied to "${shift.name}" ✅`);
-            // Immediately mark shift as applied so button is disabled before load() completes
-            setMyApps(prev => [...prev, { shiftId: shift.shiftId, opportunityId: oppId, status: 'Pending' } as ApplicationSummary]);
-            load();
+            // Optimistic UI: immediately mark applied and bump displayed count.
+            setMyApps(prev => {
+                if (prev.some(a => a.shiftId === shift.shiftId)) return prev;
+                const optimistic: ApplicationSummary = {
+                    applicationId: `temp-${shift.shiftId}`,
+                    opportunityId: oppId,
+                    shiftId: shift.shiftId,
+                    opportunityTitle: opp?.info.title ?? '',
+                    shiftName: shift.name,
+                    shiftStartTime: shift.startTime,
+                    shiftEndTime: shift.endTime,
+                    volunteerId,
+                    volunteerName: 'You',
+                    status: ApplicationStatus.Pending,
+                    appliedAt: new Date().toISOString(),
+                };
+                return [...prev, optimistic];
+            });
+            setOpp(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    shifts: prev.shifts.map(s => s.shiftId === shift.shiftId
+                        ? { ...s, currentCount: Math.min(s.maxCapacity, s.currentCount + 1) }
+                        : s),
+                };
+            });
+            // Allow read-model projector a moment, then refresh from server.
+            setTimeout(() => { void load(); }, 900);
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to apply');
+            showToast(getErr(err, 'Failed to apply'));
         } finally { setApplying(null); }
     };
 
