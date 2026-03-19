@@ -153,18 +153,18 @@ node tools/seed-debug-data.mjs \
   --checkin-ready-rate 0.9
 ```
 
-30/30-day window example (past 30 days + next 30 days):
+10/20-day window example (past 10 days + next 20 days):
 
 ```bash
 node tools/seed-debug-data.mjs \
   --base-url http://10.20.30.2:8080 \
   --long-running true \
-  --history-days 30 \
-  --future-days 30 \
+  --history-days 10 \
+  --future-days 20 \
   --past-opportunity-rate 0.45 \
   --ongoing-opportunity-rate 0.1 \
-  --coordinators 5 \
-  --volunteers 80 \
+  --coordinators 2 \
+  --volunteers 2 \
   --opportunities-per-org 10 \
   --shifts-per-opportunity 3 \
   --applications-per-opportunity 9 \
@@ -178,6 +178,7 @@ node tools/seed-debug-data.mjs \
 Notes:
 - Uses the default admin account: `admin@vsms.com / Admin@123` (override with `--admin-email` and `--admin-password`).
 - `--long-running true` spreads opportunities/shifts across past/ongoing/future timeline and uses realistic names for people, organizations, and events.
+- `--checkin-ready-rate` biases generated shifts/applications toward records that can be checked in immediately (and attendance flow will auto-promote pending ready applications when needed).
 - `--incremental true` will reuse accounts from `data/debug-seed/latest.json` (same base URL) and only top up to requested coordinator/volunteer counts.
 - Generated account credentials and IDs are saved to:
   - `data/debug-seed/latest.json`

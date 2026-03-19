@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink } from 'lucide-react';
-import type { ViewName, OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState } from '../../types';
+import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink, Server, Gauge, ShieldCheck } from 'lucide-react';
+import type { ViewName, OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState, SystemInfoSummary } from '../../types';
 import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { adminService } from '../../services/admin';
@@ -189,6 +189,306 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                     )}
                 </div>
             </div>
+
+        </div>
+    );
+}
+
+export function AdminSystemInfo() {
+    const [data, setData] = useState<SystemInfoSummary | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const res = await adminService.getSystemInfo();
+            setData(res);
+        } catch (err: any) {
+            setError(getErr(err, 'Failed to load system info'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    if (loading) return <Spinner />;
+    if (error) return <ErrorBox msg={error} onRetry={load} />;
+    if (!data) return <Empty msg="No system runtime data available." />;
+
+    const aliveCount = data.silos.filter(s => s.isAlive).length;
+    const staleHeartbeatCount = data.silos.filter(s => {
+        if (!s.lastHeartbeatUtc) return true;
+        return (Date.now() - new Date(s.lastHeartbeatUtc).getTime()) > 120_000;
+    }).length;
+
+    const statusClass = (status: string) => {
+        if (status.toLowerCase() === 'active') return 'bg-emerald-100 text-emerald-700';
+        if (status.toLowerCase().includes('dead')) return 'bg-rose-100 text-rose-700';
+        return 'bg-amber-100 text-amber-700';
+    };
+
+    const formatTimestamp = (value?: string | null) => {
+        if (!value) return 'N/A';
+        return new Date(value).toLocaleString(undefined, {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    };
+
+    const formatUptime = (minutes?: number | null) => {
+        if (minutes === null || minutes === undefined) return 'N/A';
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}m`;
+    };
+
+    const formatPercent = (value?: number | null) => {
+        if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+        const normalized = value <= 1.5 ? value * 100 : value;
+        return `${normalized.toFixed(1)}%`;
+    };
+
+    const formatBytes = (value?: number | null) => {
+        if (value === null || value === undefined || value < 0) return 'N/A';
+        if (value < 1024) return `${value} B`;
+        const units = ['KB', 'MB', 'GB', 'TB'];
+        let size = value;
+        let unitIdx = -1;
+        while (size >= 1024 && unitIdx < units.length - 1) {
+            size /= 1024;
+            unitIdx += 1;
+        }
+        return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[Math.max(unitIdx, 0)]}`;
+    };
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-stone-800">System Info</h1>
+                    <p className="text-stone-500 mt-2 text-lg">Silo health, load skew, and grain runtime distribution.</p>
+                </div>
+                <button onClick={load} className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 font-bold text-sm hover:bg-stone-200 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" /> Refresh
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <p className="text-xs font-bold uppercase tracking-wide text-stone-400 mb-2">Silos</p>
+                    <p className="text-3xl font-extrabold text-stone-800">{data.totalSilos}</p>
+                    <p className="text-xs text-stone-500 mt-1">Alive: {aliveCount}</p>
+                </div>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <p className="text-xs font-bold uppercase tracking-wide text-stone-400 mb-2">Total Activations</p>
+                    <p className="text-3xl font-extrabold text-stone-800">{data.totalActivations}</p>
+                    <p className="text-xs text-stone-500 mt-1">Updated: {formatTimestamp(data.generatedAtUtc)}</p>
+                </div>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <p className="text-xs font-bold uppercase tracking-wide text-stone-400 mb-2">Skew Ratio</p>
+                    <p className="text-3xl font-extrabold text-stone-800">{data.skew.skewRatio?.toFixed(2) ?? 'N/A'}</p>
+                    <p className="text-xs text-stone-500 mt-1">StdDev: {data.skew.stdDevActivations.toFixed(2)}</p>
+                </div>
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <p className="text-xs font-bold uppercase tracking-wide text-stone-400 mb-2">Heartbeat Alerts</p>
+                    <p className="text-3xl font-extrabold text-stone-800">{staleHeartbeatCount}</p>
+                    <p className="text-xs text-stone-500 mt-1">Stale or unavailable</p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                <div className="flex items-center gap-2 mb-5">
+                    <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                    <h2 className="text-xl font-bold text-stone-800">Silo Health</h2>
+                </div>
+                <div className="space-y-3">
+                    {data.silos.map(s => (
+                        <div key={s.silo} className="grid grid-cols-1 lg:grid-cols-6 gap-3 items-center rounded-2xl border border-stone-100 p-4">
+                            <div className="lg:col-span-2">
+                                <p className="font-semibold text-stone-800 truncate" title={s.silo}>{s.silo}</p>
+                                <p className="text-xs text-stone-400 truncate" title={s.hostName || ''}>{s.hostName || 'Host N/A'}</p>
+                            </div>
+                            <div>
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${statusClass(s.status)}`}>{s.status}</span>
+                            </div>
+                            <div>
+                                <p className="text-xs text-stone-400">Last Heartbeat</p>
+                                <p className="text-sm font-medium text-stone-700">{formatTimestamp(s.lastHeartbeatUtc)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-stone-400">Uptime</p>
+                                <p className="text-sm font-medium text-stone-700">{formatUptime(s.uptimeMinutes)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-stone-400">Version</p>
+                                <p className="text-sm font-medium text-stone-700">{s.version || 'N/A'}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                <div className="flex items-center gap-2 mb-5">
+                    <Server className="w-5 h-5 text-blue-500" />
+                    <h2 className="text-xl font-bold text-stone-800">Silo Runtime Resources</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
+                    <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4">
+                        <p className="text-xs text-stone-500 uppercase tracking-wide font-semibold">Sampled Silos</p>
+                        <p className="text-2xl font-bold text-stone-800">{data.runtimeOverview.sampledSilos}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4">
+                        <p className="text-xs text-stone-500 uppercase tracking-wide font-semibold">Avg CPU</p>
+                        <p className="text-2xl font-bold text-stone-800">{formatPercent(data.runtimeOverview.avgCpuUsage)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4">
+                        <p className="text-xs text-stone-500 uppercase tracking-wide font-semibold">Avg Memory</p>
+                        <p className="text-2xl font-bold text-stone-800">{formatPercent(data.runtimeOverview.avgMemoryUsageRatio)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 border border-stone-100 p-4">
+                        <p className="text-xs text-stone-500 uppercase tracking-wide font-semibold">Overloaded</p>
+                        <p className="text-2xl font-bold text-stone-800">{data.runtimeOverview.overloadedSilos}</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {data.silos.map(s => (
+                        <div key={`${s.silo}-runtime`} className="rounded-2xl border border-stone-100 p-4">
+                            <div className="flex items-center justify-between gap-3 mb-3">
+                                <p className="font-semibold text-stone-800 truncate" title={s.silo}>{s.silo}</p>
+                                {s.runtime?.isOverloaded && (
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700">Overloaded</span>
+                                )}
+                            </div>
+                            {!s.runtime ? (
+                                <p className="text-sm text-stone-400">Runtime statistics unavailable for this silo.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">CPU</p>
+                                        <p className="font-semibold text-stone-800">{formatPercent(s.runtime.cpuUsage)}</p>
+                                    </div>
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">Memory Usage</p>
+                                        <p className="font-semibold text-stone-800">{formatPercent(s.runtime.memoryUsageRatio)}</p>
+                                        <p className="text-xs text-stone-500 mt-1">{formatBytes(s.runtime.memoryUsageBytes)} / {formatBytes(s.runtime.totalPhysicalMemoryBytes)}</p>
+                                    </div>
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">Available Memory</p>
+                                        <p className="font-semibold text-stone-800">{formatBytes(s.runtime.availableMemoryBytes)}</p>
+                                    </div>
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">Clients</p>
+                                        <p className="font-semibold text-stone-800">{s.runtime.clientCount}</p>
+                                    </div>
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">Messages</p>
+                                        <p className="font-semibold text-stone-800">In {s.runtime.receivedMessages} · Out {s.runtime.sentMessages}</p>
+                                    </div>
+                                    <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+                                        <p className="text-xs text-stone-500 mb-1">Runtime Sample</p>
+                                        <p className="font-semibold text-stone-800">{formatTimestamp(s.runtime.runtimeCollectedAtUtc)}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center gap-2 mb-5">
+                        <Gauge className="w-5 h-5 text-orange-500" />
+                        <h2 className="text-xl font-bold text-stone-800">Load Skew</h2>
+                    </div>
+                    <div className="space-y-3 text-sm">
+                        <div className="flex justify-between"><span className="text-stone-500">Most Busy</span><span className="font-semibold text-stone-800">{data.skew.mostBusySilo || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">Least Busy</span><span className="font-semibold text-stone-800">{data.skew.leastBusySilo || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">Max Activations</span><span className="font-semibold text-stone-800">{data.skew.maxActivations}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">Min Activations</span><span className="font-semibold text-stone-800">{data.skew.minActivations}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">Average</span><span className="font-semibold text-stone-800">{data.skew.avgActivations.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">StdDev</span><span className="font-semibold text-stone-800">{data.skew.stdDevActivations.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className="text-stone-500">Skew Ratio</span><span className="font-semibold text-stone-800">{data.skew.skewRatio?.toFixed(2) ?? 'N/A'}</span></div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                    <div className="flex items-center gap-2 mb-5">
+                        <Server className="w-5 h-5 text-blue-500" />
+                        <h2 className="text-xl font-bold text-stone-800">System vs Business Grains</h2>
+                    </div>
+                    <div className="mb-4">
+                        <div className="flex justify-between text-sm mb-1">
+                            <span className="text-stone-500">Overall System</span>
+                            <span className="font-semibold text-stone-700">{Math.round(data.overallSystemRatio * 100)}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+                            <div className="h-full bg-blue-500" style={{ width: `${Math.round(data.overallSystemRatio * 100)}%` }} />
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        {data.silos.map(s => (
+                            <div key={`${s.silo}-ratio`}>
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-stone-500 truncate max-w-[70%]" title={s.silo}>{s.silo}</span>
+                                    <span className="font-semibold text-stone-700">{Math.round(s.systemRatio * 100)}% / {Math.round(s.businessRatio * 100)}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden flex">
+                                    <div className="h-full bg-blue-500" style={{ width: `${Math.round(s.systemRatio * 100)}%` }} />
+                                    <div className="h-full bg-orange-400" style={{ width: `${Math.round(s.businessRatio * 100)}%` }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                <h2 className="text-xl font-bold text-stone-800 mb-5">Orleans Grain Distribution</h2>
+                <div className="space-y-5">
+                    {data.silos.map(silo => {
+                        const visible = silo.grainTypes.slice(0, 8);
+                        const top = Math.max(1, visible[0]?.activations || 1);
+                        return (
+                            <div key={silo.silo} className="rounded-2xl border border-stone-100 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="font-semibold text-stone-700 truncate" title={silo.silo}>{silo.silo}</p>
+                                    <span className="text-xs text-stone-500">{silo.totalActivations} activations</span>
+                                </div>
+                                {visible.length === 0 ? (
+                                    <p className="text-sm text-stone-400">No active grains in this silo.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {visible.map((g, idx) => (
+                                            <div key={`${silo.silo}-${g.grainType}-${idx}`} className="grid grid-cols-12 items-center gap-3 text-sm">
+                                                <div className="col-span-8 text-stone-700 font-medium truncate" title={g.grainType}>{g.grainType}</div>
+                                                <div className="col-span-4">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-xs text-stone-500">Activations</span>
+                                                        <span className="text-xs font-bold text-stone-700">{g.activations}</span>
+                                                    </div>
+                                                    <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                                                        <div className="h-full bg-orange-400" style={{ width: `${Math.max(8, Math.min(100, Math.round((g.activations / top) * 100)))}%` }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {silo.grainTypes.length > visible.length && (
+                                    <p className="text-xs text-stone-400 mt-2">+ {silo.grainTypes.length - visible.length} more grain types</p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 }
@@ -321,14 +621,26 @@ export function AdminOrgs() {
         Promise.allSettled(orgs.map(o => organizationService.getById(o.orgId))).then(results => {
             const membersMap: Record<string, OrgState['members']> = {};
             const proofMap: Record<string, string | undefined> = {};
+            const statusMap: Record<string, string> = {};
             results.forEach((r, i) => {
                 if (r.status === 'fulfilled') {
                     membersMap[orgs[i].orgId] = r.value.members || [];
                     proofMap[orgs[i].orgId] = r.value.proofUrl;
+                    statusMap[orgs[i].orgId] = r.value.status;
                 }
             });
             setOrgMembersMap(membersMap);
             setOrgProofUrlMap(proofMap);
+            setOrgs(prev => {
+                let changed = false;
+                const next = prev.map(org => {
+                    const actualStatus = statusMap[org.orgId];
+                    if (!actualStatus || actualStatus === org.status) return org;
+                    changed = true;
+                    return { ...org, status: actualStatus };
+                });
+                return changed ? next : prev;
+            });
         });
     }, [orgs]);
 

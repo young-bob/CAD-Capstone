@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
 import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
-import { OrgRole } from '../../types';
+import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
 import { opportunityService } from '../../services/opportunities';
@@ -104,6 +104,7 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const handleCreateOrg = async () => {
         if (!orgName || !auth.userId) return;
@@ -135,7 +136,7 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
         setSaving(true);
         try {
             await organizationService.updateInfo(auth.linkedGrainId, { name: editName, description: editDesc });
-            setShowEdit(false); showToast('Organization updated!'); load();
+            setShowEdit(false); showToast('Organization updated!'); refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
         finally { setSaving(false); }
     };
@@ -527,6 +528,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const handleCreate = async () => {
         if (!auth.linkedGrainId || !createForm.title) { setError('Title is required.'); return; }
@@ -563,7 +565,8 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         setPublishingId(id);
         try {
             await opportunityService.publish(id);
-            load();
+            setOpps(prev => prev.map(o => o.opportunityId === id ? { ...o, status: OpportunityStatus.Published } : o));
+            refreshSoon();
         } catch (err: any) {
             setError(getErr(err, 'Failed to publish'));
         } finally { setPublishingId(null); }
@@ -685,7 +688,20 @@ export function CoordApplications() {
         setLoading(true); setError('');
         try {
             const data = await organizationService.getApplications(auth.linkedGrainId);
-            setApps(data || []);
+            const incoming = data || [];
+            setApps(prev => {
+                const prevMap = new Map(prev.map(a => [a.applicationId, a]));
+                return incoming.map(a => {
+                    const before = prevMap.get(a.applicationId);
+                    if (!before) return a;
+                    // Keep optimistic terminal status if projection temporarily still shows Pending.
+                    if ((before.status === ApplicationStatus.Approved || before.status === ApplicationStatus.Rejected)
+                        && a.status === ApplicationStatus.Pending) {
+                        return { ...a, status: before.status };
+                    }
+                    return a;
+                });
+            });
         } catch (err: any) {
             setError(getErr(err, 'Failed to load applications'));
         } finally { setLoading(false); }
@@ -700,9 +716,9 @@ export function CoordApplications() {
         try {
             await applicationService.approve(id);
             // Optimistic update: immediately show new status
-            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: 'Approved' as any } : a));
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: ApplicationStatus.Approved } : a));
             showToast('Application approved ✅');
-            load();
+            setTimeout(() => { void load(); }, 900);
         } catch (err: any) {
             showToast(getErr(err, 'Failed to approve'));
         } finally { setActionId(null); }
@@ -713,9 +729,9 @@ export function CoordApplications() {
         try {
             await applicationService.reject(id, 'Application rejected.');
             // Optimistic update
-            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: 'Rejected' as any } : a));
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: ApplicationStatus.Rejected } : a));
             showToast('Application rejected');
-            load();
+            setTimeout(() => { void load(); }, 900);
         } catch (err: any) {
             showToast(getErr(err, 'Failed to reject'));
         } finally { setActionId(null); }
@@ -792,6 +808,7 @@ export function CoordMembers() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -804,7 +821,7 @@ export function CoordMembers() {
             setShowInvite(false);
             setInviteEmail('');
             showToast('Member invited!');
-            load();
+            refreshSoon();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to invite member'));
         } finally { setInviting(false); }
@@ -814,8 +831,14 @@ export function CoordMembers() {
         if (!auth.linkedGrainId) return;
         try {
             await organizationService.blockVolunteer(auth.linkedGrainId, userId);
+            setOrg(prev => prev ? {
+                ...prev,
+                blockedVolunteerIds: prev.blockedVolunteerIds.includes(userId)
+                    ? prev.blockedVolunteerIds
+                    : [...prev.blockedVolunteerIds, userId],
+            } : prev);
             showToast('Volunteer blocked');
-            load();
+            refreshSoon();
         } catch { showToast('Failed to block volunteer'); }
     };
 
@@ -823,8 +846,12 @@ export function CoordMembers() {
         if (!auth.linkedGrainId) return;
         try {
             await organizationService.unblockVolunteer(auth.linkedGrainId, userId);
+            setOrg(prev => prev ? {
+                ...prev,
+                blockedVolunteerIds: prev.blockedVolunteerIds.filter(id => id !== userId),
+            } : prev);
             showToast('Volunteer unblocked');
-            load();
+            refreshSoon();
         } catch { showToast('Failed to unblock volunteer'); }
     };
 
@@ -973,6 +1000,7 @@ export function CoordCertTemplates() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const handleCreate = async () => {
         if (!createForm.name) return;
@@ -985,7 +1013,7 @@ export function CoordCertTemplates() {
             setShowCreate(false);
             setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C' });
             showToast('Template created!');
-            load();
+            refreshSoon();
         } catch (err: any) {
             setError(getErr(err, 'Failed to create template'));
         } finally { setCreating(false); }
@@ -1005,7 +1033,7 @@ export function CoordCertTemplates() {
             await certificateService.updateTemplate(editingTemplate.id, editForm);
             setEditingTemplate(null);
             showToast('Template updated!');
-            load();
+            refreshSoon();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to update template'));
         } finally { setSaving(false); }
@@ -1017,7 +1045,7 @@ export function CoordCertTemplates() {
             setDeleteConfirm(null);
             setEditingTemplate(null);
             showToast('Template deleted');
-            load();
+            refreshSoon();
         } catch (err: any) {
             showToast(getErr(err, 'Failed to delete template'));
         }
@@ -1176,7 +1204,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             });
             setShowEdit(false);
             showToast('Opportunity updated ✅');
-            load();
+            refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
         finally { setSaving(false); }
     };
@@ -1200,19 +1228,20 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     }, [oppId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const doPublish = async () => {
         setActionId('pub');
-        try { await opportunityService.publish(oppId); showToast('Published ✅'); load(); }
+        try { await opportunityService.publish(oppId); showToast('Published ✅'); refreshSoon(); }
         catch (err: any) { showToast(getErr(err, 'Failed to publish')); }
         finally { setActionId(null); }
     };
 
     const doCancelSubmit = async () => {
         if (!cancelReason) return; setCancelling(true);
-        try { await opportunityService.cancel(oppId, cancelReason); setShowCancel(false); showToast('Cancelled'); load(); }
+        try { await opportunityService.cancel(oppId, cancelReason); setShowCancel(false); showToast('Cancelled'); refreshSoon(); }
         catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setCancelling(false); }
     };
@@ -1222,7 +1251,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         try {
             await opportunityService.addShift(oppId, { name: shiftName, startTime: new Date(shiftStart).toISOString(), endTime: new Date(shiftEnd).toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
             setShowAddShift(false); setShiftName(''); setShiftStart(''); setShiftEnd(''); setShiftCap('10');
-            showToast('Shift added!'); load();
+            showToast('Shift added!'); refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed')); }
         finally { setAddingShift(false); }
     };
@@ -1234,7 +1263,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
     const doSaveSkills = async () => {
         setSavingSkills(true);
-        try { await skillService.setRequiredSkills(oppId, Array.from(selSkillIds)); setShowSkills(false); showToast('Skills updated'); load(); }
+        try { await skillService.setRequiredSkills(oppId, Array.from(selSkillIds)); setShowSkills(false); showToast('Skills updated'); refreshSoon(); }
         catch { showToast('Failed'); }
         finally { setSavingSkills(false); }
     };

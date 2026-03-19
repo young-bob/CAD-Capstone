@@ -1,6 +1,6 @@
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
-    Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus
+    Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus, Server
 } from 'lucide-react';
 import type { ViewName } from '../types';
 
@@ -55,6 +55,7 @@ export default function Sidebar({ userRole, currentView, sidebarOpen, onNavigate
                         <button onClick={() => onNavigate('admin_disputes')} className={btnClass('admin_disputes')}><AlertTriangle className="w-5 h-5" /> Disputes</button>
                         <button onClick={() => onNavigate('admin_users')} className={btnClass('admin_users')}><User className="w-5 h-5" /> User Control</button>
                         <button onClick={() => onNavigate('admin_skills')} className={btnClass('admin_skills')}><Star className="w-5 h-5" /> Skills</button>
+                        <button onClick={() => onNavigate('admin_system_info')} className={btnClass('admin_system_info')}><Server className="w-5 h-5" /> System Info</button>
                     </>
                 )}
             </div>

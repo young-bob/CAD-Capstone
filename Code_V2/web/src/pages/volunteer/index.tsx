@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
 import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
+import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
 import { opportunityService } from '../../services/opportunities';
@@ -701,6 +702,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (message: string, actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[]) => {
         setToast({ message, actions });
@@ -716,9 +718,13 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                 idempotencyKey: `undo-${app.applicationId}-${Date.now()}`
             });
             showToast('Withdrawal undone');
-            load();
+            setApps(prev => {
+                if (prev.some(a => a.shiftId === app.shiftId && a.opportunityId === app.opportunityId)) return prev;
+                return [{ ...app, status: ApplicationStatus.Pending, appliedAt: new Date().toISOString() }, ...prev];
+            });
+            refreshSoon();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to undo withdrawal');
+            showToast(getErr(err, 'Failed to undo withdrawal'));
         } finally { setActionId(null); }
     };
 
@@ -729,13 +735,14 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
         setActionId(app.applicationId);
         try {
             await opportunityService.withdrawApplication(app.opportunityId, app.applicationId);
+            setApps(prev => prev.filter(a => a.applicationId !== app.applicationId));
             showToast('Application withdrawn', [
                 { label: 'Undo', tone: 'default', onClick: () => handleUndoWithdraw(app) },
                 { label: 'Browse Events', tone: 'primary', onClick: () => onNavigate?.('opportunities') },
             ]);
-            load();
+            refreshSoon();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to withdraw');
+            showToast(getErr(err, 'Failed to withdraw'));
         } finally { setActionId(null); }
     };
 
@@ -743,12 +750,13 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
         setActionId(app.applicationId);
         try {
             await applicationService.accept(app.applicationId);
+            setApps(prev => prev.map(a => a.applicationId === app.applicationId ? { ...a, status: ApplicationStatus.Approved } : a));
             showToast('Invitation accepted! 🎉', [
                 { label: 'Go To Attendance', tone: 'primary', onClick: () => onNavigate?.('attendance') }
             ]);
-            load();
+            refreshSoon();
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to accept');
+            showToast(getErr(err, 'Failed to accept'));
         } finally { setActionId(null); }
     };
 
@@ -851,6 +859,7 @@ export function VolAttendance() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -860,9 +869,11 @@ export function VolAttendance() {
         if (!disputeId || !disputeReason.trim()) return;
         setSubmitting(true);
         try {
+            const targetId = disputeId;
             await attendanceService.dispute(disputeId, { reason: disputeReason, evidenceUrl: disputeEvidence });
-            setDisputeId(null); showToast('Dispute submitted for review ✅'); load();
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to submit dispute'); }
+            setRecords(prev => prev.map(r => r.attendanceId === targetId ? { ...r, status: AttendanceStatus.Disputed } : r));
+            setDisputeId(null); showToast('Dispute submitted for review ✅'); refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed to submit dispute')); }
         finally { setSubmitting(false); }
     };
 
@@ -905,15 +916,20 @@ export function VolAttendance() {
                                 </button>
                             )}
                             {r.status === 'Pending' && (
-                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} shiftStartTime={r.shiftStartTime} onDone={() => { showToast('Checked in ✅'); load(); }} />
+                                <GpsCheckInButton attendanceId={r.attendanceId} opportunityId={r.opportunityId} shiftStartTime={r.shiftStartTime} onDone={() => {
+                                    setRecords(prev => prev.map(x => x.attendanceId === r.attendanceId ? { ...x, status: AttendanceStatus.CheckedIn } : x));
+                                    showToast('Checked in ✅');
+                                    refreshSoon();
+                                }} />
                             )}
                             {r.status === 'CheckedIn' && (
                                 <button onClick={async () => {
                                     try {
                                         await attendanceService.checkOut(r.attendanceId);
+                                        setRecords(prev => prev.map(x => x.attendanceId === r.attendanceId ? { ...x, status: AttendanceStatus.CheckedOut } : x));
                                         showToast('Checked out successfully 🔚');
-                                        load();
-                                    } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to check out'); }
+                                        refreshSoon();
+                                    } catch (err: any) { showToast(getErr(err, 'Failed to check out')); }
                                 }} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 mt-2">
                                     🔚 Check Out
                                 </button>
@@ -1353,8 +1369,14 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                 opportunityService.getById(oppId),
                 auth.linkedGrainId ? applicationService.getForVolunteer(auth.linkedGrainId) : Promise.resolve([]),
             ]);
+            const serverApps = (appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId);
             setOpp(oppData);
-            setMyApps((appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId));
+            // Keep optimistic temp applications until projection/read model catches up.
+            setMyApps(prev => {
+                const serverShiftIds = new Set(serverApps.map(a => a.shiftId));
+                const optimisticOnly = prev.filter(a => a.applicationId.startsWith('temp-') && !serverShiftIds.has(a.shiftId));
+                return [...serverApps, ...optimisticOnly];
+            });
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunity'));
         } finally { setLoading(false); }
@@ -1365,23 +1387,54 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const handleApply = async (shift: Shift) => {
-        if (!auth.linkedGrainId) return;
+        const volunteerId = auth.linkedGrainId;
+        if (!volunteerId) return;
+        if (appliedShiftIds.has(shift.shiftId)) {
+            showToast('You already applied to this shift.');
+            return;
+        }
         setApplying(shift.shiftId);
         try {
             // Deterministic key: same volunteer + shift always produces the same key
             // This lets the backend reject true duplicates even across separate clicks
-            const key = `${auth.linkedGrainId}-${shift.shiftId}`;
+            const key = `${volunteerId}-${shift.shiftId}`;
             await opportunityService.apply(oppId, {
-                volunteerId: auth.linkedGrainId,
+                volunteerId,
                 shiftId: shift.shiftId,
                 idempotencyKey: key,
             });
             showToast(`Applied to "${shift.name}" ✅`);
-            // Immediately mark shift as applied so button is disabled before load() completes
-            setMyApps(prev => [...prev, { shiftId: shift.shiftId, opportunityId: oppId, status: 'Pending' } as ApplicationSummary]);
-            load();
+            // Optimistic UI: immediately mark applied and bump displayed count.
+            setMyApps(prev => {
+                if (prev.some(a => a.shiftId === shift.shiftId)) return prev;
+                const optimistic: ApplicationSummary = {
+                    applicationId: `temp-${shift.shiftId}`,
+                    opportunityId: oppId,
+                    shiftId: shift.shiftId,
+                    opportunityTitle: opp?.info.title ?? '',
+                    shiftName: shift.name,
+                    shiftStartTime: shift.startTime,
+                    shiftEndTime: shift.endTime,
+                    volunteerId,
+                    volunteerName: 'You',
+                    status: ApplicationStatus.Pending,
+                    appliedAt: new Date().toISOString(),
+                };
+                return [...prev, optimistic];
+            });
+            setOpp(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    shifts: prev.shifts.map(s => s.shiftId === shift.shiftId
+                        ? { ...s, currentCount: Math.min(s.maxCapacity, s.currentCount + 1) }
+                        : s),
+                };
+            });
+            // Allow read-model projector a moment, then refresh from server.
+            setTimeout(() => { void load(); }, 900);
         } catch (err: any) {
-            showToast(err.response?.data?.toString() || 'Failed to apply');
+            showToast(getErr(err, 'Failed to apply'));
         } finally { setApplying(null); }
     };
 

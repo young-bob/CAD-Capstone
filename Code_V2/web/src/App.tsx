@@ -34,7 +34,7 @@ import RegisterPage from './pages/RegisterPage';
 
 import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail } from './pages/volunteer';
 import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail } from './pages/coordinator';
-import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills } from './pages/admin';
+import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills, AdminSystemInfo } from './pages/admin';
 
 function AppInner() {
     const auth = useAuth();
@@ -110,6 +110,7 @@ function AppInner() {
                 case 'admin_disputes': return <AdminDisputes />;
                 case 'admin_users': return <AdminUsers />;
                 case 'admin_skills': return <AdminSkills />;
+                case 'admin_system_info': return <AdminSystemInfo />;
                 default: return <AdminDashboard onNavigate={navigateTo} />;
             }
         }

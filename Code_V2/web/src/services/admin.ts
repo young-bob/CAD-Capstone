@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrganizationSummary, UserRecord } from '../types';
+import type { OrganizationSummary, UserRecord, GrainDistributionSummary, SystemInfoSummary } from '../types';
 
 export const adminService = {
     approveOrg: async (orgId: string): Promise<void> => {
@@ -46,5 +46,13 @@ export const adminService = {
     },
     removeCoordinatorFromOrg: async (orgId: string, coordinatorUserId: string): Promise<void> => {
         await api.post(`/api/admin/organizations/${orgId}/remove-coordinator`, { coordinatorUserId });
+    },
+    getGrainDistribution: async (): Promise<GrainDistributionSummary> => {
+        const res = await api.get<GrainDistributionSummary>('/api/admin/runtime/grain-distribution');
+        return res.data;
+    },
+    getSystemInfo: async (): Promise<SystemInfoSummary> => {
+        const res = await api.get<SystemInfoSummary>('/api/admin/runtime/system-info');
+        return res.data;
     },
 };

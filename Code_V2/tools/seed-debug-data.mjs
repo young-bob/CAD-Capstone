@@ -99,6 +99,17 @@ function toIso(date) {
   return new Date(date).toISOString();
 }
 
+function parseIsoMs(value) {
+  const n = Date.parse(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function isCheckinReadyByShiftStart(startTimeIso, nowMs = Date.now()) {
+  const startMs = parseIsoMs(startTimeIso);
+  if (startMs === null) return false;
+  return nowMs >= (startMs - 30 * 60 * 1000);
+}
+
 function randHex(size = 6) {
   return crypto.randomBytes(size).toString("hex");
 }
@@ -194,7 +205,7 @@ const cfg = {
   disputeRate: clamp(asFloat(argMap["dispute-rate"], defaults.disputeRate), 0, 1),
   checkinReadyRate: clamp(asFloat(argMap["checkin-ready-rate"], defaults.checkinReadyRate), 0, 1),
   longRunning: asBool(argMap["long-running"], defaults.longRunning),
-  historyDays: Math.max(30, asInt(argMap["history-days"], defaults.historyDays)),
+  historyDays: Math.max(1, asInt(argMap["history-days"], defaults.historyDays)),
   futureDays: Math.max(1, asInt(argMap["future-days"], defaults.futureDays)),
   pastOpportunityRate: clamp(asFloat(argMap["past-opportunity-rate"], defaults.pastOpportunityRate), 0, 1),
   ongoingOpportunityRate: clamp(asFloat(argMap["ongoing-opportunity-rate"], defaults.ongoingOpportunityRate), 0, 1),
@@ -740,11 +751,17 @@ async function createOrganizations(admin) {
     counters.organizations += 1;
 
     try {
-      await api("POST", `/api/admin/organizations/${orgId}/approve`, {
+      const approveRes = await api("POST", `/api/admin/organizations/${orgId}/approve`, {
         token: admin.token,
         expected: [204, 400],
       });
-      counters.approvedOrganizations += 1;
+      if (approveRes.status === 204) {
+        counters.approvedOrganizations += 1;
+      } else {
+        const detail = get(approveRes.data, "detail", "Detail", "error", "Error", "message", "Message")
+          || (typeof approveRes.data === "string" ? approveRes.data : "Approve returned non-204");
+        warn(`Approve org ${orgId} returned ${approveRes.status}: ${detail}`);
+      }
     } catch (err) {
       if (!usedExisting) {
         warn(`Failed approving org ${orgId}: ${err.message}`);
@@ -784,11 +801,17 @@ function buildShiftWindow(opportunityIndex, shiftIndex, phase) {
     date.setUTCHours(hour, randInt(0, 1) * 30, 0, 0);
     baseStartMs = date.getTime();
   } else {
-    const dayOffset = randInt(1, cfg.futureDays);
-    const hour = randInt(8, 18);
-    const date = new Date(now + dayOffset * 24 * 60 * 60 * 1000);
-    date.setUTCHours(hour, randInt(0, 1) * 30, 0, 0);
-    baseStartMs = date.getTime();
+    const makeReadySoon = shiftIndex === 0 && Math.random() < cfg.checkinReadyRate;
+    if (makeReadySoon) {
+      // Keep some future opportunities close to "now" so web check-in flows are testable.
+      baseStartMs = now + randInt(5, 25) * 60 * 1000;
+    } else {
+      const dayOffset = randInt(1, cfg.futureDays);
+      const hour = randInt(8, 18);
+      const date = new Date(now + dayOffset * 24 * 60 * 60 * 1000);
+      date.setUTCHours(hour, randInt(0, 1) * 30, 0, 0);
+      baseStartMs = date.getTime();
+    }
   }
 
   const startMs =
@@ -855,6 +878,7 @@ async function createOpportunities() {
           shiftId: get(x, "shiftId", "ShiftId"),
           name: get(x, "name", "Name"),
           startTime: get(x, "startTime", "StartTime"),
+          endTime: get(x, "endTime", "EndTime"),
         }))
         .filter((x) => x.shiftId);
 
@@ -901,8 +925,19 @@ async function createApplications() {
       Math.min(cfg.applicationsPerOpportunity, memory.volunteers.length),
     );
     for (const volunteer of applicants) {
-      const preferred = opp.phase === "ongoing" ? opp.shifts[0] : null;
-      const shift = preferred && Math.random() < cfg.checkinReadyRate ? preferred : choose(opp.shifts);
+      const readyShifts = opp.shifts.filter((s) => isCheckinReadyByShiftStart(s.startTime));
+      const preferredReady = opp.phase === "ongoing" && opp.shifts[0] && isCheckinReadyByShiftStart(opp.shifts[0].startTime)
+        ? opp.shifts[0]
+        : null;
+      const shouldPreferReady = Math.random() < cfg.checkinReadyRate;
+      let shift;
+      if (shouldPreferReady && preferredReady) {
+        shift = preferredReady;
+      } else if (shouldPreferReady && readyShifts.length > 0) {
+        shift = choose(readyShifts);
+      } else {
+        shift = choose(opp.shifts);
+      }
       const key = `seed-${runId}-${opp.opportunityId}-${volunteer.linkedGrainId}-${shift.shiftId}`;
       try {
         const res = await api("POST", `/api/opportunities/${opp.opportunityId}/apply`, {
@@ -918,12 +953,16 @@ async function createApplications() {
         memory.applications.push({
           applicationId,
           opportunityId: opp.opportunityId,
+          shiftId: shift.shiftId,
+          shiftName: shift.name,
+          shiftStartTime: shift.startTime,
           volunteerEmail: volunteer.email,
           volunteerUserId: volunteer.userId,
           volunteerGrainId: volunteer.linkedGrainId,
           volunteerToken: volunteer.token,
           opportunityPhase: opp.phase,
           coordinatorToken: opp.coordinatorToken,
+          status: "Pending",
         });
         counters.applications += 1;
       } catch (err) {
@@ -943,6 +982,7 @@ async function processApplications() {
           token: app.coordinatorToken,
           expected: [204],
         });
+        app.status = "Approved";
         counters.approvedApplications += 1;
         memory.approvedApps.push(app);
       } catch (err) {
@@ -958,6 +998,7 @@ async function processApplications() {
           body: { reason: "Seeded rejection for workflow testing." },
           expected: [204],
         });
+        app.status = "Rejected";
         counters.rejectedApplications += 1;
       } catch (err) {
         warn(`Reject failed for app ${app.applicationId}: ${err.message}`);
@@ -968,16 +1009,44 @@ async function processApplications() {
 
 async function runAttendanceFlows(admin) {
   if (cfg.attendanceFlows <= 0 || memory.approvedApps.length === 0) return;
+  const initialReadyApproved = memory.approvedApps.filter((a) => isCheckinReadyByShiftStart(a.shiftStartTime)).length;
   const target = Math.min(cfg.attendanceFlows, memory.approvedApps.length);
-  info(`Running attendance/dispute flows with success target=${target} from approved applications=${memory.approvedApps.length}...`);
+  info(`Running attendance/dispute flows with success target=${target} from approved applications=${memory.approvedApps.length} (ready now=${initialReadyApproved})...`);
+
+  if (initialReadyApproved < target) {
+    const pendingReady = memory.applications.filter((a) =>
+      a.status === "Pending" && isCheckinReadyByShiftStart(a.shiftStartTime));
+    for (const app of pendingReady) {
+      if (memory.approvedApps.length >= cfg.attendanceFlows) break;
+      try {
+        await api("POST", `/api/applications/${app.applicationId}/approve`, {
+          token: app.coordinatorToken,
+          expected: [204],
+        });
+        app.status = "Approved";
+        memory.approvedApps.push(app);
+        counters.approvedApplications += 1;
+      } catch (err) {
+        warn(`Auto-approve for attendance flow failed (app=${app.applicationId}): ${err.message}`);
+      }
+    }
+  }
+
   const prioritized = [...memory.approvedApps].sort((a, b) => {
+    const ar = isCheckinReadyByShiftStart(a.shiftStartTime) ? 0 : 1;
+    const br = isCheckinReadyByShiftStart(b.shiftStartTime) ? 0 : 1;
+    if (ar !== br) return ar - br;
     const aw = a.opportunityPhase === "ongoing" ? 0 : 1;
     const bw = b.opportunityPhase === "ongoing" ? 0 : 1;
-    return aw - bw;
+    if (aw !== bw) return aw - bw;
+    const at = parseIsoMs(a.shiftStartTime) ?? Number.MAX_SAFE_INTEGER;
+    const bt = parseIsoMs(b.shiftStartTime) ?? Number.MAX_SAFE_INTEGER;
+    return at - bt;
   });
+  const finalTarget = Math.min(cfg.attendanceFlows, prioritized.length);
   let successes = 0;
   for (let i = 0; i < prioritized.length; i += 1) {
-    if (successes >= target) break;
+    if (successes >= finalTarget) break;
     const app = prioritized[i];
     try {
       const appState = await api("GET", `/api/applications/${app.applicationId}`, {
@@ -995,7 +1064,9 @@ async function runAttendanceFlows(admin) {
         expected: [204, 400],
       });
       if (checkIn.status !== 204) {
-        warn(`Attendance ${attendanceId} too early for check-in, skipped.`);
+        const detail = get(checkIn.data, "detail", "Detail", "error", "Error", "message", "Message")
+          || (typeof checkIn.data === "string" ? checkIn.data : "Check-in rejected");
+        warn(`Attendance ${attendanceId} check-in skipped (${detail}).`);
         continue;
       }
 
@@ -1030,6 +1101,10 @@ async function runAttendanceFlows(admin) {
     } catch (err) {
       warn(`Attendance flow failed for app ${app.applicationId}: ${err.message}`);
     }
+  }
+
+  if (successes < finalTarget) {
+    warn(`Attendance flow completed with ${successes}/${finalTarget} successes. Increase --ongoing-opportunity-rate or lower --attendance-flows for this data window.`);
   }
 }
 
