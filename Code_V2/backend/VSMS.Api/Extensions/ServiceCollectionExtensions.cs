@@ -92,6 +92,8 @@ public static class ServiceCollectionExtensions
         builder.Services.AddScoped<IEventHandler<OpportunityCreatedEvent>, OpportunityEventHandlers>();
         builder.Services.AddScoped<IEventHandler<OpportunityStatusChangedEvent>, OpportunityEventHandlers>();
         builder.Services.AddScoped<IEventHandler<OpportunitySpotsUpdatedEvent>, OpportunityEventHandlers>();
+        builder.Services.AddScoped<IEventHandler<OpportunitySkillsUpdatedEvent>, OpportunityEventHandlers>();
+        builder.Services.AddScoped<IEventHandler<OpportunityGeoFenceUpdatedEvent>, OpportunityEventHandlers>();
 
         builder.Services.AddScoped<IEventHandler<ApplicationSubmittedEvent>, ApplicationEventHandlers>();
         builder.Services.AddScoped<IEventHandler<ApplicationStatusChangedEvent>, ApplicationEventHandlers>();

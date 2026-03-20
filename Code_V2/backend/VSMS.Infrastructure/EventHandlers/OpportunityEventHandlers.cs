@@ -11,7 +11,8 @@ public class OpportunityEventHandlers(AppDbContext dbContext) :
     IEventHandler<OpportunityCreatedEvent>,
     IEventHandler<OpportunityStatusChangedEvent>,
     IEventHandler<OpportunitySpotsUpdatedEvent>,
-    IEventHandler<OpportunitySkillsUpdatedEvent>
+    IEventHandler<OpportunitySkillsUpdatedEvent>,
+    IEventHandler<OpportunityGeoFenceUpdatedEvent>
 {
     public async Task HandleAsync(OpportunityCreatedEvent domainEvent)
     {
@@ -68,6 +69,21 @@ public class OpportunityEventHandlers(AppDbContext dbContext) :
         if (opp != null)
         {
             opp.RequiredSkillIds = domainEvent.RequiredSkillIds;
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Mirrors the geofence lat/lon into the read model so opportunity search
+    /// and distance-based ranking can use the DB directly without activating grains.
+    /// </summary>
+    public async Task HandleAsync(OpportunityGeoFenceUpdatedEvent domainEvent)
+    {
+        var opp = await dbContext.OpportunityReadModels.FindAsync(domainEvent.OpportunityId);
+        if (opp != null)
+        {
+            opp.Latitude = domainEvent.Latitude;
+            opp.Longitude = domainEvent.Longitude;
             await dbContext.SaveChangesAsync();
         }
     }

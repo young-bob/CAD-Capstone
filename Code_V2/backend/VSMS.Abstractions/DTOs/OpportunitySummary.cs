@@ -14,5 +14,6 @@ public record OpportunitySummary(
     int TotalSpots,
     int AvailableSpots,
     double? Latitude,
-    double? Longitude
+    double? Longitude,
+    List<Guid>? RequiredSkillIds = null
 );
