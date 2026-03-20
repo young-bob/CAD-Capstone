@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink, Server, Gauge, ShieldCheck } from 'lucide-react';
+import SystemHealthPanel from '../../components/SystemHealthPanel';
+import StatusBadge from '../../components/StatusBadge';
 import type { ViewName, OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState, SystemInfoSummary } from '../../types';
 import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -72,125 +74,124 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     });
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Platform Overview</h1><p className="text-stone-500 mt-2 text-lg">System-wide monitoring and controls.</p></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="max-w-6xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-2xl font-black text-stone-800">Platform Overview</h1>
+                <p className="text-stone-400 mt-1 text-sm">System-wide monitoring and controls.</p>
+            </div>
+
+            {/* Zone A: System Health Panel */}
+            <SystemHealthPanel
+                silos={[]}
+                totalActivations={0}
+                onViewDetails={() => onNavigate('admin_system_info')}
+            />
+
+            {/* Zone B: KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Users', val: String(users.length), icon: Users, color: 'text-blue-500', target: 'admin_users' as ViewName },
-                    { label: 'Pending Orgs', val: String(pendingOrgs.length), icon: Building, color: 'text-amber-500', target: 'admin_orgs' as ViewName },
-                    { label: 'Active Disputes', val: String(disputes.length), icon: AlertTriangle, color: 'text-rose-500', target: 'admin_disputes' as ViewName },
-                    { label: 'Banned Users', val: String(bannedUsers), icon: Calendar, color: 'text-emerald-500', target: 'admin_users' as ViewName },
+                    { label: 'Total Users', val: String(users.length), icon: Users, gradient: 'from-blue-500 to-cyan-400', target: 'admin_users' as ViewName },
+                    { label: 'Pending Orgs', val: String(pendingOrgs.length), icon: Building, gradient: 'from-amber-400 to-orange-500', target: 'admin_orgs' as ViewName },
+                    { label: 'Active Disputes', val: String(disputes.length), icon: AlertTriangle, gradient: 'from-rose-500 to-pink-500', target: 'admin_disputes' as ViewName },
+                    { label: 'Banned Users', val: String(bannedUsers), icon: User, gradient: 'from-stone-500 to-slate-600', target: 'admin_users' as ViewName },
                 ].map((s, i) => (
-                    <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex items-center gap-4 hover:shadow-md transition-shadow text-left">
-                        <div className={`w-12 h-12 rounded-2xl bg-stone-50 ${s.color} flex items-center justify-center`}><s.icon className="w-6 h-6" /></div>
-                        <div>
-                            <h3 className="text-2xl font-extrabold text-stone-800">{s.val}</h3>
-                            <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">{s.label}</p>
-                        </div>
+                    <button key={i} onClick={() => onNavigate(s.target)}
+                        className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start card-interactive group animate-content-reveal"
+                        style={{ animationDelay: `${i * 0.07}s` }}>
+                        <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}><s.icon className="w-5 h-5" /></div>
+                        <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                        <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label}</div>
                     </button>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
-                    <h2 className="text-xl font-bold text-stone-800 mb-5">User Role Mix</h2>
-                    <div className="space-y-4">
+            {/* Zone C: Approval queue + User role mix */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* Approval priority queue */}
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-bold text-stone-800">Org Approval Queue</h2>
+                        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{pendingOrgs.length} pending</span>
+                    </div>
+                    {pendingOrgs.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-6 text-center">No pending organizations.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {pendingOrgs.slice(0, 5).map(org => {
+                                const daysWaiting = Math.floor((Date.now() - new Date(org.createdAt ?? 0).getTime()) / (1000 * 60 * 60 * 24));
+                                const urgency = daysWaiting > 14 ? 'border-rose-300' : daysWaiting > 7 ? 'border-amber-300' : 'border-stone-200';
+                                return (
+                                    <div key={org.orgId} className={`flex items-center gap-3 p-3 rounded-xl border-l-4 ${urgency} bg-stone-50`}>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-stone-800 text-sm truncate">{org.name}</p>
+                                            <p className="text-xs text-stone-400">{daysWaiting} days waiting</p>
+                                        </div>
+                                        <button onClick={() => onNavigate('admin_orgs')}
+                                            className="shrink-0 text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition-colors">
+                                            Review
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* User role mix */}
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <h2 className="text-base font-bold text-stone-800 mb-4">User Role Mix</h2>
+                    <div className="space-y-3">
                         {roleCounts.map(role => {
                             const pct = users.length === 0 ? 0 : Math.round((role.count / users.length) * 100);
                             return (
                                 <div key={role.key}>
                                     <div className="flex justify-between text-sm mb-1.5">
                                         <span className="font-semibold text-stone-700">{role.label}</span>
-                                        <span className="text-stone-500">{role.count} ({pct}%)</span>
+                                        <span className="text-stone-500 text-xs">{role.count} ({pct}%)</span>
                                     </div>
                                     <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-                                        <div className={`h-full ${role.color}`} style={{ width: `${pct}%` }} />
+                                        <div className={`h-full ${role.color} transition-all duration-700 rounded-full`} style={{ width: `${pct}%` }} />
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                </div>
-
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
-                    <h2 className="text-xl font-bold text-stone-800 mb-5">Org Approval Health</h2>
-                    <div className="space-y-4 text-sm">
-                        <div className="rounded-2xl bg-emerald-50 p-4 border border-emerald-100">
-                            <p className="text-emerald-700 font-semibold">Approved Ratio</p>
-                            <p className="text-2xl font-extrabold text-emerald-800 mt-1">{approvalRatio}%</p>
-                            <p className="text-xs text-emerald-700 mt-1">{approvedOrgs} of {allOrgs.length || 0} organizations approved</p>
-                        </div>
-                        <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
-                            <p className="text-amber-700 font-semibold">Pending Ratio</p>
-                            <p className="text-2xl font-extrabold text-amber-800 mt-1">{pendingRatio}%</p>
-                            <p className="text-xs text-amber-700 mt-1">{pendingOrgs.length} organizations waiting review</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 xl:col-span-1">
-                    <h2 className="text-xl font-bold text-stone-800 mb-5">Moderation Queue</h2>
-                    <div className="space-y-4">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-stone-500">Items waiting action</span>
-                            <span className="font-bold text-stone-800">{queueItems}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-stone-500">Open disputes</span>
-                            <span className="font-bold text-rose-600">{disputes.length}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-stone-500">Oldest dispute age</span>
-                            <span className="font-bold text-stone-800">{oldestDisputeHours}h</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-stone-500">Banned users</span>
-                            <span className="font-bold text-stone-800">{bannedUsers}</span>
-                        </div>
+                    <div className="mt-4 pt-3 border-t border-stone-100 grid grid-cols-2 gap-3 text-xs text-stone-500">
+                        <div>Approved orgs: <span className="font-bold text-stone-700">{approvedOrgs}</span></div>
+                        <div>Approval rate: <span className="font-bold text-emerald-600">{approvalRatio}%</span></div>
+                        <div>Queue items: <span className="font-bold text-amber-600">{queueItems}</span></div>
+                        <div>Oldest dispute: <span className="font-bold text-rose-600">{oldestDisputeHours}h</span></div>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
-                    <h2 className="text-xl font-bold text-stone-800 mb-6">Recent Users</h2>
-                    <div className="space-y-4">
-                        {users.slice(0, 5).map(u => (
-                            <div key={u.id} className="flex items-center gap-4 py-3 border-b border-stone-50 last:border-0">
-                                <div className={`w-2.5 h-2.5 rounded-full ${u.isBanned ? 'bg-rose-500' : 'bg-emerald-500'} shrink-0`}></div>
-                                <div className="flex-1">
-                                    <p className="text-stone-800 font-medium">{u.email}</p>
-                                    <p className="text-sm text-stone-400">{u.role} · {u.isBanned ? 'Banned' : 'Active'}</p>
+            {/* Zone D: Recent disputes */}
+            <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-bold text-stone-800">Recent Disputes</h2>
+                    {disputes.length > 0 && (
+                        <button onClick={() => onNavigate('admin_disputes')} className="text-xs font-bold text-orange-500 hover:text-orange-600">View all →</button>
+                    )}
+                </div>
+                {recentDisputes.length === 0 ? (
+                    <p className="text-sm text-stone-400 py-6 text-center">No pending disputes. 🎉</p>
+                ) : (
+                    <div className="space-y-3">
+                        {recentDisputes.map(d => (
+                            <div key={d.attendanceId} className="rounded-xl border border-stone-100 p-4 hover:bg-stone-50 transition-colors">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="font-semibold text-stone-800 text-sm">{d.opportunityTitle}</p>
+                                        <p className="text-xs text-stone-400 mt-0.5">{d.volunteerName} · {formatDateTime(d.raisedAt)}</p>
+                                    </div>
+                                    <StatusBadge status="Disputed" />
                                 </div>
-                                <span className="text-xs text-stone-400 shrink-0">{new Date(u.createdAt).toLocaleDateString()}</span>
+                                <p className="text-sm text-stone-500 mt-2 line-clamp-2">{d.reason}</p>
                             </div>
                         ))}
                     </div>
-                </div>
-
-                <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
-                    <h2 className="text-xl font-bold text-stone-800 mb-6">Recent Disputes</h2>
-                    {recentDisputes.length === 0 ? (
-                        <p className="text-sm text-stone-400 py-6">No pending disputes.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {recentDisputes.map(d => (
-                                <div key={d.attendanceId} className="rounded-2xl border border-stone-100 p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-stone-800">{d.opportunityTitle}</p>
-                                            <p className="text-xs text-stone-500 mt-1">{d.volunteerName} · {formatDateTime(d.raisedAt)}</p>
-                                        </div>
-                                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">Open</span>
-                                    </div>
-                                    <p className="text-sm text-stone-600 mt-2 line-clamp-2">{d.reason}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
-
         </div>
     );
 }

@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import OrgHealthCard from '../../components/OrgHealthCard';
+import EventKanbanPreview from '../../components/EventKanbanPreview';
+import StatusBadge from '../../components/StatusBadge';
 import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -169,6 +173,22 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
         finally { setResubmitting(false); }
     };
 
+    // ── Chart data — must be before early returns (Rules of Hooks) ─────────
+    const appsPerEvent = useMemo(() => {
+        const counts: Record<string, { title: string; count: number }> = {};
+        apps.forEach(a => {
+            if (!counts[a.opportunityId]) counts[a.opportunityId] = { title: a.opportunityTitle, count: 0 };
+            counts[a.opportunityId].count++;
+        });
+        return Object.values(counts)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 6)
+            .map(e => ({
+                event: e.title.length > 18 ? e.title.slice(0, 18) + '…' : e.title,
+                count: e.count,
+            }));
+    }, [apps]);
+
     const statusConfig: Record<string, { color: string; bg: string; icon: string; msg: string }> = {
         PendingApproval: { color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '⏳', msg: 'Your organization is pending admin approval. You cannot create events until approved.' },
         Approved: { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '✅', msg: 'Your organization is approved and active.' },
@@ -225,16 +245,16 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     const isPrimaryCoord = org.members?.some(m => m.userId === auth.userId && m.role === OrgRole.Admin) ?? false;
     const pendingApps = apps.filter(a => a.status === 'Pending').length;
     const oppStatusCounts = [
-        { key: 'Draft', label: 'Draft', count: opps.filter(o => o.status === 'Draft').length, color: 'bg-stone-500' },
-        { key: 'Published', label: 'Published', count: opps.filter(o => o.status === 'Published').length, color: 'bg-emerald-500' },
-        { key: 'Completed', label: 'Completed', count: opps.filter(o => o.status === 'Completed').length, color: 'bg-blue-500' },
-        { key: 'Cancelled', label: 'Cancelled', count: opps.filter(o => o.status === 'Cancelled').length, color: 'bg-rose-500' },
+        { key: 'Draft', label: 'Draft', count: opps.filter(o => o.status === 'Draft').length, gradient: 'from-stone-400 to-slate-500' },
+        { key: 'Published', label: 'Published', count: opps.filter(o => o.status === 'Published').length, gradient: 'from-emerald-400 to-teal-500' },
+        { key: 'Completed', label: 'Completed', count: opps.filter(o => o.status === 'Completed').length, gradient: 'from-blue-400 to-cyan-500' },
+        { key: 'Cancelled', label: 'Cancelled', count: opps.filter(o => o.status === 'Cancelled').length, gradient: 'from-rose-400 to-pink-500' },
     ];
     const appStatusCounts = [
-        { key: 'Pending', label: 'Pending', count: apps.filter(a => a.status === 'Pending').length, color: 'bg-amber-400' },
-        { key: 'Approved', label: 'Approved', count: apps.filter(a => a.status === 'Approved').length, color: 'bg-emerald-500' },
-        { key: 'Waitlisted', label: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, color: 'bg-blue-500' },
-        { key: 'Rejected', label: 'Rejected', count: apps.filter(a => a.status === 'Rejected').length, color: 'bg-rose-500' },
+        { key: 'Pending', label: 'Pending', count: apps.filter(a => a.status === 'Pending').length, gradient: 'from-amber-400 to-orange-400' },
+        { key: 'Approved', label: 'Approved', count: apps.filter(a => a.status === 'Approved').length, gradient: 'from-emerald-400 to-teal-500' },
+        { key: 'Waitlisted', label: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, gradient: 'from-blue-400 to-cyan-500' },
+        { key: 'Rejected', label: 'Rejected', count: apps.filter(a => a.status === 'Rejected').length, gradient: 'from-rose-400 to-pink-500' },
     ];
     const totalOpps = oppStatusCounts.reduce((sum, s) => sum + s.count, 0);
     const totalApps = appStatusCounts.reduce((sum, s) => sum + s.count, 0);
@@ -256,34 +276,23 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     });
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
 
-            <div className="flex justify-between items-start">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-stone-800">{org.name}</h1>
-                    {org.description && <p className="text-stone-500 mt-1 text-lg">{org.description}</p>}
-                </div>
-                {isApproved && isPrimaryCoord && (
-                    <button onClick={() => { setEditName(org.name); setEditDesc(org.description || ''); setShowEdit(true); }}
-                        className="px-4 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200 text-sm">
-                        ✏️ Edit Organization
-                    </button>
-                )}
-            </div>
+            {/* Zone A: Org Health Card */}
+            <OrgHealthCard
+                orgName={org.name}
+                orgStatus={org.status}
+                publishedEvents={opps.filter(o => o.status === 'Published').length}
+                totalApplications={apps.length}
+                memberCount={org.members?.length ?? 0}
+                onEdit={isApproved && isPrimaryCoord ? () => { setEditName(org.name); setEditDesc(org.description || ''); setShowEdit(true); } : undefined}
+                onResubmit={org.status === 'Rejected' ? () => openResubmitForm(true) : undefined}
+            />
 
-            {/* Status Banner */}
-            <div className={`flex items-start gap-4 p-5 rounded-2xl border ${status.bg}`}>
-                <span className="text-2xl">{status.icon}</span>
-                <div>
-                    <p className={`font-bold ${status.color}`}>{org.status}</p>
-                    <p className="text-stone-500 text-sm mt-0.5">{status.msg}</p>
-                </div>
-            </div>
-
-            {/* Submission details for pending orgs */}
+            {/* Submission details for pending */}
             {org.status === 'PendingApproval' && (
-                <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm space-y-3">
+                <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-level-1 space-y-3">
                     <div className="flex justify-between items-center">
                         <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">Submission Details</p>
                         <button onClick={() => openResubmitForm(true)} className="text-sm text-orange-500 font-bold hover:underline flex items-center gap-1">
@@ -292,7 +301,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div><span className="text-stone-500 font-medium">Name: </span><span className="text-stone-800 font-bold">{org.name}</span></div>
-                        <div><span className="text-stone-500 font-medium">Description: </span><span className="text-stone-700">{org.description || '—'}</span></div>
                         <div><span className="text-stone-500 font-medium">Submitted: </span><span className="text-stone-700">{new Date(org.createdAt).toLocaleDateString()}</span></div>
                         {org.proofUrl && (
                             <div className="flex items-center gap-1">
@@ -306,136 +314,95 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                 </div>
             )}
 
-            {/* Rejected actions */}
-            {org.status === 'Rejected' && (
-                <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm space-y-3">
-                    <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">What would you like to do?</p>
-                    <div className="flex flex-wrap gap-3">
-                        <button onClick={() => openResubmitForm(true)} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 text-sm">
-                            ✏️ Edit & Resubmit
-                        </button>
-                        <button onClick={() => openResubmitForm(false)} className="px-5 py-2.5 bg-stone-100 text-stone-700 font-bold rounded-xl hover:bg-stone-200 text-sm">
-                            🆕 New Application
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Restricted notice */}
-            {!isApproved && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-                    <span className="text-amber-500 text-xl">🔒</span>
-                    <p className="text-amber-700 text-sm font-medium">Creating events, inviting members, and other actions require admin approval first.</p>
-                </div>
-            )}
-
-            {/* Stats */}
             {isApproved && (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {/* Zone B: KPI cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-50', target: 'manage_events' as ViewName },
-                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, color: 'text-amber-500', bg: 'bg-amber-50', target: 'org_applications' as ViewName },
-                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50', target: 'org_applications' as ViewName },
-                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, color: 'text-rose-500', bg: 'bg-rose-50', target: 'org_members' as ViewName },
+                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, gradient: 'from-blue-500 to-cyan-400', target: 'manage_events' as ViewName },
+                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, gradient: 'from-amber-400 to-orange-500', target: 'org_applications' as ViewName },
+                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, gradient: 'from-emerald-500 to-teal-400', target: 'org_applications' as ViewName },
+                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, gradient: 'from-rose-500 to-pink-500', target: 'org_members' as ViewName },
                         ].map((s, i) => (
-                            <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-shadow">
-                                <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.color} flex items-center justify-center mb-4`}><s.icon className="w-6 h-6" /></div>
-                                <h3 className="text-3xl font-extrabold text-stone-800">{s.val}</h3>
-                                <p className="text-sm font-bold text-stone-400 uppercase tracking-wide mt-1">{s.label}</p>
+                            <button key={i} onClick={() => onNavigate(s.target)}
+                                className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start text-left card-interactive group animate-content-reveal"
+                                style={{ animationDelay: `${i * 0.07}s` }}>
+                                <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}><s.icon className="w-5 h-5" /></div>
+                                <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                                <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label}</div>
                             </button>
                         ))}
                     </div>
 
-                    {/* Calendar & Activities */}
-                    <div className="flex flex-col lg:flex-row gap-6 mt-8">
-                        <div className="flex-1 bg-white rounded-3xl p-8 shadow-sm border border-stone-100 flex flex-col justify-center items-center text-center space-y-4">
-                            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 mb-2">
-                                <Star className="w-10 h-10 fill-current" />
-                            </div>
-                            <h2 className="text-2xl font-extrabold text-stone-800">Your Impact Hub</h2>
-                            <p className="text-stone-500 max-w-md mx-auto">Track your organization's ongoing events, review new volunteer applications, and confirm attendance all in one place. Use the calendar to see days with active shifts.</p>
-                        </div>
-                        <div className="w-full lg:w-80 shrink-0">
-                            <MiniCalendar eventDates={apps.map(a => new Date(a.shiftStartTime))} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Event Pipeline</h3>
-                            <div className="space-y-4">
-                                {oppStatusCounts.map(s => {
-                                    const pct = totalOpps === 0 ? 0 : Math.round((s.count / totalOpps) * 100);
-                                    return (
-                                        <div key={s.key}>
-                                            <div className="flex justify-between text-sm mb-1.5">
-                                                <span className="font-semibold text-stone-700">{s.label}</span>
-                                                <span className="text-stone-500">{s.count} ({pct}%)</span>
-                                            </div>
-                                            <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-                                                <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Application Funnel</h3>
-                            <div className="space-y-4">
+                    {/* Zone C: Application funnel + Kanban */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                            <h3 className="text-base font-bold text-stone-800 mb-4">Application Funnel</h3>
+                            <div className="space-y-3">
                                 {appStatusCounts.map(s => {
                                     const pct = totalApps === 0 ? 0 : Math.round((s.count / totalApps) * 100);
                                     return (
                                         <div key={s.key}>
                                             <div className="flex justify-between text-sm mb-1.5">
                                                 <span className="font-semibold text-stone-700">{s.label}</span>
-                                                <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                                <span className="text-xs font-bold text-stone-500">{s.count} <span className="text-stone-400 font-normal">({pct}%)</span></span>
                                             </div>
                                             <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-                                                <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                                <div className={`h-full bg-gradient-to-r ${s.gradient} transition-all duration-700 rounded-full`} style={{ width: `${pct}%` }} />
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
+                        <EventKanbanPreview
+                            opportunities={opps.map(o => ({ opportunityId: o.opportunityId, title: o.title, status: o.status }))}
+                            onViewDetail={(id) => onNavigate('manage_events')}
+                        />
                     </div>
 
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Top Categories</h3>
-                            {categoryCounts.length === 0 ? (
-                                <p className="text-sm text-stone-400">No event categories yet.</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {categoryCounts.map(([category, count]) => (
-                                        <div key={category} className="flex items-center justify-between p-3 rounded-xl bg-stone-50">
-                                            <span className="text-sm font-semibold text-stone-700">{category}</span>
-                                            <span className="text-xs font-bold text-stone-500">{count} event{count > 1 ? 's' : ''}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                    {/* Zone D: Applications per event chart */}
+                    <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                        <h3 className="text-base font-bold text-stone-800 mb-4">Applications per Event</h3>
+                        {appsPerEvent.length === 0 ? (
+                            <p className="text-sm text-stone-400 py-8 text-center">No application data yet.</p>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={200}>
+                                <BarChart data={appsPerEvent} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="coordAppsGrad" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0%" stopColor="#f97316" />
+                                            <stop offset="100%" stopColor="#ef4444" />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="event" width={100} tick={{ fontSize: 10, fill: '#78716c' }} axisLine={false} tickLine={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: '#fff7ed' }} />
+                                    <Bar dataKey="count" fill="url(#coordAppsGrad)" radius={[0, 6, 6, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
 
-                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                            <h3 className="text-xl font-extrabold text-stone-800 mb-5">Upcoming Workload</h3>
-                            {upcomingWorkload.length === 0 ? (
-                                <p className="text-sm text-stone-400">No upcoming volunteer shifts yet.</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {upcomingWorkload.map(app => (
-                                        <div key={app.applicationId} className="border border-stone-100 rounded-2xl p-4">
-                                            <p className="font-semibold text-stone-800">{app.opportunityTitle}</p>
-                                            <p className="text-xs text-stone-500 mt-1">{app.shiftName} · {formatDateTime(app.shiftStartTime)}</p>
-                                            <p className="text-xs text-stone-400 mt-1">Volunteer: {app.volunteerName}</p>
+                    {/* Upcoming workload */}
+                    <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                        <h3 className="text-base font-bold text-stone-800 mb-4">Upcoming Volunteer Shifts</h3>
+                        {upcomingWorkload.length === 0 ? (
+                            <p className="text-sm text-stone-400">No upcoming shifts yet.</p>
+                        ) : (
+                            <div className="divide-y divide-stone-50">
+                                {upcomingWorkload.map(app => (
+                                    <div key={app.applicationId} className="py-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="font-semibold text-stone-800 text-sm">{app.opportunityTitle}</p>
+                                            <p className="text-xs text-stone-400 mt-0.5">{app.shiftName} · {formatDateTime(app.shiftStartTime)} · {app.volunteerName}</p>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                        <StatusBadge status={app.status} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </>
             )}

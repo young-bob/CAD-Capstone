@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Sun, Heart, Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart } from 'lucide-react';
+import ImpactRing from '../../components/ImpactRing';
+import AttendanceHeatmap from '../../components/AttendanceHeatmap';
+import StreakCard, { computeStreak } from '../../components/StreakCard';
+import StatusBadge from '../../components/StatusBadge';
 import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
 import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -177,16 +182,38 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 
     useEffect(() => { load(); }, [load]);
 
+    // ── Chart data — must be before early returns (Rules of Hooks) ────────────
+    const monthlyHours = useMemo(() => {
+        const buckets: Record<string, number> = {};
+        attendance.forEach(a => {
+            if (a.checkInTime && (a.totalHours ?? 0) > 0) {
+                const label = new Date(a.checkInTime).toLocaleString('default', { month: 'short', year: '2-digit' });
+                buckets[label] = (buckets[label] ?? 0) + (a.totalHours ?? 0);
+            }
+        });
+        return Object.entries(buckets)
+            .slice(-6)
+            .map(([month, hours]) => ({ month, hours: Math.round(hours * 10) / 10 }));
+    }, [attendance]);
+
+    const appStatusForPie = useMemo(() => [
+        { label: 'Pending', count: apps.filter(a => a.status === 'Pending').length },
+        { label: 'Approved', count: apps.filter(a => a.status === 'Approved').length },
+        { label: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length },
+        { label: 'Closed', count: apps.filter(a => ['Rejected', 'Withdrawn', 'NoShow', 'Completed'].includes(a.status)).length },
+    ].filter(s => s.count > 0).map(s => ({ name: s.label, value: s.count })), [apps]);
+    const PIE_COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#6b7280'];
+
     if (loading) return <Spinner />;
     if (error) return <ErrorBox msg={error} onRetry={load} />;
 
     const name = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || auth.email : auth.email;
     const approvedShiftDates = apps.filter(a => a.status === 'Approved' && a.shiftStartTime).map(a => new Date(a.shiftStartTime));
     const appStatusCounts = [
-        { label: 'Pending', key: 'Pending', count: apps.filter(a => a.status === 'Pending').length, color: 'bg-amber-400' },
-        { label: 'Approved', key: 'Approved', count: apps.filter(a => a.status === 'Approved').length, color: 'bg-emerald-500' },
-        { label: 'Waitlisted', key: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, color: 'bg-blue-500' },
-        { label: 'Closed', key: 'Closed', count: apps.filter(a => ['Rejected', 'Withdrawn', 'NoShow', 'Completed'].includes(a.status)).length, color: 'bg-stone-500' },
+        { label: 'Pending', key: 'Pending', count: apps.filter(a => a.status === 'Pending').length, gradient: 'from-amber-400 to-orange-400' },
+        { label: 'Approved', key: 'Approved', count: apps.filter(a => a.status === 'Approved').length, gradient: 'from-emerald-400 to-teal-500' },
+        { label: 'Waitlisted', key: 'Waitlisted', count: apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted').length, gradient: 'from-blue-400 to-cyan-500' },
+        { label: 'Closed', key: 'Closed', count: apps.filter(a => ['Rejected', 'Withdrawn', 'NoShow', 'Completed'].includes(a.status)).length, gradient: 'from-stone-400 to-slate-500' },
     ];
     const totalStatusCount = appStatusCounts.reduce((sum, s) => sum + s.count, 0);
     const upcomingApps = apps
@@ -202,11 +229,11 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const completedSessions = attendance.filter(a => ['CheckedOut', 'Confirmed', 'Resolved'].includes(a.status)).length;
     const rejectedOrWithdrawn = apps.filter(a => ['Rejected', 'Withdrawn'].includes(a.status)).length;
     const funnelSteps = [
-        { key: 'applied', label: 'Applied', count: apps.length, color: 'bg-sky-500' },
-        { key: 'reviewed', label: 'Reviewed', count: reviewedApps, color: 'bg-violet-500' },
-        { key: 'approved', label: 'Approved Track', count: approvedTrackApps, color: 'bg-emerald-500' },
-        { key: 'checkedin', label: 'Checked In', count: checkedInSessions, color: 'bg-amber-500' },
-        { key: 'completed', label: 'Completed', count: completedSessions, color: 'bg-orange-500' },
+        { key: 'applied', label: 'Applied', count: apps.length, gradient: 'from-sky-400 to-blue-500' },
+        { key: 'reviewed', label: 'Reviewed', count: reviewedApps, gradient: 'from-violet-400 to-purple-500' },
+        { key: 'approved', label: 'Approved Track', count: approvedTrackApps, gradient: 'from-emerald-400 to-teal-500' },
+        { key: 'checkedin', label: 'Checked In', count: checkedInSessions, gradient: 'from-amber-400 to-orange-500' },
+        { key: 'completed', label: 'Completed', count: completedSessions, gradient: 'from-orange-400 to-rose-500' },
     ];
     const funnelMax = Math.max(1, ...funnelSteps.map(s => s.count));
     const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, {
@@ -220,61 +247,119 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         return 'bg-stone-100 text-stone-700';
     };
     const statCards = [
-        { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50', hoverBg: 'group-hover:bg-blue-500', target: 'attendance' as ViewName },
-        { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50', hoverBg: 'group-hover:bg-emerald-500', target: 'attendance' as ViewName },
-        { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, color: 'text-amber-500', bg: 'bg-amber-50', hoverBg: 'group-hover:bg-amber-500', target: 'profile' as ViewName },
-        { label: 'Applications', val: String(apps.length), unit: 'total', icon: BadgeCheck, color: 'text-violet-500', bg: 'bg-violet-50', hoverBg: 'group-hover:bg-violet-500', target: 'applications' as ViewName },
+        { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, gradient: 'from-blue-500 to-cyan-400', glow: 'hover:shadow-blue-500/20', target: 'attendance' as ViewName },
+        { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, gradient: 'from-emerald-500 to-teal-400', glow: 'hover:shadow-emerald-500/20', target: 'attendance' as ViewName },
+        { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, gradient: 'from-amber-400 to-orange-500', glow: 'hover:shadow-amber-500/20', target: 'profile' as ViewName },
+        { label: 'Applications', val: String(apps.length), unit: 'total', icon: BadgeCheck, gradient: 'from-violet-500 to-purple-500', glow: 'hover:shadow-violet-500/20', target: 'applications' as ViewName },
     ];
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
-            <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left: Welcome & Stats */}
-                <div className="flex-1 space-y-8">
-                    <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 sm:p-10 text-white shadow-xl shadow-orange-500/20 relative overflow-hidden">
-                        <div className="relative z-10">
-                            <h1 className="text-3xl font-extrabold mb-3 flex items-center gap-3">Welcome, {name}! <Sun className="w-8 h-8 text-yellow-200" /></h1>
-                            <p className="text-orange-50 text-lg max-w-xl font-medium">Ready to start today's volunteer service? Check your upcoming events.</p>
-                            <button onClick={() => onNavigate('attendance')} className="mt-8 bg-white text-orange-600 px-8 py-3.5 rounded-full font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">Check-in</button>
-                        </div>
-                        <div className="absolute -right-20 -top-20 w-80 h-80 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
-                        <Heart className="absolute -right-4 -bottom-4 w-56 h-56 text-white opacity-10" />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                        {statCards.map((s, i) => (
-                            <button key={i} onClick={() => onNavigate(s.target)} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-col items-center text-center hover:shadow-md transition-shadow group">
-                                <div className={`${s.bg} p-4 rounded-full ${s.color} mb-3 ${s.hoverBg} group-hover:text-white transition-colors`}><s.icon className="w-8 h-8" /></div>
-                                <div>
-                                    <h3 className="text-2xl font-extrabold text-stone-800">{s.val} <span className="text-sm font-medium text-stone-400">{s.unit}</span></h3>
-                                    <p className="text-xs font-semibold text-stone-400 tracking-wide uppercase mt-1">{s.label}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
+        <div className="max-w-6xl mx-auto space-y-6">
 
-                {/* Right: Calendar */}
-                <div className="w-full lg:w-80 shrink-0">
-                    <MiniCalendar eventDates={approvedShiftDates} />
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 mt-6 relative overflow-hidden group">
-                        <div className="absolute -right-4 -top-4 w-24 h-24 bg-rose-50 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                        <div className="relative z-10 flex items-start gap-4">
-                            <div className="bg-rose-100 p-3 rounded-2xl text-rose-500"><Heart className="w-6 h-6 fill-current" /></div>
-                            <div>
-                                <h3 className="font-extrabold text-stone-800 mb-1">Impact Goal</h3>
-                                <p className="text-sm font-medium text-stone-500 leading-relaxed">You've completed {profile?.completedOpportunities ?? 0} events. Just {(5 - ((profile?.completedOpportunities ?? 0) % 5)) || 5} more to reach your next milestone!</p>
-                            </div>
+            {/* ── Zone A: Impact Ring Banner ── */}
+            <div className="bg-gradient-to-br from-amber-400 via-orange-400 to-orange-500 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 dark:border dark:border-zinc-800 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-brand dark:shadow-level-3">
+                {/* Glow orb — white in light, amber in dark */}
+                <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-20 pointer-events-none"
+                    style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.55) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+                <div className="relative flex flex-col sm:flex-row items-center gap-8">
+                    {/* Impact ring */}
+                    <div className="shrink-0">
+                        <ImpactRing score={profile?.impactScore ?? 0} maxScore={1000} size={130} />
+                        <p className="text-xs text-white/70 dark:text-zinc-500 text-center mt-2">of 1,000 pts</p>
+                    </div>
+                    {/* Greeting */}
+                    <div className="flex-1 text-center sm:text-left">
+                        <h1 className="text-2xl sm:text-3xl font-black text-white dark:text-zinc-100 mb-1">
+                            Welcome back, <span className="dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-amber-400 dark:to-orange-400">{name?.split(' ')[0] ?? 'Volunteer'}!</span>
+                        </h1>
+                        <p className="text-white/75 dark:text-zinc-400 mb-5">Ready to make an impact today? Here's your volunteer summary.</p>
+                        {/* Quick action pills */}
+                        <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                            {[
+                                { label: 'Check In', icon: MapPin, view: 'attendance' as ViewName },
+                                { label: 'Browse Events', icon: Search, view: 'opportunities' as ViewName },
+                                { label: 'Certificates', icon: Award, view: 'certificates' as ViewName },
+                            ].map(a => (
+                                <button key={a.label} onClick={() => onNavigate(a.view)}
+                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:-translate-y-0.5 backdrop-blur-sm bg-white/20 hover:bg-white/30 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-200">
+                                    <a.icon className="w-4 h-4" /> {a.label}
+                                </button>
+                            ))}
                         </div>
+                    </div>
+                    {/* Inline stats */}
+                    <div className="flex gap-6 shrink-0">
+                        {[
+                            { label: 'Hours', value: (profile?.totalHours ?? 0).toFixed(0) },
+                            { label: 'Completed', value: String(profile?.completedOpportunities ?? 0) },
+                            { label: 'Pending', value: String(apps.filter(a => a.status === 'Pending').length) },
+                        ].map(s => (
+                            <div key={s.label} className="text-center">
+                                <div className="text-3xl font-black text-white dark:text-zinc-100">{s.value}</div>
+                                <div className="text-xs text-white/65 dark:text-zinc-500 font-medium">{s.label}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
 
+            {/* ── Zone B: Stat cards ── */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                {statCards.map((s, i) => (
+                    <button
+                        key={i}
+                        onClick={() => onNavigate(s.target)}
+                        className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start text-left card-interactive group animate-content-reveal"
+                        style={{ animationDelay: `${i * 0.07}s` }}
+                    >
+                        <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}>
+                            <s.icon className="w-5 h-5" />
+                        </div>
+                        <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                        <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label} <span className="text-stone-300">· {s.unit}</span></div>
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Zone C: Heatmap + Calendar ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                {/* Heatmap (2/3 width) */}
+                <div className="xl:col-span-2 bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-bold text-stone-800">Volunteer Activity</h2>
+                        <span className="text-xs text-stone-400">{attendance.filter(a => ['CheckedOut','Confirmed','Resolved'].includes(a.status)).length} sessions total</span>
+                    </div>
+                    <AttendanceHeatmap attendance={attendance} />
+                    {/* Stats footer */}
+                    <div className="mt-4 pt-4 border-t border-stone-100 grid grid-cols-4 gap-3">
+                        {(() => {
+                            const { current: streak } = computeStreak(attendance);
+                            return [
+                                { label: 'Total Hours', value: (profile?.totalHours ?? 0).toFixed(1) },
+                                { label: 'Completed', value: String(profile?.completedOpportunities ?? 0) },
+                                { label: 'Sessions', value: String(attendance.filter(a => ['CheckedOut','Confirmed','Resolved'].includes(a.status)).length) },
+                                { label: 'Week Streak', value: String(streak), highlight: streak > 0 },
+                            ].map(s => (
+                                <div key={s.label} className={`rounded-xl px-3 py-3 text-center ${s.highlight ? 'bg-amber-50' : 'bg-stone-50'}`}>
+                                    <div className={`text-lg font-black ${s.highlight ? 'text-orange-500' : 'text-stone-800'}`}>{s.value}</div>
+                                    <div className="text-[11px] text-stone-400 font-medium mt-0.5">{s.label}</div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                </div>
+                {/* Calendar only */}
+                <div>
+                    <MiniCalendar eventDates={approvedShiftDates} />
+                </div>
+            </div>
+
+            {/* ── Zone D: Upcoming commitments + charts ── */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                    <div className="flex items-center justify-between mb-5">
-                        <h2 className="text-xl font-extrabold text-stone-800">Application Snapshot</h2>
-                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-bold text-stone-800">Application Snapshot</h2>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wide">Live</span>
                     </div>
                     <div className="space-y-4">
                         {appStatusCounts.map((s) => {
@@ -283,10 +368,10 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                                 <div key={s.key}>
                                     <div className="flex justify-between items-center text-sm mb-1.5">
                                         <span className="font-semibold text-stone-700">{s.label}</span>
-                                        <span className="text-stone-500">{s.count} ({pct}%)</span>
+                                        <span className="text-xs font-bold text-stone-500">{s.count} <span className="text-stone-400 font-normal">({pct}%)</span></span>
                                     </div>
                                     <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-                                        <div className={`h-full ${s.color}`} style={{ width: `${pct}%` }} />
+                                        <div className={`h-full bg-gradient-to-r ${s.gradient} transition-all duration-700 rounded-full`} style={{ width: `${pct}%` }} />
                                     </div>
                                 </div>
                             );
@@ -294,71 +379,112 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                    <h2 className="text-xl font-extrabold text-stone-800 mb-5">Upcoming Commitments</h2>
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <h2 className="text-base font-bold text-stone-800 mb-4">Upcoming Shifts</h2>
                     {upcomingApps.length === 0 ? (
                         <p className="text-sm text-stone-400 py-8 text-center">No upcoming shifts yet.</p>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {upcomingApps.map(app => (
-                                <div key={app.applicationId} className="border border-stone-100 rounded-2xl p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
-                                            <p className="text-xs text-stone-500 mt-1">{formatDateTime(app.shiftStartTime)}</p>
-                                        </div>
-                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
-                                            {app.status}
-                                        </span>
+                                <div key={app.applicationId} className="border border-stone-100 rounded-xl p-3 hover:bg-stone-50 transition-colors flex items-start gap-3">
+                                    <div className={`w-1 self-stretch rounded-full shrink-0 mt-0.5 ${app.status === 'Approved' ? 'bg-emerald-400' : app.status === 'Pending' ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-stone-800 text-sm truncate">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                        <p className="text-xs text-stone-400 mt-0.5">{formatDateTime(app.shiftStartTime)}</p>
                                     </div>
+                                    <StatusBadge status={app.status} />
                                 </div>
                             ))}
                         </div>
                     )}
                 </div>
 
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                    <div className="flex items-center justify-between mb-5">
-                        <h2 className="text-xl font-extrabold text-stone-800">Application Funnel</h2>
-                        <span className="text-xs font-semibold text-stone-400 uppercase">Live</span>
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-bold text-stone-800">Application Funnel</h2>
+                        <TrendingUp className="w-4 h-4 text-stone-400" />
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {funnelSteps.map((step, idx) => {
                             const pctOfTop = Math.round((step.count / funnelMax) * 100);
                             return (
                                 <div key={step.key}>
-                                    <div className="flex justify-between items-center text-sm mb-1.5">
-                                        <span className="font-semibold text-stone-700">{idx + 1}. {step.label}</span>
-                                        <span className="text-stone-500">{step.count}</span>
+                                    <div className="flex justify-between items-center text-xs mb-1.5">
+                                        <span className="font-semibold text-stone-600">{idx + 1}. {step.label}</span>
+                                        <span className="font-bold text-stone-500">{step.count}</span>
                                     </div>
                                     <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-                                        <div className={`h-full ${step.color}`} style={{ width: `${Math.max(6, pctOfTop)}%` }} />
+                                        <div className={`h-full bg-gradient-to-r ${step.gradient} transition-all duration-700 rounded-full`} style={{ width: `${Math.max(6, pctOfTop)}%` }} />
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-stone-100 text-xs text-stone-500">
-                        Drop-off (Rejected/Withdrawn): <span className="font-bold text-rose-600">{rejectedOrWithdrawn}</span>
+                    <div className="mt-4 pt-3 border-t border-stone-100 text-xs text-stone-500 flex items-center justify-between">
+                        <span>Drop-off</span>
+                        <span className="font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">{rejectedOrWithdrawn}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                <h2 className="text-xl font-extrabold text-stone-800 mb-5">Recent Application Activity</h2>
+            {/* ── Charts row ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <h2 className="text-base font-bold text-stone-800 mb-4">Monthly Hours</h2>
+                    {monthlyHours.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-8 text-center">No attendance records yet.</p>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={180}>
+                            <BarChart data={monthlyHours} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="volHoursGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#f97316" />
+                                        <stop offset="100%" stopColor="#fbbf24" />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" vertical={false} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
+                                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: '#fff7ed' }} />
+                                <Bar dataKey="hours" fill="url(#volHoursGrad)" radius={[6, 6, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                    <h2 className="text-base font-bold text-stone-800 mb-2">Application Breakdown</h2>
+                    {appStatusForPie.length === 0 ? (
+                        <p className="text-sm text-stone-400 py-8 text-center">No applications yet.</p>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={200}>
+                            <PieChart>
+                                <Pie data={appStatusForPie} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
+                                    {appStatusForPie.map((_, index) => (
+                                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ color: '#57534e', fontSize: 11 }}>{value}</span>} />
+                                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
+                <h2 className="text-base font-bold text-stone-800 mb-4">Recent Application Activity</h2>
                 {recentApps.length === 0 ? (
                     <p className="text-sm text-stone-400 py-4">No activity yet.</p>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="divide-y divide-stone-50">
                         {recentApps.map(app => (
-                            <div key={app.applicationId} className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-b-0">
+                            <div key={app.applicationId} className="flex flex-wrap items-center justify-between gap-3 py-3">
                                 <div>
-                                    <p className="font-medium text-stone-800">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
-                                    <p className="text-xs text-stone-500">Applied {formatDateTime(app.appliedAt)}</p>
+                                    <p className="font-semibold text-stone-800 text-sm">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
+                                    <p className="text-xs text-stone-400 mt-0.5">Applied {formatDateTime(app.appliedAt)}</p>
                                 </div>
-                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusBadgeClass(app.status)}`}>
-                                    {app.status}
-                                </span>
+                                <StatusBadge status={app.status} />
                             </div>
                         ))}
                     </div>

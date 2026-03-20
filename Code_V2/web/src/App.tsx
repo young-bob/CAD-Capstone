@@ -1,6 +1,8 @@
-import { useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react';
+import { useState, useEffect, useRef, Component, type ReactNode, type ErrorInfo } from 'react';
 import type { ViewName } from './types';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { useTheme } from './hooks/useTheme';
+import { useCommandPalette } from './hooks/useCommandPalette';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
     constructor(props: { children: ReactNode }) {
@@ -27,7 +29,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 import AppHeader from './components/AppHeader';
-import Sidebar from './components/Sidebar';
+import Sidebar, { type SidebarMode } from './components/Sidebar';
+import CommandPalette from './components/CommandPalette';
+import AIAssistant from './components/AIAssistant';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -36,11 +40,21 @@ import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCert
 import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail } from './pages/coordinator';
 import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills, AdminSystemInfo } from './pages/admin';
 
+// Views considered "deeper" than dashboard — navigate right when entering them
+const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills',
+    'manage_events', 'org_applications', 'manage_templates', 'org_members',
+    'admin_orgs', 'admin_disputes', 'admin_users', 'admin_skills', 'admin_system_info']);
+
 function AppInner() {
     const auth = useAuth();
+    const { theme, toggleTheme } = useTheme();
+    const cmdPalette = useCommandPalette();
+
     const [currentView, setCurrentView] = useState<ViewName>('landing');
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarMode, setSidebarMode] = useState<SidebarMode>('expanded');
     const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+    const [navDirection, setNavDirection] = useState<'right' | 'left'>('right');
+    const prevViewRef = useRef<ViewName>('landing');
 
     // Map backend role string to display role for sidebar/header
     const displayRole = auth.role === 'SystemAdmin' ? 'admin' : auth.role === 'Coordinator' ? 'coordinator' : 'volunteer';
@@ -49,14 +63,26 @@ function AppInner() {
     useEffect(() => {
         if (auth.loading) return;
         const isPublicView = currentView === 'landing' || currentView === 'login' || currentView === 'register';
-        
-        if (auth.token && isPublicView) {
-            setCurrentView('dashboard');
-        }
-        if (!auth.token && !isPublicView) {
-            setCurrentView('landing');
-        }
+        if (auth.token && isPublicView) setCurrentView('dashboard');
+        if (!auth.token && !isPublicView) setCurrentView('landing');
     }, [auth.token, auth.loading, currentView]);
+
+    // On mobile, default sidebar to hidden
+    useEffect(() => {
+        if (window.innerWidth < 768) setSidebarMode('hidden');
+    }, []);
+
+    // '[' key to toggle sidebar collapse
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === '[' && !e.ctrlKey && !e.metaKey &&
+                !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+                setSidebarMode(m => m === 'expanded' ? 'collapsed' : 'expanded');
+            }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, []);
 
     const handleLogout = () => {
         auth.logout();
@@ -67,14 +93,21 @@ function AppInner() {
         return (
             <div className="min-h-screen bg-[#fffdfa] flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-orange-300 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
+                    <div className="w-12 h-12 border-4 border-orange-300 border-t-orange-600 rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-stone-500 font-medium">Loading...</p>
                 </div>
             </div>
         );
     }
 
-    const navigateTo = (view: ViewName) => { setSelectedOppId(null); setCurrentView(view); };
+    const navigateTo = (view: ViewName) => {
+        const prev = prevViewRef.current;
+        const goingShallower = !DEEP_VIEWS.has(view) && DEEP_VIEWS.has(prev);
+        setNavDirection(goingShallower ? 'left' : 'right');
+        prevViewRef.current = view;
+        setSelectedOppId(null);
+        setCurrentView(view);
+    };
 
     const renderContent = () => {
         if (displayRole === 'volunteer') {
@@ -117,33 +150,49 @@ function AppInner() {
         return null;
     };
 
+    const mainMargin = sidebarMode === 'expanded' ? 'ml-64' : sidebarMode === 'collapsed' ? 'ml-16' : 'ml-0';
+    const slideClass = navDirection === 'right' ? 'animate-slide-in-right' : 'animate-slide-in-left';
+
     return (
-        <div className="min-h-screen bg-[#fffdfa] selection:bg-orange-200 selection:text-orange-900">
-            {currentView === 'landing' && <LandingPage onGoLogin={() => setCurrentView('login')} onGoRegister={() => setCurrentView('register')} />}
-            {currentView === 'login' && (
-                <LoginPage onBack={() => setCurrentView('landing')} />
-            )}
-            {currentView === 'register' && (
-                <RegisterPage onBack={() => setCurrentView('landing')} onGoLogin={() => setCurrentView('login')} />
-            )}
+        <div className="min-h-screen bg-[#fffdfa] dark:bg-zinc-950 selection:bg-orange-200 selection:text-orange-900">
+            {currentView === 'landing'  && <LandingPage onGoLogin={() => setCurrentView('login')} onGoRegister={() => setCurrentView('register')} />}
+            {currentView === 'login'    && <LoginPage onBack={() => setCurrentView('landing')} />}
+            {currentView === 'register' && <RegisterPage onBack={() => setCurrentView('landing')} onGoLogin={() => setCurrentView('login')} />}
+
             {auth.token && currentView !== 'landing' && currentView !== 'login' && currentView !== 'register' && (
-                <div className="flex h-screen overflow-hidden">
+                <div className="flex h-screen overflow-hidden dark:bg-zinc-950">
                     <AppHeader
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
-                        sidebarOpen={sidebarOpen}
-                        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                        onOpenSearch={cmdPalette.open}
                         onNavigate={navigateTo}
+                        theme={theme}
+                        onToggleTheme={toggleTheme}
+                        onLogout={handleLogout}
                     />
                     <Sidebar
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
                         currentView={currentView}
-                        sidebarOpen={sidebarOpen}
+                        sidebarMode={sidebarMode}
                         onNavigate={navigateTo}
                         onLogout={handleLogout}
+                        onToggleCollapse={() => setSidebarMode(m => m === 'expanded' ? 'collapsed' : 'expanded')}
                     />
-                    <main className={`flex-1 overflow-y-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 transition-all ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+                    <main
+                        key={currentView}
+                        className={`flex-1 overflow-y-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 transition-[margin] duration-200 dark:bg-zinc-950 dark:text-zinc-100 ${mainMargin} ${slideClass}`}
+                    >
                         {renderContent()}
                     </main>
+                    <AIAssistant
+                        userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
+                        currentView={currentView}
+                    />
+                    <CommandPalette
+                        isOpen={cmdPalette.isOpen}
+                        onClose={cmdPalette.close}
+                        onNavigate={navigateTo}
+                        userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
+                    />
                 </div>
             )}
         </div>

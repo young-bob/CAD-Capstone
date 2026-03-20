@@ -1,16 +1,5 @@
-/**
- * AppHeader Component
- * 
- * Top navigation bar for the VSMS application.
- * Features:
- *  - Hamburger menu button to toggle the sidebar
- *  - VSMS brand logo and role badge
- *  - Notification bell with dropdown (role-aware: admin / volunteer / coordinator)
- *  - User avatar button that navigates to the Profile page
- */
-
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Heart, Menu, Bell, CheckCheck, Check } from 'lucide-react';
+import { Heart, Bell, CheckCheck, Check, Search, Sun, Moon, ChevronDown, User, LogOut } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { attendanceService } from '../services/attendance';
 import { applicationService } from '../services/applications';
@@ -18,73 +7,70 @@ import { organizationService } from '../services/organizations';
 import { useAuth } from '../hooks/useAuth';
 import type { ViewName } from '../types';
 
-/** The three possible user display roles */
 type DisplayRole = 'volunteer' | 'coordinator' | 'admin';
 
-/** Shape of an in-app notification item */
 interface Notification {
-    id: string;       // Unique key used for read/unread tracking
-    title: string;    // Primary text, e.g. "Application Approved"
-    subtitle: string; // Secondary text, e.g. opportunity + shift name
-    view: ViewName;   // Target view to navigate to when clicked
+    id: string;
+    title: string;
+    subtitle: string;
+    view: ViewName;
 }
 
-/** Props accepted by AppHeader */
 interface Props {
-    userRole: DisplayRole;              // Current user's role
-    sidebarOpen: boolean;               // Whether the sidebar is currently expanded
-    onToggleSidebar: () => void;        // Callback to toggle sidebar visibility
-    onNavigate: (view: ViewName) => void; // Callback to navigate to a specific view
+    userRole: DisplayRole;
+    onOpenSearch: () => void;
+    onNavigate: (view: ViewName) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
+    onLogout: () => void;
 }
 
-export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Props) {
+function getInitials(email: string): string {
+    if (!email) return '?';
+    const parts = email.split('@')[0].replace(/[._-]/g, ' ').trim().split(' ');
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0].slice(0, 2).toUpperCase();
+}
+
+export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, onToggleTheme, onLogout }: Props) {
     const auth = useAuth();
 
     // ── Notification state ──────────────────────────────────────
-    const [showNotif, setShowNotif] = useState(false);           // Controls dropdown visibility
-    const [notifications, setNotifications] = useState<Notification[]>([]); // Current notification list
+    const [showNotif, setShowNotif] = useState(false);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [prevUnread, setPrevUnread] = useState(0);
+    const [bellRing, setBellRing] = useState(false);
     const [readIds, setReadIds] = useState<Set<string>>(() => {
         try {
             const stored = localStorage.getItem('vsms_read_notif_ids');
             return stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
         } catch { return new Set<string>(); }
     });
-    const notifRef = useRef<HTMLDivElement>(null);                // Ref for click-outside detection
+    const notifRef = useRef<HTMLDivElement>(null);
 
-    /**
-     * Click-outside handler:
-     * Closes the notification dropdown when the user clicks anywhere
-     * outside the notification panel.
-     */
+    // ── Avatar dropdown state ───────────────────────────────────
+    const [showAvatar, setShowAvatar] = useState(false);
+    const avatarRef = useRef<HTMLDivElement>(null);
+
+    // Click-outside handlers
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-                setShowNotif(false);
-            }
+            if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotif(false);
+            if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setShowAvatar(false);
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    // Persist readIds to localStorage whenever they change
     useEffect(() => {
         localStorage.setItem('vsms_read_notif_ids', JSON.stringify([...readIds]));
     }, [readIds]);
 
-    /**
-     * Fetches notifications from the backend based on the current user role:
-     *  - Admin:       pending org applications + attendance disputes
-     *  - Volunteer:   actionable application status updates (Approved, Rejected, etc.)
-     *  - Coordinator: pending volunteer applications for their organization
-     * 
-     * Also prunes stale read IDs that no longer correspond to existing notifications.
-     */
     const fetchNotifications = useCallback(async () => {
         try {
             let notifs: Notification[] = [];
 
             if (userRole === 'admin') {
-                // Admin sees pending org registrations and attendance disputes
                 const [orgs, disputes] = await Promise.all([
                     adminService.getPendingOrganizations(),
                     attendanceService.getPendingDisputes(),
@@ -104,7 +90,6 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                     })),
                 ];
             } else if (userRole === 'volunteer' && auth.linkedGrainId) {
-                // Volunteer sees status updates on their own applications
                 const apps = await applicationService.getForVolunteer(auth.linkedGrainId);
                 const actionable = ['Approved', 'Rejected', 'Waitlisted', 'Promoted'];
                 notifs = (Array.isArray(apps) ? apps : [])
@@ -116,7 +101,6 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                         view: 'applications' as const,
                     }));
             } else if (userRole === 'coordinator' && auth.linkedGrainId) {
-                // Coordinator sees new pending volunteer applications
                 const apps = await organizationService.getApplications(auth.linkedGrainId);
                 notifs = (Array.isArray(apps) ? apps : [])
                     .filter(a => a.status === 'Pending')
@@ -129,88 +113,97 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
             }
 
             setNotifications(notifs);
-
-            // Prune stale read IDs that no longer match any existing notification
             setReadIds(prev => {
                 const existing = new Set(notifs.map(n => n.id));
                 return new Set([...prev].filter(id => existing.has(id)));
             });
-        } catch { /* Fail silently — notifications are non-critical */ }
+        } catch { /* non-critical */ }
     }, [userRole, auth.linkedGrainId]);
 
-    /**
-     * Poll notifications on mount and every 30 seconds.
-     * Cleanup clears the interval on unmount or dependency change.
-     */
     useEffect(() => {
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
     }, [fetchNotifications]);
 
-    /** Count of unread notifications (those whose IDs are NOT in readIds) */
     const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
 
-    /** Mark a single notification as read and navigate to its target view */
+    // Bell ring animation when new notifications arrive
+    useEffect(() => {
+        if (unreadCount > prevUnread && prevUnread !== 0) {
+            setBellRing(true);
+            setTimeout(() => setBellRing(false), 800);
+        }
+        setPrevUnread(unreadCount);
+    }, [unreadCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const handleClickNotif = (notif: Notification) => {
         setReadIds(prev => new Set([...prev, notif.id]));
         setShowNotif(false);
         onNavigate(notif.view);
     };
 
-    /** Mark a single notification as read without navigating (via the ✓ button) */
     const handleMarkOneRead = (e: React.MouseEvent, notifId: string) => {
-        e.stopPropagation(); // Prevent triggering the parent li's onClick
+        e.stopPropagation();
         setReadIds(prev => new Set([...prev, notifId]));
     };
 
-    /** Mark all notifications as read at once */
-    const handleMarkAllRead = () => {
-        setReadIds(new Set(notifications.map(n => n.id)));
-    };
+    const handleMarkAllRead = () => setReadIds(new Set(notifications.map(n => n.id)));
 
-    // ── Render ──────────────────────────────────────────────────
+    const initials = getInitials(auth.email ?? '');
+
     return (
-        <header className="bg-white border-b border-stone-100 h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 sm:px-6">
+        <header className="bg-white/80 dark:bg-zinc-900/85 backdrop-blur-xl border-b border-stone-100/80 dark:border-zinc-800 h-16 fixed top-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 shadow-sm shadow-stone-100/50">
 
-            {/* ── Left section: hamburger + branding ── */}
-            <div className="flex items-center gap-4">
-                {/* Sidebar toggle button (hamburger icon) */}
-                <button onClick={onToggleSidebar} className="p-2 rounded-xl text-stone-500 hover:bg-stone-100 focus:outline-none transition-colors">
-                    <Menu className="w-6 h-6" />
-                </button>
-
-                {/* VSMS logo and role badge */}
-                <div className="flex items-center gap-2">
-                    <Heart className="h-6 w-6 text-rose-500 fill-rose-500" />
-                    <span className="text-lg font-extrabold text-stone-800">VSMS</span>
-                    {/* Role badge — hidden on small screens */}
-                    <span className="hidden sm:inline-block ml-2 px-2.5 py-0.5 rounded-md text-xs font-bold bg-stone-100 text-stone-500 capitalize">
+            {/* ── Left: logo + role badge ── */}
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+                        <Heart className="h-4 w-4 text-white fill-white" />
+                    </div>
+                    <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-amber-500">VSMS</span>
+                    <span className="hidden sm:inline-block ml-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-gradient-to-r from-amber-50 to-orange-50 text-orange-600 border border-orange-100 capitalize">
                         {userRole} Portal
                     </span>
                 </div>
             </div>
 
-            {/* ── Right section: notifications + profile avatar ── */}
-            <div className="flex items-center gap-4">
+            {/* ── Center: search pill ── */}
+            <button
+                onClick={onOpenSearch}
+                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 text-stone-400 dark:text-zinc-500 hover:text-stone-600 dark:hover:text-zinc-300 text-sm transition-all w-64 text-left"
+            >
+                <Search className="w-4 h-4 shrink-0" />
+                <span className="flex-1">Search or press</span>
+                <kbd className="text-xs bg-white border border-stone-200 rounded px-1.5 py-0.5 text-stone-400 font-mono">⌘K</kbd>
+            </button>
 
-                {/* ── Notification bell + dropdown ── */}
+            {/* ── Right: theme toggle + notifications + avatar ── */}
+            <div className="flex items-center gap-2">
+
+                {/* Theme toggle */}
+                <button
+                    onClick={onToggleTheme}
+                    className="p-2 rounded-xl text-stone-400 dark:text-zinc-500 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
+                    title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                >
+                    {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </button>
+
+                {/* Notification bell */}
                 <div ref={notifRef} className="relative">
-                    {/* Bell icon button — red dot appears when there are unread notifications */}
                     <button
                         onClick={() => setShowNotif(v => !v)}
-                        className="p-2 text-stone-400 hover:text-orange-500 transition-colors relative"
+                        className={`p-2 text-stone-400 hover:text-orange-500 transition-colors relative ${bellRing ? 'animate-bell-ring' : ''}`}
                     >
-                        <Bell className="w-6 h-6" />
+                        <Bell className="w-5 h-5" />
                         {unreadCount > 0 && (
                             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
                         )}
                     </button>
 
-                    {/* Notification dropdown panel */}
                     {showNotif && (
-                        <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-stone-100 overflow-hidden z-50">
-                            {/* Dropdown header: title + "Mark all read" button */}
+                        <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 rounded-2xl shadow-level-3 border border-stone-100 dark:border-zinc-800 overflow-hidden z-50">
                             <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
                                 <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2">
                                     Notifications
@@ -224,8 +217,6 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                                     </button>
                                 )}
                             </div>
-
-                            {/* Notification list or empty state */}
                             {notifications.length === 0 ? (
                                 <div className="px-5 py-8 text-center text-stone-400 text-sm font-medium">No notifications</div>
                             ) : (
@@ -238,13 +229,11 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                                                 onClick={() => handleClickNotif(n)}
                                                 className={`px-5 py-3.5 cursor-pointer hover:bg-orange-50 flex gap-3 items-start transition-colors ${isUnread ? 'bg-orange-50/40' : ''}`}
                                             >
-                                                {/* Unread indicator dot */}
                                                 <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? 'bg-rose-500' : 'bg-transparent'}`} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className={`text-sm ${isUnread ? 'font-bold text-stone-800' : 'font-medium text-stone-500'}`}>{n.title}</p>
                                                     <p className="text-xs text-stone-400 truncate mt-0.5">{n.subtitle}</p>
                                                 </div>
-                                                {/* Individual "mark as read" button (only shown for unread items) */}
                                                 {isUnread && (
                                                     <button
                                                         onClick={e => handleMarkOneRead(e, n.id)}
@@ -263,16 +252,44 @@ export default function AppHeader({ userRole, onToggleSidebar, onNavigate }: Pro
                     )}
                 </div>
 
-                {/* ── Profile avatar button ── 
-                     Displays the first letter of the user's role (V / C / A).
-                     Clicking navigates to the Profile page. */}
-                <button
-                    onClick={() => onNavigate('profile')}
-                    className="h-9 w-9 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-white hover:ring-orange-300 cursor-pointer transition-all"
-                    title="Go to Profile"
-                >
-                    {userRole === 'volunteer' ? 'V' : userRole === 'coordinator' ? 'C' : 'A'}
-                </button>
+                {/* Avatar dropdown */}
+                <div ref={avatarRef} className="relative">
+                    <button
+                        onClick={() => setShowAvatar(v => !v)}
+                        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-stone-100 transition-all group"
+                    >
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-white group-hover:ring-orange-200 transition-all">
+                            {initials}
+                        </div>
+                        <span className="hidden sm:block text-sm font-medium text-stone-700 max-w-28 truncate">
+                            {auth.email?.split('@')[0]}
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-stone-400 hidden sm:block" />
+                    </button>
+
+                    {showAvatar && (
+                        <div className="absolute right-0 top-12 w-52 bg-white dark:bg-zinc-900 rounded-2xl shadow-level-3 border border-stone-100 dark:border-zinc-800 overflow-hidden z-50">
+                            <div className="px-4 py-3 border-b border-stone-100">
+                                <p className="text-sm font-semibold text-stone-800 truncate">{auth.email}</p>
+                                <p className="text-xs text-stone-400 capitalize">{userRole} account</p>
+                            </div>
+                            <div className="p-2">
+                                <button
+                                    onClick={() => { setShowAvatar(false); onNavigate('profile'); }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-stone-600 hover:bg-stone-50 text-sm transition-colors"
+                                >
+                                    <User className="w-4 h-4" /> Profile
+                                </button>
+                                <button
+                                    onClick={() => { setShowAvatar(false); onLogout(); }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-rose-500 hover:bg-rose-50 text-sm transition-colors font-medium"
+                                >
+                                    <LogOut className="w-4 h-4" /> Log Out
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </header>
     );
