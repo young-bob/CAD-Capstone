@@ -123,6 +123,7 @@ export interface OpportunitySummary {
     availableSpots: number;
     latitude: number | null;
     longitude: number | null;
+    requiredSkillIds: string[] | null;
 }
 
 export interface OpportunityRecommendation extends OpportunitySummary {

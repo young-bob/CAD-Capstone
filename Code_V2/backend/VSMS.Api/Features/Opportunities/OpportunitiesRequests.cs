@@ -28,5 +28,6 @@ public record OpportunityRecommendation(
     int RequiredSkillCount,
     double SkillMatchRatio,
     double? DistanceKm,
-    double RecommendationScore
+    double RecommendationScore,
+    List<Guid>? RequiredSkillIds = null
 );

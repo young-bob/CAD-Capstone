@@ -10,6 +10,8 @@ public record OpportunityStatusChangedEvent(Guid OpportunityId, OpportunityStatu
 public record OpportunitySpotsUpdatedEvent(Guid OpportunityId, int AvailableSpots, int TotalSpots);
 /// <summary>Published when a Coordinator sets which skills an opportunity requires.</summary>
 public record OpportunitySkillsUpdatedEvent(Guid OpportunityId, List<Guid> RequiredSkillIds);
+/// <summary>Published when a Coordinator sets or updates the geofence for an opportunity.</summary>
+public record OpportunityGeoFenceUpdatedEvent(Guid OpportunityId, double Latitude, double Longitude);
 
 public record ApplicationSubmittedEvent(Guid ApplicationId, Guid OpportunityId, Guid ShiftId, string OpportunityTitle, string ShiftName, DateTime ShiftStartTime, DateTime ShiftEndTime, Guid VolunteerId, string VolunteerName, ApplicationStatus Status, DateTime AppliedAt);
 public record ApplicationStatusChangedEvent(Guid ApplicationId, ApplicationStatus Status);
