@@ -201,6 +201,7 @@ public class OpportunityGrain(
             RadiusMeters = radiusMeters
         };
         await state.WriteStateAsync();
+        await eventBus.PublishAsync(new OpportunityGeoFenceUpdatedEvent(this.GetPrimaryKey(), lat, lon));
         logger.LogInformation("Opportunity {Id} geofence updated: Lat {Lat}, Lon {Lon}, Radius {Radius}m",
             this.GetPrimaryKey(), lat, lon, radiusMeters);
     }

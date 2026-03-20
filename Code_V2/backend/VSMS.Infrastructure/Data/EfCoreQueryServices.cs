@@ -100,7 +100,7 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
             .Take(safeTake)
             .Select(o => new OpportunitySummary(
                 o.OpportunityId, o.OrganizationId, o.OrganizationName, o.Title, o.Category,
-                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude))
+                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude, o.RequiredSkillIds))
             .ToListAsync();
     }
 
@@ -115,7 +115,7 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
             .Take(safeTake)
             .Select(o => new OpportunitySummary(
                 o.OpportunityId, o.OrganizationId, o.OrganizationName, o.Title, o.Category,
-                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude))
+                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude, o.RequiredSkillIds))
             .ToListAsync();
     }
 
@@ -126,7 +126,7 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
             .Where(o => opportunityIds.Contains(o.OpportunityId))
             .Select(o => new OpportunitySummary(
                 o.OpportunityId, o.OrganizationId, o.OrganizationName, o.Title, o.Category,
-                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude))
+                o.Status, o.PublishDate, o.TotalSpots, o.AvailableSpots, o.Latitude, o.Longitude, o.RequiredSkillIds))
             .ToListAsync();
     }
 }

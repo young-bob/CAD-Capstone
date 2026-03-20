@@ -117,7 +117,8 @@ public static class OpportunityEndpoints
                         requiredSkillCount,
                         Math.Round(skillMatchRatio, 4),
                         distanceKm.HasValue ? Math.Round(distanceKm.Value, 2) : null,
-                        Math.Round(recommendationScore, 4)
+                        Math.Round(recommendationScore, 4),
+                        o.RequiredSkillIds
                     );
                 })
                 .OrderByDescending(x => x.RecommendationScore)

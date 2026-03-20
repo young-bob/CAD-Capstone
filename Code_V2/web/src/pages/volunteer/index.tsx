@@ -327,7 +327,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 <div className="xl:col-span-2 bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-base font-bold text-stone-800">Volunteer Activity</h2>
-                        <span className="text-xs text-stone-400">{attendance.filter(a => ['CheckedOut','Confirmed','Resolved'].includes(a.status)).length} sessions total</span>
+                        <span className="text-xs text-stone-400">{attendance.filter(a => ['CheckedOut', 'Confirmed', 'Resolved'].includes(a.status)).length} sessions total</span>
                     </div>
                     <AttendanceHeatmap attendance={attendance} />
                     {/* Stats footer */}
@@ -337,7 +337,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                             return [
                                 { label: 'Total Hours', value: (profile?.totalHours ?? 0).toFixed(1) },
                                 { label: 'Completed', value: String(profile?.completedOpportunities ?? 0) },
-                                { label: 'Sessions', value: String(attendance.filter(a => ['CheckedOut','Confirmed','Resolved'].includes(a.status)).length) },
+                                { label: 'Sessions', value: String(attendance.filter(a => ['CheckedOut', 'Confirmed', 'Resolved'].includes(a.status)).length) },
                                 { label: 'Week Streak', value: String(streak), highlight: streak > 0 },
                             ].map(s => (
                                 <div key={s.label} className={`rounded-xl px-3 py-3 text-center ${s.highlight ? 'bg-amber-50' : 'bg-stone-50'}`}>
@@ -497,104 +497,6 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // VOLUNTEER OPPORTUNITIES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{/* interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
-export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
-    const [opps, setOpps] = useState<OpportunitySummary[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [query, setQuery] = useState('');
-
-    const load = useCallback(async (q?: string) => {
-        setLoading(true); setError('');
-        try {
-            const data = await opportunityService.search(q);
-            setOpps(data);
-        } catch (err: any) {
-            setError(getErr(err, 'Failed to load opportunities'));
-        } finally { setLoading(false); }
-    }, []);
-
-    useEffect(() => { load(); }, [load]);
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        load(query);
-    };
-
-    const tagColors: Record<string, string> = {
-        'Community': 'text-rose-600 bg-rose-50',
-        'Environment': 'text-emerald-600 bg-emerald-50',
-        'Education': 'text-amber-600 bg-amber-50',
-        'Health': 'text-blue-600 bg-blue-50',
-        'Technology': 'text-violet-600 bg-violet-50',
-    };
-    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
-    const recommendationTier = (score: number): string => {
-        if (score >= 0.8) return 'Excellent Match';
-        if (score >= 0.6) return 'Strong Match';
-        if (score >= 0.45) return 'Good Match';
-        return 'Possible Match';
-    };
-    const recommendationTone = (score: number): string => {
-        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
-        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
-        return 'text-stone-700 bg-stone-50 border-stone-200';
-    };
-    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
-    const recommendationTier = (score: number): string => {
-        if (score >= 0.8) return 'Excellent Match';
-        if (score >= 0.6) return 'Strong Match';
-        if (score >= 0.45) return 'Good Match';
-        return 'Possible Match';
-    };
-    const recommendationTone = (score: number): string => {
-        if (score >= 0.8) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-        if (score >= 0.6) return 'text-lime-700 bg-lime-50 border-lime-200';
-        if (score >= 0.45) return 'text-amber-700 bg-amber-50 border-amber-200';
-        return 'text-stone-700 bg-stone-50 border-stone-200';
-    };
-
-    return (
-        <div className="max-w-6xl mx-auto space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div><h1 className="text-3xl font-extrabold text-stone-800">Opportunities</h1><p className="text-stone-500 mt-2 text-lg">Discover meaningful projects.</p></div>
-                <form onSubmit={handleSearch} className="flex w-full sm:w-auto gap-3">
-                    <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
-                        <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search..." className="w-full pl-12 pr-4 py-3 rounded-full border border-stone-200 focus:ring-2 focus:ring-orange-500 outline-none shadow-sm" />
-                    </div>
-                    <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded-full font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/20">Search</button>
-                </form>
-            </div>
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : opps.length === 0 ? <Empty msg="No opportunities found." /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {opps.map(opp => (
-                        <div key={opp.opportunityId} className="bg-white rounded-3xl p-7 shadow-sm border border-stone-100 hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col group">
-                            <div className="flex justify-between items-start mb-5">
-                                <span className={`inline-block px-4 py-1.5 text-xs font-bold rounded-full ${tagColors[opp.category] || 'text-stone-600 bg-stone-50'}`}>{opp.category}</span>
-                                <Heart className="w-6 h-6 text-stone-200 group-hover:text-rose-400 hover:!text-rose-500 hover:!fill-rose-500 cursor-pointer transition-colors" />
-                            </div>
-                            <h3 className="text-xl font-bold text-stone-800 mb-2">{opp.title}</h3>
-                            <p className="text-sm font-medium text-stone-500 mb-6">{opp.organizationName}</p>
-                            <div className="mt-auto space-y-3 mb-8">
-                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
-                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
-                            </div>
-                            <button
-                                disabled={opp.availableSpots === 0}
-                                onClick={() => onViewDetail?.(opp.opportunityId)}
-                                className={`w-full py-3.5 rounded-2xl font-bold transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
-                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details →'}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-*/}
 
 
 interface VolOpportunitiesProps { onViewDetail?: (id: string) => void; }
@@ -617,6 +519,25 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
     const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'ready' | 'denied' | 'unsupported'>('idle');
     const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
+    const [volunteerSkills, setVolunteerSkills] = useState<Skill[]>([]);
+    const [allSkills, setAllSkills] = useState<Skill[]>([]);
+    const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+    const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [maxDistance, setMaxDistance] = useState<number>(20);
+    const [availableOnly, setAvailableOnly] = useState<boolean>(false);
+    const [filtersOpen, setFiltersOpen] = useState<boolean>(true);
+
+    useEffect(() => {
+        skillService.getAll().then(setAllSkills).catch(() => { });
+    }, []);
+
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        skillService.getVolunteerSkills(auth.linkedGrainId)
+            .then(setVolunteerSkills)
+            .catch(() => { });
+    }, [auth.linkedGrainId]);
 
     const asRecommendation = (opp: OpportunitySummary): OpportunityRecommendation => ({
         ...opp,
@@ -643,6 +564,7 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                 const ranked = await opportunityService.recommendForVolunteer({
                     volunteerId: auth.userId,
                     query: q,
+                    category: selectedCategory || undefined,
                     lat: coords?.lat,
                     lon: coords?.lon,
                     take: 500,
@@ -650,12 +572,12 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                 setOpps(ranked.opportunities);
                 return;
             }
-            const data = await opportunityService.search(q);
+            const data = await opportunityService.search(q, selectedCategory || undefined);
             setOpps(data.map(asRecommendation));
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunities'));
         } finally { setLoading(false); }
-    }, [auth.userId, coords?.lat, coords?.lon, smartMatch]);
+    }, [auth.userId, coords?.lat, coords?.lon, smartMatch, selectedCategory]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -688,7 +610,6 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         'Health': 'text-blue-600 bg-blue-50',
         'Technology': 'text-violet-600 bg-violet-50',
     };
-    const mappableOpps = opps.filter(o => o.latitude !== null && o.longitude !== null);
     const recommendationTier = (score: number): string => {
         if (score >= 0.8) return 'Excellent Match';
         if (score >= 0.6) return 'Strong Match';
@@ -702,10 +623,18 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         return 'text-stone-700 bg-stone-50 border-stone-200';
     };
 
+    const displayedOpps = useMemo(() => {
+        let result = opps;
+        if (availableOnly) result = result.filter(o => o.availableSpots > 0);
+        if (smartMatch && maxDistance < 20) result = result.filter(o => o.distanceKm === null || o.distanceKm <= maxDistance);
+        return result;
+    }, [opps, availableOnly, smartMatch, maxDistance]);
+
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+            {/* ── Header + Search ── */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div><h1 className="text-3xl font-extrabold text-stone-800">Opportunities</h1><p className="text-stone-500 mt-2 text-lg">Discover meaningful projects.</p></div>
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Discover Opportunities</h1><p className="text-stone-500 mt-2 text-lg">Find volunteer positions near you that match your skills and interests</p></div>
                 <form onSubmit={handleSearch} className="flex w-full sm:w-auto gap-3">
                     <div className="relative w-full sm:w-72">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
@@ -714,6 +643,8 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                     <button type="submit" className="bg-orange-500 text-white px-6 py-3 rounded-full font-bold hover:bg-orange-600 shadow-lg shadow-orange-500/20">Search</button>
                 </form>
             </div>
+
+            {/* ── Smart Match toggle ── */}
             <div className="flex items-center gap-3">
                 <button
                     onClick={() => setSmartMatch(v => !v)}
@@ -734,69 +665,242 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                     </span>
                 )}
             </div>
-            {mappableOpps.length > 0 && (
-                <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-stone-100 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-lg font-extrabold text-stone-800">Opportunity Heat Layer</h2>
-                        <span className="text-xs font-semibold text-stone-500">
-                            {mappableOpps.length} mappable opportunities
-                            {coords ? ' · centered on your location' : ''}
-                        </span>
-                    </div>
-                    <Suspense fallback={<div className="h-80 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-400 text-sm">Loading map layer...</div>}>
-                        <OpportunityHeatMap opportunities={opps} userLocation={coords} height={320} />
-                    </Suspense>
-                </div>
-            )}
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : opps.length === 0 ? <Empty msg="No opportunities found." /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {opps.map(opp => (
-                        <div key={opp.opportunityId} className="bg-white rounded-3xl p-7 shadow-sm border border-stone-100 hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col group">
-                            <div className="flex justify-between items-start mb-5">
-                                <span className={`inline-block px-4 py-1.5 text-xs font-bold rounded-full ${tagColors[opp.category] || 'text-stone-600 bg-stone-50'}`}>{opp.category}</span>
-                                <Heart
-                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(opp.opportunityId); }}
-                                    className={`w-6 h-6 cursor-pointer transition-colors ${favorites.has(opp.opportunityId)
-                                        ? 'text-rose-500 fill-rose-500'
-                                        : 'text-stone-200 group-hover:text-rose-400 hover:!text-rose-500 hover:!fill-rose-500'
-                                        }`}
-                                />
+
+            {/* ── Mobile tab toggle (List / Map) ── */}
+            <div className="flex lg:hidden bg-stone-100 rounded-full p-1 w-fit">
+                <button
+                    onClick={() => setMobileTab('list')}
+                    className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${mobileTab === 'list' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+                >List</button>
+                <button
+                    onClick={() => setMobileTab('map')}
+                    className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${mobileTab === 'map' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
+                >Map</button>
+            </div>
+
+            {/* ── Main content: filters + list + map ── */}
+            <div className="flex gap-6 items-start">
+
+                {/* ── Filters sidebar ── */}
+                <div className={`hidden lg:flex flex-col w-56 shrink-0 bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden`}>
+                    <button
+                        onClick={() => setFiltersOpen(v => !v)}
+                        className="flex items-center justify-between px-5 py-4 font-bold text-stone-800 border-b border-stone-100 hover:bg-stone-50 transition-colors"
+                    >
+                        <span className="flex items-center gap-2 text-sm"><Search className="w-4 h-4 text-orange-500" />Filters</span>
+                        <span className={`text-stone-400 text-xs transition-transform ${filtersOpen ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+
+                    {filtersOpen && (
+                        <div className="p-5 space-y-6">
+                            {/* Category */}
+                            <div>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-stone-400 mb-3">Category</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {['', 'Community', 'Environment', 'Education', 'Health', 'Technology'].map(cat => (
+                                        <button
+                                            key={cat}
+                                            onClick={() => { setSelectedCategory(cat); }}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${selectedCategory === cat
+                                                ? 'bg-orange-500 text-white border-orange-500'
+                                                : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}
+                                        >
+                                            {cat || 'All'}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <h3 className="text-xl font-bold text-stone-800 mb-2">{opp.title}</h3>
-                            <p className="text-sm font-medium text-stone-500 mb-6">{opp.organizationName}</p>
-                            <div className="mt-auto space-y-3 mb-8">
-                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><Calendar className="w-4 h-4 text-orange-500" /><span>{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : 'N/A'}</span></div>
-                                <div className="flex items-center gap-3 text-sm font-medium text-stone-600"><User className="w-4 h-4 text-orange-500" /><span>{opp.availableSpots}/{opp.totalSpots} spots</span></div>
-                                {smartMatch && (
-                                    <div className={`rounded-2xl border p-3 space-y-1.5 ${recommendationTone(opp.recommendationScore || 0)}`}>
-                                        <div className="text-[11px] uppercase tracking-wide font-extrabold">Why This Match</div>
-                                        <div className="text-xs font-semibold">
-                                            {opp.requiredSkillCount > 0
-                                                ? `Skills: ${opp.matchedSkillCount}/${opp.requiredSkillCount} matched`
-                                                : 'Skills: open to all volunteers'}
-                                        </div>
-                                        <div className="text-xs font-semibold">
-                                            Recommendation: {Math.round((opp.recommendationScore || 0) * 100)}% · {recommendationTier(opp.recommendationScore || 0)}
-                                        </div>
-                                        {opp.distanceKm !== null && (
-                                            <div className="flex items-center gap-1 text-xs font-semibold">
-                                                <MapPin className="w-3.5 h-3.5" />
-                                                <span>Distance: {opp.distanceKm.toFixed(1)} km</span>
-                                            </div>
-                                        )}
+
+                            {/* Skills (volunteer's own) */}
+                            {volunteerSkills.length > 0 && (
+                                <div>
+                                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-stone-400 mb-3">My Skills</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {volunteerSkills.map(s => (
+                                            <span key={s.id} className="px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-100">
+                                                {s.name}
+                                            </span>
+                                        ))}
                                     </div>
-                                )}
+                                    <p className="text-[10px] text-stone-400 mt-2">Smart Match uses your skills automatically</p>
+                                </div>
+                            )}
+
+                            {/* Distance slider (only when Smart Match ON and location available) */}
+                            {smartMatch && locationStatus === 'ready' && (
+                                <div>
+                                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-stone-400 mb-3">Distance</p>
+                                    <div className="space-y-2">
+                                        <input
+                                            type="range"
+                                            min={1}
+                                            max={20}
+                                            value={maxDistance}
+                                            onChange={e => setMaxDistance(Number(e.target.value))}
+                                            className="w-full accent-orange-500"
+                                        />
+                                        <div className="flex justify-between text-xs text-stone-400 font-medium">
+                                            <span>1 km</span>
+                                            <span className="text-orange-600 font-bold">{maxDistance < 20 ? `≤ ${maxDistance} km` : 'Any distance'}</span>
+                                            <span>20 km</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Availability */}
+                            <div>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-stone-400 mb-3">Availability</p>
+                                <label className="flex items-center gap-2.5 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={availableOnly}
+                                        onChange={e => setAvailableOnly(e.target.checked)}
+                                        className="accent-orange-500 w-4 h-4 rounded"
+                                    />
+                                    <span className="text-xs font-semibold text-stone-700 group-hover:text-orange-600 transition-colors">Available spots only</span>
+                                </label>
                             </div>
-                            <button
-                                disabled={opp.availableSpots === 0}
-                                onClick={() => onViewDetail?.(opp.opportunityId)}
-                                className={`w-full py-3.5 rounded-2xl font-bold transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
-                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details →'}
-                            </button>
+
+                            {/* Reset */}
+                            {(selectedCategory || availableOnly || maxDistance < 20) && (
+                                <button
+                                    onClick={() => { setSelectedCategory(''); setAvailableOnly(false); setMaxDistance(20); }}
+                                    className="w-full text-xs font-bold text-stone-500 hover:text-orange-600 transition-colors py-1"
+                                >
+                                    Reset filters
+                                </button>
+                            )}
                         </div>
-                    ))}
+                    )}
                 </div>
-            )}
+
+                {/* ── Card list ── */}
+                <div className={`flex-1 min-w-0 ${mobileTab === 'map' ? 'hidden lg:block' : 'block'}`}>
+                    {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={() => load()} /> : displayedOpps.length === 0 ? <Empty msg="No opportunities found." /> : (
+                        <>
+                            <p className="text-sm font-semibold text-stone-500 mb-4">{displayedOpps.length} opportunities found</p>
+                            <div className="space-y-4">
+                                {displayedOpps.map(opp => (
+                                    <div
+                                        key={opp.opportunityId}
+                                        id={`opp-card-${opp.opportunityId}`}
+                                        onClick={() => setSelectedOppId(opp.opportunityId)}
+                                        className={`bg-white rounded-3xl px-6 py-5 shadow-sm border transition-all group cursor-pointer hover:shadow-lg ${selectedOppId === opp.opportunityId ? 'border-orange-400 ring-2 ring-orange-400' : 'border-stone-100'}`}
+                                    >
+                                        {/* Row 1: title + match badge + date + heart */}
+                                        <div className="flex items-start justify-between gap-3 mb-1">
+                                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                                <h3 className="text-base font-bold text-stone-800 truncate">{opp.title}</h3>
+                                                {smartMatch && (opp.recommendationScore || 0) >= 0.45 && (
+                                                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${recommendationTone(opp.recommendationScore || 0)}`}>
+                                                        {recommendationTier(opp.recommendationScore || 0)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <span className="text-xs font-medium text-stone-400 hidden sm:block">
+                                                    {opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : ''}
+                                                </span>
+                                                <Heart
+                                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleFavorite(opp.opportunityId); }}
+                                                    className={`w-5 h-5 cursor-pointer transition-colors ${favorites.has(opp.opportunityId)
+                                                        ? 'text-rose-500 fill-rose-500'
+                                                        : 'text-stone-200 group-hover:text-rose-400 hover:!text-rose-500 hover:!fill-rose-500'
+                                                        }`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: org name + category tag */}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <p className="text-sm font-medium text-stone-500">{opp.organizationName}</p>
+                                            <span className={`inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full ${tagColors[opp.category] || 'text-stone-600 bg-stone-50'}`}>{opp.category}</span>
+                                        </div>
+
+                                        {/* Row 3: info chips (distance · spots · date mobile) */}
+                                        <div className="flex flex-wrap items-center gap-4 mb-3 text-sm font-medium text-stone-600">
+                                            {opp.distanceKm !== null && (
+                                                <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-orange-500" />{opp.distanceKm.toFixed(1)} km</span>
+                                            )}
+                                            <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-orange-500" />{opp.totalSpots - opp.availableSpots}/{opp.totalSpots} spots filled</span>
+                                            <span className="flex items-center gap-1.5 sm:hidden"><Calendar className="w-3.5 h-3.5 text-orange-500" />{opp.publishDate ? new Date(opp.publishDate).toLocaleDateString() : ''}</span>
+                                        </div>
+
+                                        {/* Row 4: skill chips + Why This Match + button */}
+                                        <div className="flex items-end justify-between gap-4">
+                                            <div className="flex-1 min-w-0 space-y-2">
+                                                {opp.requiredSkillIds && opp.requiredSkillIds.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {opp.requiredSkillIds.slice(0, 4).map(id => {
+                                                            const skill = allSkills.find(s => s.id === id);
+                                                            if (!skill) return null;
+                                                            const isMatched = volunteerSkills.some(s => s.id === id);
+                                                            return (
+                                                                <span key={id} className={`text-xs font-semibold rounded-full px-2.5 py-0.5 border ${isMatched ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                                                                    {skill.name}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                                {smartMatch && (
+                                                    <div className={`inline-flex flex-wrap gap-x-3 gap-y-0.5 rounded-xl border px-3 py-2 text-xs font-semibold ${recommendationTone(opp.recommendationScore || 0)}`}>
+                                                        <span className="font-extrabold uppercase tracking-wide text-[10px]">Why This Match</span>
+                                                        <span>{opp.requiredSkillCount > 0 ? `Skills: ${opp.matchedSkillCount}/${opp.requiredSkillCount} matched` : 'Skills: open to all volunteers'}</span>
+                                                        <span>Recommendation: {Math.round((opp.recommendationScore || 0) * 100)}%</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                disabled={opp.availableSpots === 0}
+                                                onClick={(e) => { e.stopPropagation(); onViewDetail?.(opp.opportunityId); }}
+                                                className={`shrink-0 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all ${opp.availableSpots === 0 ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-orange-50 text-orange-600 hover:bg-orange-500 hover:text-white'}`}>
+                                                {opp.availableSpots === 0 ? 'Fully Booked' : 'View Details →'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* ── Map panel ── always rendered so MapContainer never unmounts */}
+                <div className={`lg:w-96 lg:sticky lg:top-4 lg:self-start ${mobileTab === 'map' ? 'block w-full' : 'hidden lg:block'}`}>
+                    <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden relative">
+                        <Suspense fallback={<div className="h-[500px] bg-stone-100 flex items-center justify-center text-stone-400 text-sm">Loading map...</div>}>
+                            <OpportunityHeatMap
+                                opportunities={displayedOpps}
+                                userLocation={coords}
+                                selectedOppId={selectedOppId}
+                                onSelect={(id) => {
+                                    setSelectedOppId(id);
+                                    document.getElementById(`opp-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }}
+                                onLocationFound={(c) => {
+                                    setCoords(c);
+                                    setLocationStatus('ready');
+                                }}
+                                height={500}
+                            />
+                        </Suspense>
+                        {/* Map legend */}
+                        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-stone-100 px-4 py-3 space-y-1.5" style={{ zIndex: 1001 }}>
+                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-stone-500 mb-2">Map Legend</p>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-stone-700">
+                                <span className="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span> You
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-stone-700">
+                                <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span> Recommended
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-stone-700">
+                                <span className="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span> Selected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -1351,7 +1455,7 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                     </div>
                 )}
             </div>
-         
+
             {/* Upload Credential */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h3 className="text-xl font-bold text-stone-800 mb-2">Credentials</h3>
@@ -1455,8 +1559,8 @@ export function VolSkills() {
                                             onClick={() => toggle(skill)}
                                             title={skill.description}
                                             className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${selected
-                                                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/30'
-                                                    : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600'
+                                                ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/30'
+                                                : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300 hover:text-orange-600'
                                                 }`}
                                         >
                                             {selected && <span className="mr-1">✓</span>}
