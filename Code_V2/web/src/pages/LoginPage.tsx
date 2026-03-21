@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Heart, Loader2, AlertCircle, Users, Clock, Award, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import CustomCursor from '../components/CustomCursor';
 
 interface Props {
     onBack: () => void;
@@ -34,7 +35,8 @@ export default function LoginPage({ onBack }: Props) {
     };
 
     return (
-        <div className="min-h-screen flex">
+        <div className="light-page min-h-screen flex">
+            <CustomCursor />
 
             {/* ── Left: Brand panel (lg+) ── */}
             <div className="hidden lg:flex w-[46%] bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 relative overflow-hidden flex-col items-center justify-center p-14">
