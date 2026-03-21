@@ -135,35 +135,8 @@ html.dark .bg-\[\#fff7ed\] { background-color: #0f0f11 !important; }
 .dark .divide-stone-50  > * + * { border-color: #1c1c1f; }
 .dark .divide-stone-100 > * + * { border-color: #27272a; }
 
-/* ── Landing page: always light (overrides dark mode) ── */
-/* Higher specificity (3 classes) beats dark overrides (2 classes) */
-.dark .light-page                          { background-color: #fffaf5 !important; color: #1c1917 !important; }
-.dark .light-page .bg-\[\#fffaf5\],
-.dark .light-page .bg-\[\#fffdfa\]        { background-color: #fffaf5 !important; }
-.dark .light-page .bg-white               { background-color: #ffffff !important; }
-.dark .light-page .bg-white\/70,
-.dark .light-page .bg-white\/80,
-.dark .light-page .bg-white\/55,
-.dark .light-page .bg-white\/60           { background-color: rgba(255,255,255,0.7) !important; }
-.dark .light-page .bg-stone-50            { background-color: #fafaf9 !important; }
-.dark .light-page .bg-stone-100           { background-color: #f5f5f4 !important; }
-.dark .light-page .bg-stone-200           { background-color: #e7e5e4 !important; }
-.dark .light-page .bg-orange-50           { background-color: #fff7ed !important; }
-.dark .light-page .bg-amber-50            { background-color: #fffbeb !important; }
-.dark .light-page .bg-blue-50             { background-color: #eff6ff !important; }
-.dark .light-page .bg-emerald-50          { background-color: #ecfdf5 !important; }
-.dark .light-page .text-stone-900         { color: #1c1917 !important; }
-.dark .light-page .text-stone-800         { color: #292524 !important; }
-.dark .light-page .text-stone-700         { color: #44403c !important; }
-.dark .light-page .text-stone-600         { color: #57534e !important; }
-.dark .light-page .text-stone-500         { color: #78716c !important; }
-.dark .light-page .text-stone-400         { color: #a8a29e !important; }
-.dark .light-page .border-stone-100       { border-color: #f5f5f4 !important; }
-.dark .light-page .border-stone-200       { border-color: #e7e5e4 !important; }
-.dark .light-page .border-white           { border-color: #ffffff !important; }
-.dark .light-page input,
-.dark .light-page textarea,
-.dark .light-page select                  { background-color: #ffffff !important; color: #1c1917 !important; border-color: #e7e5e4 !important; }
+/* light-page class kept for reference but no longer needed — dark class is
+   never applied on public routes (landing/login/register) via useTheme(active) */
 
 /* ============================================================
    ELEVATION SHADOWS
@@ -329,6 +302,15 @@ body {
   30%, 60%      { transform: rotate(-12deg); }
 }
 .animate-bell-ring { animation: bell-ring 0.7s ease-in-out; }
+
+/* Landing page — hide native cursor, use custom one */
+.light-page, .light-page * { cursor: none !important; }
+
+/* Landing page cursor sparkle burst */
+@keyframes sparkle-burst {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1.2); }
+  100% { opacity: 0; transform: translate(var(--tx, 0px), var(--ty, -32px)) scale(0); }
+}
 
 /* Button success flash */
 @keyframes btn-success-flash {

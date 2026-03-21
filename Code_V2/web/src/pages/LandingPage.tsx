@@ -1,9 +1,148 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Heart, Sun, ChevronRight, CheckCircle2, Award, ShieldCheck, MapPin, Clock, Users, Briefcase, FileCheck, Star, Mail, Github, Twitter } from 'lucide-react';
 
 interface Props {
     onGoLogin: () => void;
     onGoRegister: () => void;
+}
+
+// ─── Custom cursor with sparkle effect ───────────────────────────────────────
+interface Sparkle { id: number; x: number; y: number; tx: number; ty: number; color: string; }
+
+const SPARKLE_COLORS = ['#f59e0b', '#f97316', '#fbbf24', '#fb923c', '#fde68a', '#fff7ed'];
+
+function useCursor() {
+    const dotRef = useRef<HTMLDivElement>(null);
+    const ringRef = useRef<HTMLDivElement>(null);
+    const pos = useRef({ x: -200, y: -200 });
+    const ring = useRef({ x: -200, y: -200 });
+    const raf = useRef<number>(0);
+    const hovering = useRef(false);
+    const [sparkles, setSparkles] = useState<Sparkle[]>([]);
+    const sparkleId = useRef(0);
+
+    const animate = useCallback(() => {
+        const lerpFactor = 0.12;
+        ring.current.x += (pos.current.x - ring.current.x) * lerpFactor;
+        ring.current.y += (pos.current.y - ring.current.y) * lerpFactor;
+
+        if (dotRef.current) {
+            dotRef.current.style.transform = `translate(${pos.current.x}px, ${pos.current.y}px)`;
+        }
+        if (ringRef.current) {
+            const scale = hovering.current ? 1.8 : 1;
+            ringRef.current.style.transform = `translate(${ring.current.x}px, ${ring.current.y}px) scale(${scale})`;
+        }
+        raf.current = requestAnimationFrame(animate);
+    }, []);
+
+    useEffect(() => {
+        const onMove = (e: MouseEvent) => {
+            pos.current = { x: e.clientX, y: e.clientY };
+        };
+
+        const onEnterInteractive = () => { hovering.current = true; };
+        const onLeaveInteractive = () => { hovering.current = false; };
+
+        const onClick = (e: MouseEvent) => {
+            const burst: Sparkle[] = Array.from({ length: 8 }, (_, i) => {
+                const angle = (i / 8) * Math.PI * 2;
+                const dist = 32 + Math.random() * 20;
+                return {
+                    id: ++sparkleId.current,
+                    x: e.clientX,
+                    y: e.clientY,
+                    tx: Math.cos(angle) * dist,
+                    ty: Math.sin(angle) * dist,
+                    color: SPARKLE_COLORS[i % SPARKLE_COLORS.length],
+                };
+            });
+            setSparkles(prev => [...prev, ...burst]);
+            setTimeout(() => {
+                setSparkles(prev => prev.filter(s => !burst.find(b => b.id === s.id)));
+            }, 700);
+        };
+
+        const attachHoverListeners = () => {
+            document.querySelectorAll('a, button, [role="button"]').forEach(el => {
+                el.addEventListener('mouseenter', onEnterInteractive);
+                el.addEventListener('mouseleave', onLeaveInteractive);
+            });
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('click', onClick);
+        attachHoverListeners();
+        // Re-attach on DOM changes (dynamic content)
+        const mo = new MutationObserver(attachHoverListeners);
+        mo.observe(document.body, { childList: true, subtree: true });
+
+        raf.current = requestAnimationFrame(animate);
+        return () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('click', onClick);
+            cancelAnimationFrame(raf.current);
+            mo.disconnect();
+        };
+    }, [animate]);
+
+    return { dotRef, ringRef, sparkles };
+}
+
+function CustomCursor() {
+    const { dotRef, ringRef, sparkles } = useCursor();
+    return (
+        <>
+            {/* Dot */}
+            <div
+                ref={dotRef}
+                style={{
+                    position: 'fixed', top: 0, left: 0, zIndex: 9999,
+                    width: 10, height: 10,
+                    background: 'radial-gradient(circle, #f97316, #f59e0b)',
+                    borderRadius: '50%',
+                    pointerEvents: 'none',
+                    marginLeft: -4, marginTop: -4,
+                    boxShadow: '0 0 6px rgba(249,115,22,0.8)',
+                }}
+            />
+            {/* Ring */}
+            <div
+                ref={ringRef}
+                style={{
+                    position: 'fixed', top: 0, left: 0, zIndex: 9998,
+                    width: 36, height: 36,
+                    border: '1.5px solid rgba(249,115,22,0.5)',
+                    borderRadius: '50%',
+                    pointerEvents: 'none',
+                    marginLeft: -18, marginTop: -18,
+                    transition: 'transform 0s, border-color 0.2s',
+                    backdropFilter: 'none',
+                }}
+            />
+            {/* Sparkles */}
+            {sparkles.map(s => (
+                <div
+                    key={s.id}
+                    style={{
+                        position: 'fixed',
+                        top: s.y,
+                        left: s.x,
+                        zIndex: 9997,
+                        pointerEvents: 'none',
+                        width: 7, height: 7,
+                        borderRadius: '50%',
+                        background: s.color,
+                        boxShadow: `0 0 8px ${s.color}`,
+                        animation: 'sparkle-burst 0.65s ease-out forwards',
+                        marginLeft: -3.5, marginTop: -3.5,
+                        ['--tx' as string]: `${s.tx}px`,
+                        ['--ty' as string]: `${s.ty}px`,
+                    }}
+                />
+            ))}
+        </>
+    );
 }
 
 // ─── Count-up hook (triggers on scroll into view) ────────────────────────────
@@ -149,6 +288,7 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
 
     return (
         <div className="light-page min-h-screen bg-[#fffaf5] flex flex-col font-sans">
+            <CustomCursor />
 
             {/* ─── Header ─── */}
             <header className="bg-white/70 backdrop-blur-xl shadow-sm shadow-stone-100/80 sticky top-0 z-50 border-b border-stone-100/50">
@@ -311,9 +451,9 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                                                 <span className="text-xs text-stone-500">Coordinator confirmed</span>
                                             </div>
                                             <div className="flex -space-x-1.5">
-                                                {['A','B','C','D'].map((l, idx) => (
+                                                {['A', 'B', 'C', 'D'].map((l, idx) => (
                                                     <div key={l} className="w-5 h-5 rounded-full border border-white flex items-center justify-center text-[8px] font-bold text-white"
-                                                        style={{ background: ['#f59e0b','#10b981','#8b5cf6','#f97316'][idx] }}>
+                                                        style={{ background: ['#f59e0b', '#10b981', '#8b5cf6', '#f97316'][idx] }}>
                                                         {l}
                                                     </div>
                                                 ))}
@@ -334,8 +474,8 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                                         </div>
                                         {[
                                             { name: 'Beach Cleanup', tag: 'Environment', pct: 98 },
-                                            { name: 'Food Bank Help', tag: 'Community',  pct: 91 },
-                                            { name: 'Tree Planting',  tag: 'Green',       pct: 87 },
+                                            { name: 'Food Bank Help', tag: 'Community', pct: 91 },
+                                            { name: 'Tree Planting', tag: 'Green', pct: 87 },
                                         ].map(ev => (
                                             <div key={ev.name} className="flex items-center justify-between bg-white/20 rounded-xl px-3 py-2.5 mb-2">
                                                 <div>
@@ -409,16 +549,16 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                                                 transform: rank === 0
                                                     ? 'rotate(0deg) scale(1) translate(0px, 0px)'
                                                     : rank === 1
-                                                    ? 'rotate(4deg) scale(0.95) translate(18px, 14px)'
-                                                    : rank === 2
-                                                    ? 'rotate(8deg) scale(0.90) translate(36px, 28px)'
-                                                    : 'rotate(11deg) scale(0.85) translate(52px, 40px)',
+                                                        ? 'rotate(4deg) scale(0.95) translate(18px, 14px)'
+                                                        : rank === 2
+                                                            ? 'rotate(8deg) scale(0.90) translate(36px, 28px)'
+                                                            : 'rotate(11deg) scale(0.85) translate(52px, 40px)',
                                                 opacity: rank === 0 ? 1 : rank === 1 ? 0.72 : rank === 2 ? 0.45 : 0.2,
                                                 boxShadow: rank === 0
                                                     ? '0 20px 40px -8px rgba(0,0,0,0.18)'
                                                     : rank === 1
-                                                    ? '0 8px 20px -4px rgba(0,0,0,0.10)'
-                                                    : '0 4px 8px -2px rgba(0,0,0,0.06)',
+                                                        ? '0 8px 20px -4px rgba(0,0,0,0.10)'
+                                                        : '0 4px 8px -2px rgba(0,0,0,0.06)',
                                                 transition: 'transform 0.7s cubic-bezier(0.4,0,0.2,1), opacity 0.5s ease, box-shadow 0.5s ease',
                                             }}
                                         >

@@ -47,7 +47,8 @@ const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendan
 
 function AppInner() {
     const auth = useAuth();
-    const { theme, toggleTheme } = useTheme();
+    const isPublicView = !auth.token;
+    const { theme, toggleTheme } = useTheme(!isPublicView);
     const cmdPalette = useCommandPalette();
 
     const [currentView, setCurrentView] = useState<ViewName>('landing');
