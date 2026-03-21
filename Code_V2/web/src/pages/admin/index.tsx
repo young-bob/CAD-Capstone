@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink, Server, Gauge, ShieldCheck } from 'lucide-react';
+import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink, Server, Gauge, ShieldCheck, Download, Copy } from 'lucide-react';
+import { downloadCsv } from '../../utils/exportCsv';
+import { useCountUp } from '../../hooks/useCountUp';
+import { useInfiniteList } from '../../hooks/useInfiniteList';
 import SystemHealthPanel from '../../components/SystemHealthPanel';
 import StatusBadge from '../../components/StatusBadge';
+import { SkeletonDashboard } from '../../components/Skeleton';
 import type { ViewName, OrganizationSummary, UserRecord, DisputeSummary, Skill, OrgState, SystemInfoSummary } from '../../types';
 import { OrgRole } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,6 +15,10 @@ import { attendanceService } from '../../services/attendance';
 import { skillService } from '../../services/skills';
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
+function StatNum({ value }: { value: number }) {
+    const animated = useCountUp(value);
+    return <>{String(animated)}</>;
+}
 function ErrorBox({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
     return (<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center"><AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" /><p className="text-rose-700 font-medium">{msg}</p>{onRetry && <button onClick={onRetry} className="mt-3 text-sm text-orange-600 font-bold hover:underline">Retry</button>}</div>);
 }
@@ -73,6 +81,8 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
+    if (loading) return <SkeletonDashboard />;
+
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             <div>
@@ -90,16 +100,16 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             {/* Zone B: KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Users', val: String(users.length), icon: Users, gradient: 'from-blue-500 to-cyan-400', target: 'admin_users' as ViewName },
-                    { label: 'Pending Orgs', val: String(pendingOrgs.length), icon: Building, gradient: 'from-amber-400 to-orange-500', target: 'admin_orgs' as ViewName },
-                    { label: 'Active Disputes', val: String(disputes.length), icon: AlertTriangle, gradient: 'from-rose-500 to-pink-500', target: 'admin_disputes' as ViewName },
-                    { label: 'Banned Users', val: String(bannedUsers), icon: User, gradient: 'from-stone-500 to-slate-600', target: 'admin_users' as ViewName },
+                    { label: 'Total Users', numVal: users.length, icon: Users, gradient: 'from-blue-500 to-cyan-400', target: 'admin_users' as ViewName },
+                    { label: 'Pending Orgs', numVal: pendingOrgs.length, icon: Building, gradient: 'from-amber-400 to-orange-500', target: 'admin_orgs' as ViewName },
+                    { label: 'Active Disputes', numVal: disputes.length, icon: AlertTriangle, gradient: 'from-rose-500 to-pink-500', target: 'admin_disputes' as ViewName },
+                    { label: 'Banned Users', numVal: bannedUsers, icon: User, gradient: 'from-stone-500 to-slate-600', target: 'admin_users' as ViewName },
                 ].map((s, i) => (
                     <button key={i} onClick={() => onNavigate(s.target)}
                         className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start card-interactive group animate-content-reveal"
                         style={{ animationDelay: `${i * 0.07}s` }}>
                         <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}><s.icon className="w-5 h-5" /></div>
-                        <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                        <div className="text-2xl font-black text-stone-800"><StatNum value={s.numVal} /></div>
                         <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label}</div>
                     </button>
                 ))}
@@ -652,13 +662,23 @@ export function AdminOrgs() {
     }, [orgs]);
 
     const handleApprove = async (orgId: string) => {
-        try { await adminService.approveOrg(orgId); showToast('Organization approved'); setTimeout(() => load(), 600); }
-        catch (err: any) { showToast(getErr(err, 'Failed to approve')); }
+        const prev = orgs.find(o => o.orgId === orgId);
+        setOrgs(prev => prev.map(o => o.orgId === orgId ? { ...o, status: 'Approved' } : o));
+        try { await adminService.approveOrg(orgId); showToast('Organization approved ✅'); setTimeout(() => load(), 600); }
+        catch (err: any) {
+            if (prev) setOrgs(list => list.map(o => o.orgId === orgId ? prev : o));
+            showToast(getErr(err, 'Failed to approve'));
+        }
     };
 
     const handleReject = async (orgId: string) => {
+        const prev = orgs.find(o => o.orgId === orgId);
+        setOrgs(prev => prev.map(o => o.orgId === orgId ? { ...o, status: 'Rejected' } : o));
         try { await adminService.rejectOrg(orgId, 'Rejected by administrator.'); showToast('Organization rejected'); setTimeout(() => load(), 600); }
-        catch (err: any) { showToast(getErr(err, 'Failed to reject')); }
+        catch (err: any) {
+            if (prev) setOrgs(list => list.map(o => o.orgId === orgId ? prev : o));
+            showToast(getErr(err, 'Failed to reject'));
+        }
     };
 
     const handleCreate = async (e: React.FormEvent) => {
@@ -807,9 +827,19 @@ export function AdminOrgs() {
 
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-extrabold text-stone-800">Organizations</h1>
-                <button onClick={() => setShowCreate(v => !v)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
-                    <Plus className="w-5 h-5" /> Create Organization
-                </button>
+                <div className="flex items-center gap-2">
+                    {orgs.length > 0 && (
+                        <button
+                            onClick={() => downloadCsv('organizations', orgs.map(o => ({ Name: o.name, Status: o.status, Created: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '' })))}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                        >
+                            <Download className="w-4 h-4" /> Export CSV
+                        </button>
+                    )}
+                    <button onClick={() => setShowCreate(v => !v)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
+                        <Plus className="w-5 h-5" /> Create Organization
+                    </button>
+                </div>
             </div>
 
             {showCreate && (
@@ -1596,11 +1626,22 @@ export function AdminUsers() {
         if (sort === 'email_asc') return a.email.localeCompare(b.email);
         return b.email.localeCompare(a.email);
     });
+    const { visible: pagedUsers, hasMore: usersHasMore, sentinelRef: usersSentinel } = useInfiniteList(sortedUsers);
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            <h1 className="text-3xl font-extrabold text-stone-800">User Control</h1>
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-extrabold text-stone-800">User Control</h1>
+                {sortedUsers.length > 0 && (
+                    <button
+                        onClick={() => downloadCsv('users', sortedUsers.map(u => ({ Email: u.email, Role: u.role, Organization: u.organizationName ?? '', Banned: u.isBanned ? 'Yes' : 'No', Created: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '' })))}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                )}
+            </div>
 
             {/* Filter bar — wrapped in form autoComplete=off to suppress browser autofill */}
             <form autoComplete="off" onSubmit={e => e.preventDefault()} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-wrap gap-3 items-end">
@@ -1658,7 +1699,7 @@ export function AdminUsers() {
             {loading ? <Spinner /> : sortedUsers.length === 0 ? <Empty msg="No users match the filter." /> : (
                 <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                     <div className="px-5 py-3 bg-stone-50 border-b border-stone-100 text-xs text-stone-400 font-medium">
-                        Showing {sortedUsers.length} of {nonAdminUsers.length} users
+                        Showing {pagedUsers.length} of {sortedUsers.length} ({nonAdminUsers.length} total)
                     </div>
                     <table className="w-full text-left">
                         <thead className="border-b border-stone-100 text-stone-500 text-sm">
@@ -1672,11 +1713,18 @@ export function AdminUsers() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100">
-                            {sortedUsers.map(u => (
+                            {pagedUsers.map(u => (
                                 <tr key={u.id} className={`hover:bg-orange-50/30 ${actionPending === u.id ? 'opacity-70 bg-orange-50/40' : ''}`}>
                                     <td className="p-5 font-medium text-stone-800 flex items-center gap-3">
                                         <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center shrink-0"><User className="w-4 h-4 text-stone-400" /></div>
-                                        {u.email}
+                                        <span>{u.email}</span>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(u.email); showToast('Email copied!'); }}
+                                            className="p-1 rounded text-stone-300 hover:text-stone-500 hover:bg-stone-100 transition-colors"
+                                            title="Copy email"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
                                     </td>
                                     <td className="p-5"><span className="px-2 py-0.5 bg-stone-100 text-stone-600 text-xs font-bold rounded">{u.role}</span></td>
                                     <td className="p-5 text-stone-500 text-sm">{u.organizationName ?? <span className="text-stone-300">—</span>}</td>
@@ -1757,6 +1805,7 @@ export function AdminUsers() {
                             ))}
                         </tbody>
                     </table>
+                    {usersHasMore && <div ref={usersSentinel} className="py-3 text-center text-xs text-stone-400">Loading more…</div>}
                 </div>
             )}
         </div>

@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
 
+/** Read-only hook — watches the `dark` class on <html> without modifying it. */
+export function useDarkMode(): boolean {
+    const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+    useEffect(() => {
+        const observer = new MutationObserver(() =>
+            setDark(document.documentElement.classList.contains('dark'))
+        );
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+    return dark;
+}
+
 export type Theme = 'light' | 'dark';
 
 export function useTheme(active = true) {

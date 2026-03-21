@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Heart, Bell, CheckCheck, Check, Search, Sun, Moon, ChevronDown, User, LogOut } from 'lucide-react';
+import { timeAgo } from '../utils/timeAgo';
 import { adminService } from '../services/admin';
 import { attendanceService } from '../services/attendance';
 import { applicationService } from '../services/applications';
@@ -14,6 +15,7 @@ interface Notification {
     title: string;
     subtitle: string;
     view: ViewName;
+    createdAt?: string;
 }
 
 interface Props {
@@ -23,6 +25,7 @@ interface Props {
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
     onLogout: () => void;
+    onBadgesUpdate?: (badges: Partial<Record<ViewName, number>>) => void;
 }
 
 function getInitials(email: string): string {
@@ -32,7 +35,7 @@ function getInitials(email: string): string {
     return parts[0].slice(0, 2).toUpperCase();
 }
 
-export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, onToggleTheme, onLogout }: Props) {
+export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, onToggleTheme, onLogout, onBadgesUpdate }: Props) {
     const auth = useAuth();
 
     // ── Notification state ──────────────────────────────────────
@@ -117,13 +120,26 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                 const existing = new Set(notifs.map(n => n.id));
                 return new Set([...prev].filter(id => existing.has(id)));
             });
+            if (onBadgesUpdate) {
+                const byView = notifs.reduce((acc, n) => {
+                    acc[n.view] = (acc[n.view] ?? 0) + 1;
+                    return acc;
+                }, {} as Partial<Record<ViewName, number>>);
+                onBadgesUpdate(byView);
+            }
         } catch { /* non-critical */ }
-    }, [userRole, auth.linkedGrainId]);
+    }, [userRole, auth.linkedGrainId, onBadgesUpdate]);
 
     useEffect(() => {
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
+        // Re-poll immediately when user returns to the tab
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchNotifications(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
     }, [fetchNotifications]);
 
     const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
@@ -233,6 +249,9 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                                                 <div className="min-w-0 flex-1">
                                                     <p className={`text-sm ${isUnread ? 'font-bold text-stone-800' : 'font-medium text-stone-500'}`}>{n.title}</p>
                                                     <p className="text-xs text-stone-400 truncate mt-0.5">{n.subtitle}</p>
+                                                    {n.createdAt && (
+                                                        <p className="text-[10px] text-stone-300 mt-0.5">{timeAgo(n.createdAt)}</p>
+                                                    )}
                                                 </div>
                                                 {isUnread && (
                                                     <button

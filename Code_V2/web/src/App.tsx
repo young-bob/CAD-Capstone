@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, Component, type ReactNode, type ErrorInfo } from 'react';
+import { useState, useEffect, useRef, useCallback, Component, type ReactNode, type ErrorInfo } from 'react';
+import { ChevronUp } from 'lucide-react';
 import type { ViewName } from './types';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
@@ -30,8 +31,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 import AppHeader from './components/AppHeader';
 import Sidebar, { type SidebarMode } from './components/Sidebar';
+import MobileNav from './components/MobileNav';
+import OnboardingModal from './components/OnboardingModal';
 import CommandPalette from './components/CommandPalette';
 import AIAssistant from './components/AIAssistant';
+import Toaster from './components/Toaster';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -55,7 +59,11 @@ function AppInner() {
     const [sidebarMode, setSidebarMode] = useState<SidebarMode>('expanded');
     const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
     const [navDirection, setNavDirection] = useState<'right' | 'left'>('right');
+    const [sidebarBadges, setSidebarBadges] = useState<Partial<Record<ViewName, number>>>({});
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [showScrollTop, setShowScrollTop] = useState(false);
     const prevViewRef = useRef<ViewName>('landing');
+    const mainRef = useRef<HTMLElement>(null);
 
     // Map backend role string to display role for sidebar/header
     const displayRole = auth.role === 'SystemAdmin' ? 'admin' : auth.role === 'Coordinator' ? 'coordinator' : 'volunteer';
@@ -73,16 +81,34 @@ function AppInner() {
         if (window.innerWidth < 768) setSidebarMode('hidden');
     }, []);
 
-    // '[' key to toggle sidebar collapse
+    // Show onboarding for new volunteers (once per account)
+    useEffect(() => {
+        if (!auth.token || !auth.email || auth.role !== 'Volunteer') return;
+        const key = `vsms_onboarded_${auth.email}`;
+        if (!localStorage.getItem(key)) setShowOnboarding(true);
+    }, [auth.token, auth.email, auth.role]);
+
+    // '[' key to toggle sidebar collapse; Escape to close detail views
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (e.key === '[' && !e.ctrlKey && !e.metaKey &&
-                !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (e.key === '[' && !e.ctrlKey && !e.metaKey) {
                 setSidebarMode(m => m === 'expanded' ? 'collapsed' : 'expanded');
+            }
+            if (e.key === 'Escape' && selectedOppId) {
+                setSelectedOppId(null);
             }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
+    }, [selectedOppId]);
+
+    // Scroll-to-top visibility
+    const handleMainScroll = useCallback(() => {
+        setShowScrollTop((mainRef.current?.scrollTop ?? 0) > 300);
+    }, []);
+    const scrollToTop = useCallback(() => {
+        mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
     const handleLogout = () => {
@@ -156,6 +182,7 @@ function AppInner() {
 
     return (
         <div className="min-h-screen bg-[#fffdfa] dark:bg-zinc-950 selection:bg-orange-200 selection:text-orange-900">
+            <Toaster />
             {currentView === 'landing'  && <LandingPage onGoLogin={() => setCurrentView('login')} onGoRegister={() => setCurrentView('register')} />}
             {currentView === 'login'    && <LoginPage onBack={() => setCurrentView('landing')} />}
             {currentView === 'register' && <RegisterPage onBack={() => setCurrentView('landing')} onGoLogin={() => setCurrentView('login')} />}
@@ -169,6 +196,7 @@ function AppInner() {
                         theme={theme}
                         onToggleTheme={toggleTheme}
                         onLogout={handleLogout}
+                        onBadgesUpdate={setSidebarBadges}
                     />
                     <Sidebar
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
@@ -177,13 +205,41 @@ function AppInner() {
                         onNavigate={navigateTo}
                         onLogout={handleLogout}
                         onToggleCollapse={() => setSidebarMode(m => m === 'expanded' ? 'collapsed' : 'expanded')}
+                        badges={sidebarBadges}
                     />
                     <main
+                        ref={mainRef}
                         key={currentView}
-                        className={`flex-1 overflow-y-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 transition-[margin] duration-200 dark:bg-zinc-950 dark:text-zinc-100 ${mainMargin} ${slideClass}`}
+                        onScroll={handleMainScroll}
+                        className={`flex-1 overflow-y-auto pt-24 px-4 sm:px-6 lg:px-8 pb-12 md:pb-12 pb-24 transition-[margin] duration-200 dark:bg-zinc-950 dark:text-zinc-100 ${mainMargin} ${slideClass}`}
                     >
                         {renderContent()}
                     </main>
+                    {/* Scroll-to-top button */}
+                    <button
+                        onClick={scrollToTop}
+                        aria-label="Scroll to top"
+                        className={`fixed bottom-20 right-5 z-40 w-10 h-10 rounded-full bg-stone-800 dark:bg-zinc-700 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:bg-stone-700 dark:hover:bg-zinc-600 hover:scale-110 ${
+                            showScrollTop ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+                        }`}
+                    >
+                        <ChevronUp className="w-5 h-5" />
+                    </button>
+                    <MobileNav
+                        userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
+                        currentView={currentView}
+                        onNavigate={navigateTo}
+                        badges={sidebarBadges}
+                    />
+                    {showOnboarding && (
+                        <OnboardingModal
+                            onDone={(view) => {
+                                localStorage.setItem(`vsms_onboarded_${auth.email}`, '1');
+                                setShowOnboarding(false);
+                                if (view) navigateTo(view);
+                            }}
+                        />
+                    )}
                     <AIAssistant
                         userRole={displayRole as 'volunteer' | 'coordinator' | 'admin'}
                         currentView={currentView}

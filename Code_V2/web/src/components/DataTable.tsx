@@ -103,7 +103,7 @@ export default function DataTable<T extends Record<string, unknown>>({
             ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={columns.length}>
-                  <EmptyState icon={Search} title={emptyTitle} description={emptyDescription} variant="search" />
+                  <EmptyState icon={Search} title={emptyTitle} description={emptyDescription} />
                 </td>
               </tr>
             ) : (

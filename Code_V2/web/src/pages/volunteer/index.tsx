@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Clock, CheckCircle2, Award, Calendar, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart } from 'lucide-react';
+import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart } from 'lucide-react';
+import EventCalendar from '../../components/EventCalendar';
 import ImpactRing from '../../components/ImpactRing';
 import AttendanceHeatmap from '../../components/AttendanceHeatmap';
 import StreakCard, { computeStreak } from '../../components/StreakCard';
 import StatusBadge from '../../components/StatusBadge';
+import { SkeletonDashboard } from '../../components/Skeleton';
 import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
 import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,8 +19,18 @@ import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import ActionToast from '../../components/ActionToast';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import Confetti from '../../components/Confetti';
+import ActivityFeed, { type ActivityItem } from '../../components/ActivityFeed';
+import { useCountUp } from '../../hooks/useCountUp';
+import { useDarkMode } from '../../hooks/useTheme';
 const MapView = lazy(() => import('../../components/MapView'));
 const OpportunityHeatMap = lazy(() => import('../../components/OpportunityHeatMap'));
+
+/** Animates a number from 0 → target on mount. */
+function StatNum({ value, decimals = 0 }: { value: number; decimals?: number }) {
+    const animated = useCountUp(value);
+    return <>{decimals > 0 ? animated.toFixed(decimals) : String(animated)}</>;
+}
 
 // ─── Shared loading / error / empty states ────────────────────
 function Spinner() {
@@ -156,6 +168,7 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
 interface DashboardProps { onNavigate: (view: ViewName) => void; }
 
 export function VolDashboard({ onNavigate }: DashboardProps) {
+    const dark = useDarkMode();
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [apps, setApps] = useState<ApplicationSummary[]>([]);
@@ -247,11 +260,13 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         return 'bg-stone-100 text-stone-700';
     };
     const statCards = [
-        { label: 'Total Hours', val: profile?.totalHours ? profile.totalHours.toFixed(1) : '0', unit: 'hrs', icon: Clock, gradient: 'from-blue-500 to-cyan-400', glow: 'hover:shadow-blue-500/20', target: 'attendance' as ViewName },
-        { label: 'Completed', val: String(profile?.completedOpportunities ?? 0), unit: 'events', icon: CheckCircle2, gradient: 'from-emerald-500 to-teal-400', glow: 'hover:shadow-emerald-500/20', target: 'attendance' as ViewName },
-        { label: 'Credentials', val: String(profile?.credentials?.length ?? 0), unit: 'docs', icon: Award, gradient: 'from-amber-400 to-orange-500', glow: 'hover:shadow-amber-500/20', target: 'profile' as ViewName },
-        { label: 'Applications', val: String(apps.length), unit: 'total', icon: BadgeCheck, gradient: 'from-violet-500 to-purple-500', glow: 'hover:shadow-violet-500/20', target: 'applications' as ViewName },
+        { label: 'Total Hours', numVal: profile?.totalHours ?? 0, decimals: 1, unit: 'hrs', icon: Clock, gradient: 'from-blue-500 to-cyan-400', glow: 'hover:shadow-blue-500/20', target: 'attendance' as ViewName },
+        { label: 'Completed', numVal: profile?.completedOpportunities ?? 0, decimals: 0, unit: 'events', icon: CheckCircle2, gradient: 'from-emerald-500 to-teal-400', glow: 'hover:shadow-emerald-500/20', target: 'attendance' as ViewName },
+        { label: 'Credentials', numVal: profile?.credentials?.length ?? 0, decimals: 0, unit: 'docs', icon: Award, gradient: 'from-amber-400 to-orange-500', glow: 'hover:shadow-amber-500/20', target: 'profile' as ViewName },
+        { label: 'Applications', numVal: apps.length, decimals: 0, unit: 'total', icon: BadgeCheck, gradient: 'from-violet-500 to-purple-500', glow: 'hover:shadow-violet-500/20', target: 'applications' as ViewName },
     ];
+
+    if (loading) return <SkeletonDashboard />;
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -315,7 +330,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                         <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}>
                             <s.icon className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                        <div className="text-2xl font-black text-stone-800"><StatNum value={s.numVal} decimals={s.decimals} /></div>
                         <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label} <span className="text-stone-300">· {s.unit}</span></div>
                     </button>
                 ))}
@@ -442,10 +457,10 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                                         <stop offset="100%" stopColor="#fbbf24" />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" vertical={false} />
-                                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: '#fff7ed' }} />
+                                <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#3f3f46' : '#f5f5f4'} vertical={false} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11, fill: dark ? '#a1a1aa' : '#a8a29e' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 11, fill: dark ? '#a1a1aa' : '#a8a29e' }} axisLine={false} tickLine={false} />
+                                <Tooltip contentStyle={{ backgroundColor: dark ? '#18181b' : '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: dark ? 'rgba(255,255,255,0.04)' : '#fff7ed' }} />
                                 <Bar dataKey="hours" fill="url(#volHoursGrad)" radius={[6, 6, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
@@ -464,32 +479,33 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ color: '#57534e', fontSize: 11 }}>{value}</span>} />
-                                <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} />
+                                <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ color: dark ? '#a1a1aa' : '#57534e', fontSize: 11 }}>{value}</span>} />
+                                <Tooltip contentStyle={{ backgroundColor: dark ? '#18181b' : '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} />
                             </PieChart>
                         </ResponsiveContainer>
                     )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-level-1 border border-stone-100">
-                <h2 className="text-base font-bold text-stone-800 mb-4">Recent Application Activity</h2>
-                {recentApps.length === 0 ? (
-                    <p className="text-sm text-stone-400 py-4">No activity yet.</p>
-                ) : (
-                    <div className="divide-y divide-stone-50">
-                        {recentApps.map(app => (
-                            <div key={app.applicationId} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                                <div>
-                                    <p className="font-semibold text-stone-800 text-sm">{formatEventTitle(app.opportunityTitle, app.shiftName)}</p>
-                                    <p className="text-xs text-stone-400 mt-0.5">Applied {formatDateTime(app.appliedAt)}</p>
-                                </div>
-                                <StatusBadge status={app.status} />
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <ActivityFeed items={[
+                ...apps.map((a): ActivityItem => ({
+                    id: `app-${a.applicationId}`,
+                    type: a.status === 'Approved' ? 'approved'
+                        : a.status === 'Rejected' ? 'rejected'
+                        : a.status === 'Completed' ? 'completed'
+                        : 'applied',
+                    label: formatEventTitle(a.opportunityTitle, a.shiftName),
+                    sub: a.status === 'Pending' ? 'Application submitted' : `Status: ${a.status}`,
+                    timestamp: a.appliedAt,
+                })),
+                ...attendance.filter(a => a.checkInTime).map((a): ActivityItem => ({
+                    id: `att-${a.attendanceId}`,
+                    type: a.checkOutTime ? 'checked_out' : 'checked_in',
+                    label: a.opportunityTitle ?? 'Volunteer shift',
+                    sub: a.checkOutTime ? `Checked out · ${(a.totalHours ?? 0).toFixed(1)} hrs` : 'Checked in',
+                    timestamp: a.checkInTime!,
+                })),
+            ]} />
         </div>
     );
 }
@@ -512,6 +528,7 @@ function saveFavorites(ids: Set<string>) {
 export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     const auth = useAuth();
     const [opps, setOpps] = useState<OpportunityRecommendation[]>([]);
+    const [calendarView, setCalendarView] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
@@ -664,10 +681,28 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
                         {locationStatus === 'idle' && 'Using skill-based ranking'}
                     </span>
                 )}
+                <button
+                    onClick={() => setCalendarView(v => !v)}
+                    className={`ml-auto flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                        calendarView
+                            ? 'bg-amber-50 border-amber-300 text-amber-600 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400'
+                            : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-stone-50'
+                    }`}
+                >
+                    <CalendarDays className="w-4 h-4" />
+                    {calendarView ? 'List View' : 'Calendar View'}
+                </button>
             </div>
 
+            {calendarView && (
+                <EventCalendar
+                    events={opps.map(o => ({ id: o.opportunityId, title: o.title, date: o.publishDate, color: 'bg-amber-400' }))}
+                    onEventClick={onViewDetail}
+                />
+            )}
+
             {/* ── Mobile tab toggle (List / Map) ── */}
-            <div className="flex lg:hidden bg-stone-100 rounded-full p-1 w-fit">
+            <div className={`flex lg:hidden bg-stone-100 rounded-full p-1 w-fit${calendarView ? ' hidden' : ''}`}>
                 <button
                     onClick={() => setMobileTab('list')}
                     className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${mobileTab === 'list' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500'}`}
@@ -679,7 +714,7 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
             </div>
 
             {/* ── Main content: filters + list + map ── */}
-            <div className="flex gap-6 items-start">
+            <div className={`flex gap-6 items-start${calendarView ? ' hidden' : ''}`}>
 
                 {/* ── Filters sidebar ── */}
                 <div className={`hidden lg:flex flex-col w-56 shrink-0 bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden`}>
@@ -1011,8 +1046,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                 open={!!confirmWithdrawApp}
                 title="Withdraw Application"
                 message={confirmWithdrawApp ? `Withdraw "${formatEventTitle(confirmWithdrawApp.opportunityTitle, confirmWithdrawApp.shiftName)}"?` : ''}
-                confirmText="Withdraw"
-                loading={!!confirmWithdrawApp && actionId === confirmWithdrawApp.applicationId}
+                confirmLabel="Withdraw"
                 onCancel={() => setConfirmWithdrawApp(null)}
                 onConfirm={handleWithdrawConfirm}
             />
@@ -1200,18 +1234,30 @@ export function VolCertificates() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
+    const [showConfetti, setShowConfetti] = useState(false);
 
     // Generate modal
     const [showGenerate, setShowGenerate] = useState(false);
     const [selTemplate, setSelTemplate] = useState<string | null>(null);
     const [generating, setGenerating] = useState(false);
 
+    const SEEN_KEY = `vsms_seen_certs_${auth.email ?? ''}`;
+
     const load = useCallback(async () => {
         setLoading(true); setError('');
-        try { const data = await certificateService.getTemplates(); setTemplates(data); }
+        try {
+            const data = await certificateService.getTemplates();
+            setTemplates(data);
+            // Check for new certificates since last visit
+            const seen = new Set<string>(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]'));
+            const newOnes = data.filter(t => !seen.has(t.id));
+            if (newOnes.length > 0 && seen.size > 0) setShowConfetti(true);
+            data.forEach(t => seen.add(t.id));
+            localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+        }
         catch (err: any) { setError(getErr(err, 'Failed to load certificates')); }
         finally { setLoading(false); }
-    }, []);
+    }, [SEEN_KEY]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -1233,6 +1279,7 @@ export function VolCertificates() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
+            {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             <div><h1 className="text-3xl font-extrabold text-stone-800">Certificates</h1><p className="text-stone-500 mt-2 text-lg">Generate your volunteer participation certificates.</p></div>
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : templates.length === 0

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays } from 'lucide-react';
+import { downloadCsv } from '../../utils/exportCsv';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
 import StatusBadge from '../../components/StatusBadge';
+import { SkeletonDashboard } from '../../components/Skeleton';
 import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
 import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,9 +16,18 @@ import { certificateService } from '../../services/certificates';
 import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
 import { MiniCalendar } from '../../components/MiniCalendar';
+import EventCalendar from '../../components/EventCalendar';
+import ActivityFeed, { type ActivityItem } from '../../components/ActivityFeed';
+import { useCountUp } from '../../hooks/useCountUp';
+import { useDarkMode } from '../../hooks/useTheme';
+import { useInfiniteList } from '../../hooks/useInfiniteList';
 const MapPicker = lazy(() => import('../../components/MapPicker'));
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
+function StatNum({ value, decimals = 0 }: { value: number; decimals?: number }) {
+    const animated = useCountUp(value);
+    return <>{decimals > 0 ? animated.toFixed(decimals) : String(animated)}</>;
+}
 
 function useOrgStatus(): string | null {
     const auth = useAuth();
@@ -52,6 +63,7 @@ function getErr(err: any, fallback: string): string { const d = err?.response?.d
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 interface CoordDashboardProps { onNavigate: (view: ViewName) => void; }
 export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
+    const dark = useDarkMode();
     const auth = useAuth();
     const [org, setOrg] = useState<OrgState | null>(null);
     const [orgNotFound, setOrgNotFound] = useState(false);
@@ -275,6 +287,8 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
+    if (loading) return <SkeletonDashboard />;
+
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
@@ -319,16 +333,16 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                     {/* Zone B: KPI cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: 'Active Events', val: String(opps.filter(o => o.status === 'Published').length), icon: Briefcase, gradient: 'from-blue-500 to-cyan-400', target: 'manage_events' as ViewName },
-                            { label: 'Pending Applications', val: String(pendingApps), icon: Users, gradient: 'from-amber-400 to-orange-500', target: 'org_applications' as ViewName },
-                            { label: 'Total Applicants', val: String(apps.length), icon: Clock, gradient: 'from-emerald-500 to-teal-400', target: 'org_applications' as ViewName },
-                            { label: 'Members', val: String(org.members?.length ?? 0), icon: Award, gradient: 'from-rose-500 to-pink-500', target: 'org_members' as ViewName },
+                            { label: 'Active Events', numVal: opps.filter(o => o.status === 'Published').length, icon: Briefcase, gradient: 'from-blue-500 to-cyan-400', target: 'manage_events' as ViewName },
+                            { label: 'Pending Applications', numVal: pendingApps, icon: Users, gradient: 'from-amber-400 to-orange-500', target: 'org_applications' as ViewName },
+                            { label: 'Total Applicants', numVal: apps.length, icon: Clock, gradient: 'from-emerald-500 to-teal-400', target: 'org_applications' as ViewName },
+                            { label: 'Members', numVal: org.members?.length ?? 0, icon: Award, gradient: 'from-rose-500 to-pink-500', target: 'org_members' as ViewName },
                         ].map((s, i) => (
                             <button key={i} onClick={() => onNavigate(s.target)}
                                 className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start text-left card-interactive group animate-content-reveal"
                                 style={{ animationDelay: `${i * 0.07}s` }}>
                                 <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}><s.icon className="w-5 h-5" /></div>
-                                <div className="text-2xl font-black text-stone-800">{s.val}</div>
+                                <div className="text-2xl font-black text-stone-800"><StatNum value={s.numVal} /></div>
                                 <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label}</div>
                             </button>
                         ))}
@@ -375,10 +389,10 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                                             <stop offset="100%" stopColor="#ef4444" />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f4" horizontal={false} />
-                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#a8a29e' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                    <YAxis type="category" dataKey="event" width={100} tick={{ fontSize: 10, fill: '#78716c' }} axisLine={false} tickLine={false} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: '#fff7ed' }} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={dark ? '#3f3f46' : '#f5f5f4'} horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: dark ? '#a1a1aa' : '#a8a29e' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="event" width={100} tick={{ fontSize: 10, fill: dark ? '#a1a1aa' : '#78716c' }} axisLine={false} tickLine={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: dark ? '#18181b' : '#1c1917', border: 'none', borderRadius: 12, color: '#fff', fontSize: 12 }} cursor={{ fill: dark ? 'rgba(255,255,255,0.04)' : '#fff7ed' }} />
                                     <Bar dataKey="count" fill="url(#coordAppsGrad)" radius={[0, 6, 6, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -403,6 +417,22 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* Activity Feed */}
+                    <div className="xl:col-span-2">
+                        <ActivityFeed title="Application Activity" items={[
+                            ...apps.slice().sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()).slice(0, 20).map((a): ActivityItem => ({
+                                id: `app-${a.applicationId}`,
+                                type: a.status === 'Approved' ? 'approved'
+                                    : a.status === 'Rejected' ? 'rejected'
+                                    : a.status === 'Completed' ? 'completed'
+                                    : 'applied',
+                                label: a.volunteerName ?? 'Volunteer',
+                                sub: `${a.opportunityTitle}${a.shiftName ? ` · ${a.shiftName}` : ''}`,
+                                timestamp: a.appliedAt,
+                            })),
+                        ]} />
                     </div>
                 </>
             )}
@@ -478,11 +508,39 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [opps, setOpps] = useState<OpportunitySummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const DRAFT_KEY = `vsms_draft_event_${auth.linkedGrainId ?? ''}`;
+    const DEFAULT_FORM = { title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 };
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
+    const [createForm, setCreateForm] = useState(DEFAULT_FORM);
+    const [draftRestored, setDraftRestored] = useState(false);
     const [creating, setCreating] = useState(false);
     const [publishingId, setPublishingId] = useState<string | null>(null);
     const [recoveringId, setRecoveringId] = useState<string | null>(null);
+    const [calendarView, setCalendarView] = useState(false);
+
+    // Restore draft on mount
+    useEffect(() => {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.title || parsed.description || parsed.category) {
+                    setCreateForm(parsed);
+                    setDraftRestored(true);
+                }
+            } catch { /* ignore */ }
+        }
+    }, [DRAFT_KEY]);
+
+    // Auto-save draft every 2s when form is open
+    useEffect(() => {
+        if (!showCreate) return;
+        const t = setTimeout(() => {
+            const isEmpty = !createForm.title && !createForm.description && !createForm.category;
+            if (!isEmpty) localStorage.setItem(DRAFT_KEY, JSON.stringify(createForm));
+        }, 2000);
+        return () => clearTimeout(t);
+    }, [createForm, showCreate, DRAFT_KEY]);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -516,7 +574,9 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
             });
 
             setShowCreate(false);
-            setCreateForm({ title: '', description: '', category: '', lat: 43.6532, lon: -79.3832, radius: 200 });
+            setCreateForm(DEFAULT_FORM);
+            setDraftRestored(false);
+            localStorage.removeItem(DRAFT_KEY);
             
             // Add a slight delay for Orleans CQRS read-model to sync
             setTimeout(() => {
@@ -572,14 +632,35 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-extrabold text-stone-800">Manage Events</h1>
-                {isOrgApproved && (
-                    <button onClick={() => { setShowCreate(!showCreate); setError(''); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
-                )}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setCalendarView(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                            calendarView
+                                ? 'bg-amber-50 border-amber-300 text-amber-600'
+                                : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-stone-50'
+                        }`}
+                    >
+                        <CalendarDays className="w-4 h-4" />
+                        {calendarView ? 'List View' : 'Calendar View'}
+                    </button>
+                    {isOrgApproved && (
+                        <button onClick={() => { setShowCreate(!showCreate); setError(''); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> Create Opportunity</button>
+                    )}
+                </div>
             </div>
             <OrgPendingBanner />
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
-                    <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
+                        {draftRestored && (
+                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                                <span>Draft restored</span>
+                                <button onClick={() => { setCreateForm(DEFAULT_FORM); setDraftRestored(false); localStorage.removeItem(DRAFT_KEY); }} className="text-amber-500 hover:text-amber-700 underline">Discard</button>
+                            </div>
+                        )}
+                    </div>
                     <div>
                         <label className="block text-xs font-bold text-stone-500 mb-1.5">Title <span className="text-rose-500">*</span></label>
                         <input placeholder="e.g. Park Cleanup Drive" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
@@ -617,6 +698,19 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                 </div>
             )}
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
+            {calendarView && (
+                <EventCalendar
+                    events={opps.map(o => ({
+                        id: o.opportunityId,
+                        title: o.title,
+                        date: o.publishDate,
+                        color: o.status === 'Published' ? 'bg-emerald-500' : o.status === 'InProgress' ? 'bg-blue-400' : o.status === 'Cancelled' ? 'bg-rose-400' : 'bg-stone-400',
+                        label: o.status,
+                    }))}
+                    onEventClick={onViewDetail}
+                />
+            )}
+            <div className={calendarView ? 'hidden' : ''}>
             {loading ? <Spinner /> : opps.length === 0 ? (
                 <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
                     <p className="text-stone-400 font-medium mb-5">No opportunities yet.</p>
@@ -667,6 +761,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                     </table>
                 </div>
             )}
+            </div>
         </div>
     );
 }
@@ -681,6 +776,7 @@ export function CoordApplications() {
     const [error, setError] = useState('');
     const [actionId, setActionId] = useState<string | null>(null);
     const [toast, setToast] = useState('');
+    const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(apps);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -744,12 +840,22 @@ export function CoordApplications() {
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
+            <div className="flex justify-between items-start">
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
+                {apps.length > 0 && (
+                    <button
+                        onClick={() => downloadCsv('applications', apps.map(a => ({ Volunteer: a.volunteerName, Opportunity: a.opportunityTitle, Shift: a.shiftName, Status: a.status, Applied: new Date(a.appliedAt).toLocaleDateString() })))}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                )}
+            </div>
             <OrgPendingBanner />
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
                 <div className="grid gap-4">
-                    {apps.map(app => (
+                    {visibleApps.map(app => (
                         <div key={app.applicationId} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center justify-between ${actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500">{app.volunteerName?.charAt(0) || '?'}</div>
@@ -772,6 +878,7 @@ export function CoordApplications() {
                             )}
                         </div>
                     ))}
+                    {appsHasMore && <div ref={appsSentinel} className="h-6 flex items-center justify-center text-xs text-stone-400">Loading more…</div>}
                 </div>
             )}
         </div>
@@ -794,6 +901,7 @@ export function CoordMembers() {
     const [inviteRole, setInviteRole] = useState<'Admin' | 'Coordinator' | 'Member'>('Member');
     const [inviting, setInviting] = useState(false);
     const [toast, setToast] = useState('');
+    const { visible: pagedMembers, hasMore: membersHasMore, sentinelRef: membersSentinel } = useInfiniteList(org?.members ?? []);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -865,11 +973,21 @@ export function CoordMembers() {
         <div className="max-w-5xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <div><h1 className="text-3xl font-extrabold text-stone-800">Members</h1><p className="text-stone-500 mt-2 text-lg">Manage your organization's members.</p></div>
-                {isOrgApproved && (
-                    <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
-                        <Plus className="w-5 h-5" /> Invite Member
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {org?.members && org.members.length > 0 && (
+                        <button
+                            onClick={() => downloadCsv('members', (org.members ?? []).map(m => ({ Email: m.email, Role: m.role, Joined: m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : '' })))}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                        >
+                            <Download className="w-4 h-4" /> Export CSV
+                        </button>
+                    )}
+                    {isOrgApproved && (
+                        <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
+                            <Plus className="w-5 h-5" /> Invite Member
+                        </button>
+                    )}
+                </div>
             </div>
 
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
@@ -918,15 +1036,15 @@ export function CoordMembers() {
 
             {loading ? <Spinner /> : tab === 'members' ? (
                 (() => {
-                    const visibleMembers = org?.members ?? [];
-                    return visibleMembers.length ? (
+                    const allMembers = org?.members ?? [];
+                    return allMembers.length ? (
                         <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                             <table className="w-full text-left">
                                 <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
                                     <tr><th className="p-5 font-bold">Email</th><th className="p-5 font-bold">Role</th><th className="p-5 font-bold">Joined</th><th className="p-5 font-bold text-right">Actions</th></tr>
                                 </thead>
                                 <tbody className="divide-y divide-stone-100">
-                                    {visibleMembers.map((m, idx) => (
+                                    {pagedMembers.map((m, idx) => (
                                         <tr key={`${m.userId}-${m.email}-${m.joinedAt}-${idx}`} className="hover:bg-orange-50/30">
                                             <td className="p-5 text-stone-800 font-bold">
                                                 {m.email}
@@ -945,6 +1063,7 @@ export function CoordMembers() {
                                     ))}
                                 </tbody>
                             </table>
+                            {membersHasMore && <div ref={membersSentinel} className="py-3 text-center text-xs text-stone-400">Loading more…</div>}
                         </div>
                     ) : <Empty msg="No members yet. Use the Invite button to add some." />;
                 })()

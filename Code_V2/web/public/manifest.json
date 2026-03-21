@@ -1,0 +1,28 @@
+{
+  "name": "VSMS — Volunteer Service Management",
+  "short_name": "VSMS",
+  "description": "Discover volunteer opportunities, track hours, and earn certificates.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fafaf9",
+  "theme_color": "#f59e0b",
+  "categories": ["productivity", "social"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Find Opportunities",
+      "short_name": "Explore",
+      "url": "/?view=opportunities",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

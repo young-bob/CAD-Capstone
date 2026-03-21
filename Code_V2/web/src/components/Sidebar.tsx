@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
     Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus, Server,
@@ -17,6 +18,7 @@ interface Props {
     onNavigate: (view: ViewName) => void;
     onLogout: () => void;
     onToggleCollapse: () => void;
+    badges?: Partial<Record<ViewName, number>>;
 }
 
 interface NavItem {
@@ -72,7 +74,7 @@ const ADMIN_ITEMS: { section: string; items: NavItem[] }[] = [
     },
 ];
 
-export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate, onLogout, onToggleCollapse }: Props) {
+export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate, onLogout, onToggleCollapse, badges = {} }: Props) {
     const isExpanded  = sidebarMode === 'expanded';
     const isCollapsed = sidebarMode === 'collapsed';
     const isHidden    = sidebarMode === 'hidden';
@@ -82,9 +84,35 @@ export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate
         userRole === 'coordinator' ? COORDINATOR_ITEMS :
                                      ADMIN_ITEMS;
 
+    // Flat ordered list — used to assign shortcut keys 1–9
+    const allItems = groups.flatMap(g => g.items);
+    const shortcutMap: Partial<Record<ViewName, string>> = {};
+    allItems.forEach((item, idx) => {
+        if (idx < 9) shortcutMap[item.view] = String(idx + 1);
+    });
+    // Reverse map: key digit → view
+    const keyToView: Record<string, ViewName> = {};
+    allItems.forEach((item, idx) => {
+        if (idx < 9) keyToView[String(idx + 1)] = item.view;
+    });
+
+    // Global keyboard shortcuts: press 1–9 to navigate (blocked in inputs)
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            const view = keyToView[e.key];
+            if (view) onNavigate(view);
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [keyToView, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
     function NavButton({ item }: { item: NavItem }) {
         const isActive = currentView === item.view;
         const IconComp = item.icon;
+        const badgeCount = badges[item.view];
+        const shortcut = shortcutMap[item.view];
 
         const btn = (
             <button
@@ -100,13 +128,33 @@ export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate
                 {isActive && (
                     <span className="absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
                 )}
-                <IconComp className="w-5 h-5 shrink-0 group-hover:scale-110 transition-transform" />
-                {isExpanded && <span className="truncate">{item.label}</span>}
+                {/* Icon with collapsed badge dot */}
+                <span className="relative shrink-0">
+                    <IconComp className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    {!isExpanded && !!badgeCount && badgeCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                    )}
+                </span>
+                {isExpanded && <span className="truncate flex-1">{item.label}</span>}
+                {/* Right-side slot: badge takes priority over shortcut hint */}
+                {isExpanded && (
+                    !!badgeCount && badgeCount > 0 ? (
+                        <span className="ml-auto shrink-0 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                    ) : shortcut ? (
+                        <kbd className="ml-auto shrink-0 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-stone-200 dark:border-zinc-700 text-stone-300 dark:text-zinc-600 bg-stone-50 dark:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {shortcut}
+                        </kbd>
+                    ) : null
+                )}
             </button>
         );
 
         return isCollapsed ? (
-            <SidebarTooltip label={item.label}>{btn}</SidebarTooltip>
+            <SidebarTooltip label={shortcut ? `${item.label} (${shortcut})` : item.label}>{btn}</SidebarTooltip>
         ) : btn;
     }
 
@@ -161,7 +209,7 @@ export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate
 
                 {/* Collapse toggle chevron */}
                 {isCollapsed ? (
-                    <SidebarTooltip label="Expand Sidebar">
+                    <SidebarTooltip label="Expand Sidebar ( [ )">
                         <button
                             onClick={onToggleCollapse}
                             className="w-full flex justify-center p-3 rounded-2xl text-stone-400 dark:text-zinc-600 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-300 transition-all"
@@ -172,10 +220,17 @@ export default function Sidebar({ userRole, currentView, sidebarMode, onNavigate
                 ) : (
                     <button
                         onClick={onToggleCollapse}
-                        className="w-full flex items-center gap-3 px-4 py-2 rounded-2xl text-stone-400 dark:text-zinc-600 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-300 transition-all text-xs font-medium"
+                        className="w-full flex items-center gap-3 px-4 py-2 rounded-2xl text-stone-400 dark:text-zinc-600 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-300 transition-all text-xs font-medium group"
                     >
                         <ChevronLeft className="w-4 h-4 shrink-0" />
-                        {isExpanded && <span>Collapse</span>}
+                        {isExpanded && (
+                            <>
+                                <span className="flex-1">Collapse</span>
+                                <kbd className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-stone-200 dark:border-zinc-700 text-stone-300 dark:text-zinc-600 bg-stone-50 dark:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    [
+                                </kbd>
+                            </>
+                        )}
                     </button>
                 )}
             </div>

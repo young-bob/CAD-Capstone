@@ -4,6 +4,21 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* ============================================================
+   GLOBAL INPUT FOCUS RINGS
+   ============================================================ */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f59e0b;
+}
+.dark input:focus-visible,
+.dark textarea:focus-visible,
+.dark select:focus-visible {
+  box-shadow: 0 0 0 2px #18181b, 0 0 0 4px #f59e0b;
+}
+
+/* ============================================================
    DESIGN SYSTEM TOKENS
    ============================================================ */
 :root {
@@ -305,6 +320,12 @@ body {
 
 /* Landing page — hide native cursor, use custom one */
 .light-page, .light-page * { cursor: none !important; }
+
+/* Toast auto-dismiss progress bar */
+@keyframes toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
 
 /* Landing page cursor sparkle burst */
 @keyframes sparkle-burst {
