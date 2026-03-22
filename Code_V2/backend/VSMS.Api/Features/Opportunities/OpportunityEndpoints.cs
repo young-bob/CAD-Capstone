@@ -244,6 +244,25 @@ public static class OpportunityEndpoints
             await grain.UpdateInfo(req.Title, req.Description, req.Category, req.Lat, req.Lon, req.RadiusMeters);
             return Results.NoContent();
         });
+
+        group.MapPost("/{id:guid}/notify", async (Guid id, NotifyVolunteersRequest req, HttpContext http, AppDbContext db, IGrainFactory grains, IApplicationQueryService queryService) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, id, grains))
+                return Results.Forbid();
+
+            var applications = await queryService.GetByOpportunityAsync(id);
+            var targetIds = req.TargetStatus == "Approved"
+                ? applications.Where(a => a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Promoted).Select(a => a.VolunteerId).Distinct().ToList()
+                : applications.Select(a => a.VolunteerId).Distinct().ToList();
+
+            if (targetIds.Count > 0)
+            {
+                var notificationGrain = grains.GetGrain<INotificationGrain>(Guid.Empty);
+                await notificationGrain.SendBulkNotification(targetIds, "Coordinator Message", req.Message);
+            }
+
+            return Results.Ok(new { sent = targetIds.Count });
+        });
     }
 
     private static double DistanceScore(double distanceKm)

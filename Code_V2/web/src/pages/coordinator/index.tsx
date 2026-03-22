@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
 import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
-import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill } from '../../types';
+import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill, VolunteerProfile } from '../../types';
 import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
@@ -15,6 +15,7 @@ import { applicationService } from '../../services/applications';
 import { certificateService } from '../../services/certificates';
 import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
+import { volunteerService } from '../../services/volunteers';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import EventCalendar from '../../components/EventCalendar';
 import ActivityFeed, { type ActivityItem } from '../../components/ActivityFeed';
@@ -777,6 +778,10 @@ export function CoordApplications() {
     const [actionId, setActionId] = useState<string | null>(null);
     const [toast, setToast] = useState('');
     const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(apps);
+    const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
+    const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [volunteerProfiles, setVolunteerProfiles] = useState<Map<string, VolunteerProfile>>(new Map());
+    const [showCredOnly, setShowCredOnly] = useState(false);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
@@ -803,6 +808,17 @@ export function CoordApplications() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (apps.length === 0) return;
+        const uniqueIds = [...new Set(apps.map(a => a.volunteerId))];
+        Promise.all(uniqueIds.map(id => volunteerService.getProfile(id).then(p => [id, p] as const).catch(() => null)))
+            .then(results => {
+                const map = new Map<string, VolunteerProfile>();
+                results.forEach(r => { if (r) map.set(r[0], r[1]); });
+                setVolunteerProfiles(map);
+            });
+    }, [apps]);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -832,52 +848,135 @@ export function CoordApplications() {
         } finally { setActionId(null); }
     };
 
+    const handleBulkApprove = async () => {
+        const ids = [...selectedApps].filter(id => apps.find(a => a.applicationId === id)?.status === 'Pending');
+        if (ids.length === 0) return;
+        setBulkProcessing(true);
+        const results = await Promise.allSettled(ids.map(id => applicationService.approve(id)));
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        setApps(prev => prev.map(a => ids.includes(a.applicationId) ? { ...a, status: ApplicationStatus.Approved } : a));
+        setSelectedApps(new Set());
+        showToast(failed > 0 ? `Approved ${succeeded}, ${failed} failed` : `Approved ${succeeded} applications ✅`);
+        setBulkProcessing(false);
+        setTimeout(() => { void load(); }, 900);
+    };
+
+    const handleBulkReject = async () => {
+        const ids = [...selectedApps].filter(id => apps.find(a => a.applicationId === id)?.status === 'Pending');
+        if (ids.length === 0) return;
+        setBulkProcessing(true);
+        const results = await Promise.allSettled(ids.map(id => applicationService.reject(id, 'Application rejected.')));
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        setApps(prev => prev.map(a => ids.includes(a.applicationId) ? { ...a, status: ApplicationStatus.Rejected } : a));
+        setSelectedApps(new Set());
+        showToast(failed > 0 ? `Rejected ${succeeded}, ${failed} failed` : `Rejected ${succeeded} applications`);
+        setBulkProcessing(false);
+        setTimeout(() => { void load(); }, 900);
+    };
+
+    const toggleSelect = (id: string) => setSelectedApps(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
+
+    const pendingAppsList = apps.filter(a => a.status === 'Pending');
+    const selectAllPending = () => setSelectedApps(new Set(pendingAppsList.map(a => a.applicationId)));
+    const deselectAll = () => setSelectedApps(new Set());
+
     const statusColors: Record<string, string> = {
         Pending: 'bg-amber-100 text-amber-700', Approved: 'bg-emerald-100 text-emerald-700',
         Rejected: 'bg-rose-100 text-rose-700', Waitlisted: 'bg-blue-100 text-blue-700',
     };
+
+    const filteredApps = showCredOnly
+        ? visibleApps.filter(a => (volunteerProfiles.get(a.volunteerId)?.credentials?.length ?? 0) > 0)
+        : visibleApps;
+    const selectedPendingCount = [...selectedApps].filter(id => apps.find(a => a.applicationId === id)?.status === 'Pending').length;
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
             <div className="flex justify-between items-start">
                 <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
-                {apps.length > 0 && (
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => downloadCsv('applications', apps.map(a => ({ Volunteer: a.volunteerName, Opportunity: a.opportunityTitle, Shift: a.shiftName, Status: a.status, Applied: new Date(a.appliedAt).toLocaleDateString() })))}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                        onClick={() => setShowCredOnly(v => !v)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${showCredOnly ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700'}`}
                     >
-                        <Download className="w-4 h-4" /> Export CSV
+                        <ShieldCheck className="w-4 h-4" /> {showCredOnly ? 'Credentialed only' : 'All applicants'}
                     </button>
-                )}
+                    {apps.length > 0 && (
+                        <button
+                            onClick={() => downloadCsv('applications', apps.map(a => ({ Volunteer: a.volunteerName, Opportunity: a.opportunityTitle, Shift: a.shiftName, Status: a.status, Applied: new Date(a.appliedAt).toLocaleDateString() })))}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
+                        >
+                            <Download className="w-4 h-4" /> Export CSV
+                        </button>
+                    )}
+                </div>
             </div>
             <OrgPendingBanner />
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
+            {selectedApps.size > 0 && (
+                <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3">
+                    <span className="text-orange-700 font-bold text-sm">{selectedApps.size} selected ({selectedPendingCount} pending)</span>
+                    <div className="flex items-center gap-3">
+                        <button onClick={deselectAll} className="text-stone-500 hover:text-stone-700 text-sm font-medium">Deselect all</button>
+                        <button onClick={handleBulkReject} disabled={bulkProcessing || selectedPendingCount === 0} className="px-4 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 border border-rose-200 disabled:opacity-50 flex items-center gap-1.5">{bulkProcessing && <Loader2 className="w-3 h-3 animate-spin" />} Reject {selectedPendingCount > 0 ? selectedPendingCount : ''}</button>
+                        <button onClick={handleBulkApprove} disabled={bulkProcessing || selectedPendingCount === 0} className="px-4 py-1.5 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1.5">{bulkProcessing && <Loader2 className="w-3 h-3 animate-spin" />} Approve {selectedPendingCount > 0 ? selectedPendingCount : ''}</button>
+                    </div>
+                </div>
+            )}
+            {pendingAppsList.length > 1 && selectedApps.size === 0 && (
+                <div className="flex items-center gap-2 text-sm text-stone-400">
+                    <button onClick={selectAllPending} className="text-orange-600 font-bold hover:underline">Select all {pendingAppsList.length} pending</button>
+                </div>
+            )}
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
                 <div className="grid gap-4">
-                    {visibleApps.map(app => (
-                        <div key={app.applicationId} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center justify-between ${actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500">{app.volunteerName?.charAt(0) || '?'}</div>
-                                <div>
-                                    <h3 className="font-bold text-stone-800">{app.volunteerName} <span className="text-sm font-medium text-stone-400">applied for</span> {app.opportunityTitle}</h3>
-                                    <p className="text-sm text-stone-400 mt-1">Shift: {app.shiftName} · Applied {new Date(app.appliedAt).toLocaleDateString()}</p>
-                                    <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded ${statusColors[app.status] || 'bg-stone-100 text-stone-600'}`}>{app.status}</span>
-                                    {actionId === app.applicationId && <p className="text-xs text-orange-600 font-semibold mt-2">Processing review...</p>}
+                    {filteredApps.map(app => {
+                        const profile = volunteerProfiles.get(app.volunteerId);
+                        const hasCredentials = (profile?.credentials?.length ?? 0) > 0;
+                        const isSelected = selectedApps.has(app.applicationId);
+                        return (
+                            <div key={app.applicationId} onClick={() => app.status === 'Pending' && toggleSelect(app.applicationId)} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center justify-between transition-all cursor-pointer ${isSelected ? 'border-orange-300 bg-orange-50/40' : actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100 hover:border-stone-200'}`}>
+                                <div className="flex items-center gap-4">
+                                    {app.status === 'Pending' && (
+                                        <div className="shrink-0" onClick={e => { e.stopPropagation(); toggleSelect(app.applicationId); }}>
+                                            {isSelected ? <CheckSquare className="w-5 h-5 text-orange-500" /> : <Square className="w-5 h-5 text-stone-300" />}
+                                        </div>
+                                    )}
+                                    <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500">{app.volunteerName?.charAt(0) || '?'}</div>
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="font-bold text-stone-800">{app.volunteerName} <span className="text-sm font-medium text-stone-400">applied for</span> {app.opportunityTitle}</h3>
+                                            {hasCredentials ? (
+                                                <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200"><ShieldCheck className="w-3 h-3" /> Credentialed</span>
+                                            ) : (
+                                                <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-full border border-amber-200">⚠ No credentials</span>
+                                            )}
+                                        </div>
+                                        <p className="text-sm text-stone-400 mt-1">Shift: {app.shiftName} · Applied {new Date(app.appliedAt).toLocaleDateString()}</p>
+                                        <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded ${statusColors[app.status] || 'bg-stone-100 text-stone-600'}`}>{app.status}</span>
+                                        {actionId === app.applicationId && <p className="text-xs text-orange-600 font-semibold mt-2">Processing review...</p>}
+                                    </div>
                                 </div>
+                                {app.status === 'Pending' && (
+                                    <div className="flex gap-3 shrink-0" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => handleReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
+                                            {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Reject
+                                        </button>
+                                        <button onClick={() => handleApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1">
+                                            {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Approve
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                            {app.status === 'Pending' && (
-                                <div className="flex gap-3 shrink-0">
-                                    <button onClick={() => handleReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
-                                        {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Reject
-                                    </button>
-                                    <button onClick={() => handleApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1">
-                                        {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Approve
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                     {appsHasMore && <div ref={appsSentinel} className="h-6 flex items-center justify-center text-xs text-stone-400">Loading more…</div>}
                 </div>
             )}
@@ -1265,6 +1364,21 @@ export function CoordCertTemplates() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR OPPORTUNITY DETAIL
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function OppDetailModal({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+    if (!show) return null;
+    return (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-lg w-full space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-stone-800">{title}</h3>
+                    <button onClick={onClose}><X className="w-5 h-5 text-stone-400 hover:text-stone-700" /></button>
+                </div>
+                {children}
+            </div>
+        </div>
+    );
+}
+
 interface CoordOppDetailProps { oppId: string; onBack: () => void; }
 export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const auth = useAuth();
@@ -1282,6 +1396,9 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [shiftEnd, setShiftEnd] = useState('');
     const [shiftCap, setShiftCap] = useState('10');
     const [addingShift, setAddingShift] = useState(false);
+    const [repeatMode, setRepeatMode] = useState<'none' | 'weekly' | 'monthly'>('none');
+    const [repeatUntil, setRepeatUntil] = useState('');
+    const [addingProgress, setAddingProgress] = useState('');
 
     // Cancel
     const [showCancel, setShowCancel] = useState(false);
@@ -1337,6 +1454,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setSaving(false); }
     };
 
+    // Notify volunteers
+    const [showNotify, setShowNotify] = useState(false);
+    const [notifyMsg, setNotifyMsg] = useState('');
+    const [notifyTarget, setNotifyTarget] = useState<'Approved' | 'All'>('Approved');
+    const [notifying, setNotifying] = useState(false);
+
     // Certificate
     const [showCert, setShowCert] = useState(false);
     const [certTemplates, setCertTemplates] = useState<CertificateTemplate[]>([]);
@@ -1377,10 +1500,32 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const doAddShift = async () => {
         if (!shiftName || !shiftStart || !shiftEnd) return; setAddingShift(true);
         try {
-            await opportunityService.addShift(oppId, { name: shiftName, startTime: new Date(shiftStart).toISOString(), endTime: new Date(shiftEnd).toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
+            const baseStart = new Date(shiftStart);
+            const baseEnd = new Date(shiftEnd);
+            const shifts: { name: string; startTime: string; endTime: string; maxCapacity: number }[] = [];
+            if (repeatMode === 'none' || !repeatUntil) {
+                shifts.push({ name: shiftName, startTime: baseStart.toISOString(), endTime: baseEnd.toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
+            } else {
+                const until = new Date(repeatUntil);
+                const intervalMs = (repeatMode === 'weekly' ? 7 : 30) * 24 * 60 * 60 * 1000;
+                let cur = new Date(baseStart);
+                let curEnd = new Date(baseEnd);
+                let count = 0;
+                while (cur <= until && count < 52) {
+                    shifts.push({ name: shiftName, startTime: cur.toISOString(), endTime: curEnd.toISOString(), maxCapacity: parseInt(shiftCap) || 10 });
+                    cur = new Date(cur.getTime() + intervalMs);
+                    curEnd = new Date(curEnd.getTime() + intervalMs);
+                    count++;
+                }
+            }
+            for (let i = 0; i < shifts.length; i++) {
+                if (shifts.length > 1) setAddingProgress(`Creating shift ${i + 1} of ${shifts.length}…`);
+                await opportunityService.addShift(oppId, shifts[i]);
+            }
             setShowAddShift(false); setShiftName(''); setShiftStart(''); setShiftEnd(''); setShiftCap('10');
-            showToast('Shift added!'); refreshSoon();
-        } catch (err: any) { showToast(getErr(err, 'Failed')); }
+            setRepeatMode('none'); setRepeatUntil(''); setAddingProgress('');
+            showToast(shifts.length > 1 ? `${shifts.length} shifts added! 🎉` : 'Shift added!'); refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed')); setAddingProgress(''); }
         finally { setAddingShift(false); }
     };
 
@@ -1486,22 +1631,21 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setIssuingCert(false); }
     };
 
+    const doNotify = async () => {
+        if (!notifyMsg.trim()) return;
+        setNotifying(true);
+        try {
+            const res = await opportunityService.notifyVolunteers(oppId, { message: notifyMsg, targetStatus: notifyTarget });
+            setNotifyMsg('');
+            showToast(`Message sent to ${res.sent} volunteer${res.sent !== 1 ? 's' : ''} 📣`);
+            setShowNotify(false);
+        } catch (err: any) { showToast(getErr(err, 'Failed to send notification')); }
+        finally { setNotifying(false); }
+    };
+
     const pendingApps = apps.filter(a => a.status === 'Pending');
     const confirmedApps = apps.filter(a => a.status === 'Approved' || a.status === 'Promoted');
     const statusColors: Record<string, string> = { Published: 'bg-emerald-100 text-emerald-700', Draft: 'bg-stone-100 text-stone-500', InProgress: 'bg-blue-100 text-blue-700', Completed: 'bg-emerald-100 text-emerald-700', Cancelled: 'bg-rose-100 text-rose-700' };
-
-    const Modal = ({ show, onClose, title, children }: { show: boolean; onClose: () => void; title: string; children: React.ReactNode }) =>
-        !show ? null : (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-lg w-full space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-bold text-stone-800">{title}</h3>
-                        <button onClick={onClose}><X className="w-5 h-5 text-stone-400 hover:text-stone-700" /></button>
-                    </div>
-                    {children}
-                </div>
-            </div>
-        );
 
     return (
         <div className="max-w-5xl mx-auto space-y-8">
@@ -1527,6 +1671,9 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         {opp.status === 'Draft' && <button onClick={openEdit} className="px-5 py-2.5 bg-blue-50 text-blue-600 font-bold rounded-xl hover:bg-blue-100 border border-blue-200 flex items-center gap-2"><Pencil className="w-4 h-4" /> Edit</button>}
                         {(opp.status === 'Draft' || opp.status === 'Published') && <button onClick={() => setShowCancel(true)} className="px-5 py-2.5 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 border border-rose-200">Cancel Event</button>}
                         <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Required Skills ({opp.requiredSkillIds?.length || 0})</button>
+                        {(opp.status === 'Published' || opp.status === 'InProgress') && apps.length > 0 && (
+                            <button onClick={() => setShowNotify(true)} className="px-5 py-2.5 bg-violet-50 text-violet-600 font-bold rounded-xl hover:bg-violet-100 border border-violet-200 flex items-center gap-2"><Bell className="w-4 h-4" /> Notify Volunteers</button>
+                        )}
                     </div>
                     {opp.requiredSkillIds && opp.requiredSkillIds.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-100">
@@ -1552,10 +1699,21 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                 <input value={shiftCap} onChange={e => setShiftCap(e.target.value)} type="number" placeholder="Capacity" className="px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
                                 <div><label className="text-xs font-medium text-stone-500 mb-1 block">Start</label><input type="datetime-local" value={shiftStart} onChange={e => setShiftStart(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
                                 <div><label className="text-xs font-medium text-stone-500 mb-1 block">End</label><input type="datetime-local" value={shiftEnd} onChange={e => setShiftEnd(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                <div><label className="text-xs font-medium text-stone-500 mb-1 block">Repeat</label>
+                                    <select value={repeatMode} onChange={e => setRepeatMode(e.target.value as 'none' | 'weekly' | 'monthly')} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm">
+                                        <option value="none">No repeat</option>
+                                        <option value="weekly">Weekly (every 7 days)</option>
+                                        <option value="monthly">Monthly (every 30 days)</option>
+                                    </select>
+                                </div>
+                                {repeatMode !== 'none' && (
+                                    <div><label className="text-xs font-medium text-stone-500 mb-1 block">Repeat until</label><input type="date" value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                                )}
                             </div>
+                            {addingProgress && <p className="text-xs text-orange-600 font-semibold">{addingProgress}</p>}
                             <div className="flex gap-3 justify-end">
-                                <button onClick={() => setShowAddShift(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
-                                <button onClick={doAddShift} disabled={addingShift || !shiftName || !shiftStart || !shiftEnd} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">{addingShift && <Loader2 className="w-3 h-3 animate-spin" />} Add</button>
+                                <button onClick={() => { setShowAddShift(false); setRepeatMode('none'); setRepeatUntil(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
+                                <button onClick={doAddShift} disabled={addingShift || !shiftName || !shiftStart || !shiftEnd} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">{addingShift && <Loader2 className="w-3 h-3 animate-spin" />} {repeatMode !== 'none' && repeatUntil ? 'Add Series' : 'Add'}</button>
                             </div>
                         </div>
                     )}
@@ -1648,7 +1806,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             </>)}
 
             {/* Edit Info Modal */}
-            <Modal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Opportunity">
+            <OppDetailModal show={showEdit} onClose={() => setShowEdit(false)} title="Edit Opportunity">
                 <div className="space-y-3">
                     <div><label className="block text-xs font-bold text-stone-500 mb-1">Title <span className="text-rose-500">*</span></label><input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} placeholder="Event title" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
                     <div><label className="block text-xs font-bold text-stone-500 mb-1">Category</label><input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Environment, Medical" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
@@ -1666,22 +1824,22 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                     <button onClick={doSaveEdit} disabled={!editForm.title || saving} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{saving && <Loader2 className="w-4 h-4 animate-spin" />} Save</button>
                 </div>
-            </Modal>
+            </OppDetailModal>
 
-            <Modal show={showCancel} onClose={() => setShowCancel(false)} title="Cancel Event">
+            <OppDetailModal show={showCancel} onClose={() => setShowCancel(false)} title="Cancel Event">
                 <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Reason (required)" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-rose-500 outline-none resize-none" />
                 <div className="flex gap-3 justify-end"><button onClick={() => setShowCancel(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Back</button><button onClick={doCancelSubmit} disabled={!cancelReason || cancelling} className="px-4 py-2 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 disabled:opacity-50 flex items-center gap-2">{cancelling && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button></div>
-            </Modal>
+            </OppDetailModal>
 
-            <Modal show={showSkills} onClose={() => setShowSkills(false)} title="Required Skills">
+            <OppDetailModal show={showSkills} onClose={() => setShowSkills(false)} title="Required Skills">
                 <div className="max-h-56 overflow-y-auto flex flex-wrap gap-2">
                     {allSkills.map((s: Skill) => { const sel = selSkillIds.has(s.id); return <button key={s.id} onClick={() => setSelSkillIds(p => { const n = new Set(p); sel ? n.delete(s.id) : n.add(s.id); return n; })} className={`px-4 py-2 rounded-full font-bold text-sm border transition-all ${sel ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}>{sel && '✓ '}{s.name}</button>; })}
                     {allSkills.length === 0 && <p className="text-stone-400 text-sm">No skills in system.</p>}
                 </div>
                 <div className="flex gap-3 justify-end"><button onClick={() => setShowSkills(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doSaveSkills} disabled={savingSkills} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{savingSkills && <Loader2 className="w-4 h-4 animate-spin" />} Save</button></div>
-            </Modal>
+            </OppDetailModal>
 
-            <Modal show={showCert} onClose={() => setShowCert(false)} title="Issue Certificate">
+            <OppDetailModal show={showCert} onClose={() => setShowCert(false)} title="Issue Certificate">
                 <p className="text-stone-500 text-sm">To: <span className="font-bold text-stone-700">{certTargetName}</span></p>
                 <div className="max-h-48 overflow-y-auto space-y-2">
                     {certTemplates.map((t: CertificateTemplate) => (
@@ -1694,7 +1852,27 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     {certTemplates.length === 0 && <p className="text-stone-400 text-sm">No templates. Create one in Cert Templates.</p>}
                 </div>
                 <div className="flex gap-3 justify-end"><button onClick={() => setShowCert(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doIssueCert} disabled={!selTemplate || issuingCert || certTemplates.length === 0} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{issuingCert && <Loader2 className="w-4 h-4 animate-spin" />} Issue</button></div>
-            </Modal>
+            </OppDetailModal>
+
+            <OppDetailModal show={showNotify} onClose={() => setShowNotify(false)} title="Notify Volunteers">
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-sm font-bold text-stone-600 mb-2 block">Send to</label>
+                        <select value={notifyTarget} onChange={e => setNotifyTarget(e.target.value as 'Approved' | 'All')} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm">
+                            <option value="Approved">Approved volunteers only ({confirmedApps.length})</option>
+                            <option value="All">All applicants ({apps.length})</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-sm font-bold text-stone-600 mb-2 block">Message</label>
+                        <textarea value={notifyMsg} onChange={e => setNotifyMsg(e.target.value)} rows={4} placeholder="e.g. Reminder: tomorrow's bingo session starts at 2pm. Please arrive 10 minutes early." className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm resize-none" />
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <button onClick={() => setShowNotify(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
+                        <button onClick={doNotify} disabled={notifying || !notifyMsg.trim()} className="px-5 py-2.5 bg-violet-500 text-white font-bold rounded-xl hover:bg-violet-600 disabled:opacity-50 flex items-center gap-2">{notifying && <Loader2 className="w-4 h-4 animate-spin" />}<Bell className="w-4 h-4" /> Send Notification</button>
+                    </div>
+                </div>
+            </OppDetailModal>
         </div>
     );
 }
