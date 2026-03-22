@@ -41,12 +41,12 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
 import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail } from './pages/volunteer';
-import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail } from './pages/coordinator';
+import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail, CoordReports } from './pages/coordinator';
 import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills, AdminSystemInfo } from './pages/admin';
 
 // Views considered "deeper" than dashboard — navigate right when entering them
 const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills',
-    'manage_events', 'org_applications', 'manage_templates', 'org_members',
+    'manage_events', 'org_applications', 'manage_templates', 'org_members', 'coord_reports',
     'admin_orgs', 'admin_disputes', 'admin_users', 'admin_skills', 'admin_system_info']);
 
 function AppInner() {
@@ -160,6 +160,7 @@ function AppInner() {
                 case 'org_applications': return <CoordApplications />;
                 case 'manage_templates': return <CoordCertTemplates />;
                 case 'org_members': return <CoordMembers />;
+                case 'coord_reports': return <CoordReports />;
                 default: return <CoordDashboard onNavigate={navigateTo} />;
             }
         }

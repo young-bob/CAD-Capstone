@@ -22,4 +22,6 @@ public sealed class VolunteerState
     [Id(14)] public List<string> Credentials { get; set; } = [];
     [Id(15)] public bool IsInitialized { get; set; }
     [Id(16)] public string? ExpoPushToken { get; set; }
+    [Id(17)] public string BackgroundCheckStatus { get; set; } = "NotSubmitted";
+    [Id(18)] public DateTime? WaiverSignedAt { get; set; }
 }

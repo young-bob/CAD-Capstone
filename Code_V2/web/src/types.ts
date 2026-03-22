@@ -1,7 +1,7 @@
 export type ViewName =
     | 'landing' | 'login' | 'register'
     | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills'
-    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members'
+    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports'
     | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills' | 'admin_system_info';
 
 
@@ -223,6 +223,8 @@ export interface VolunteerProfile {
     completedOpportunities: number;
     credentials: string[];
     isInitialized: boolean;
+    backgroundCheckStatus: string;
+    waiverSignedAt: string | null;
 }
 
 // ─── Skill ────────────────────────────────────────────────────
@@ -231,6 +233,22 @@ export interface Skill {
     name: string;
     category: string;
     description?: string;
+}
+
+// ─── Event Template ───────────────────────────────────────────
+export interface EventTemplate {
+    id: string;
+    name: string;
+    title: string;
+    description: string;
+    category: string;
+    tagsJson: string;
+    approvalPolicy: string;
+    requiredSkillIdsJson: string;
+    latitude: number | null;
+    longitude: number | null;
+    radiusMeters: number | null;
+    createdAt: string;
 }
 
 // ─── Certificate ──────────────────────────────────────────────

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
 import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
-import type { ViewName, OpportunitySummary, ApplicationSummary, CertificateTemplate, OrgState, OpportunityState, Shift, Skill, VolunteerProfile } from '../../types';
+import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, CertificateTemplate, EventTemplate, OrgState, OpportunityState, Shift, Skill, VolunteerProfile } from '../../types';
 import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
@@ -518,6 +518,12 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [publishingId, setPublishingId] = useState<string | null>(null);
     const [recoveringId, setRecoveringId] = useState<string | null>(null);
     const [calendarView, setCalendarView] = useState(false);
+    const [templates, setTemplates] = useState<EventTemplate[]>([]);
+    const [showTemplatePanel, setShowTemplatePanel] = useState(false);
+    const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+    const [templateName, setTemplateName] = useState('');
+    const [savingTemplate, setSavingTemplate] = useState(false);
+    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
     // Restore draft on mount
     useEffect(() => {
@@ -556,6 +562,57 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
 
     useEffect(() => { load(); }, [load]);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
+
+    // Load templates when create form opens
+    useEffect(() => {
+        if (showCreate && auth.linkedGrainId) {
+            organizationService.getEventTemplates(auth.linkedGrainId).then(setTemplates).catch(() => {});
+        }
+    }, [showCreate, auth.linkedGrainId]);
+
+    const applyTemplate = (t: EventTemplate) => {
+        setCreateForm(p => ({
+            ...p,
+            title: t.title || p.title,
+            description: t.description || p.description,
+            category: t.category || p.category,
+            lat: t.latitude ?? p.lat,
+            lon: t.longitude ?? p.lon,
+            radius: t.radiusMeters ?? p.radius,
+        }));
+        setShowTemplatePanel(false);
+        setDraftRestored(false);
+    };
+
+    const handleSaveTemplate = async () => {
+        if (!auth.linkedGrainId || !templateName.trim()) return;
+        setSavingTemplate(true);
+        try {
+            await organizationService.saveEventTemplate(auth.linkedGrainId, {
+                name: templateName.trim(),
+                title: createForm.title,
+                description: createForm.description,
+                category: createForm.category,
+                tags: [], approvalPolicy: 'ManualApprove', requiredSkillIds: [],
+                latitude: createForm.lat, longitude: createForm.lon, radiusMeters: createForm.radius,
+            });
+            const updated = await organizationService.getEventTemplates(auth.linkedGrainId);
+            setTemplates(updated);
+            setShowSaveTemplate(false);
+            setTemplateName('');
+        } catch { /* ignore */ }
+        finally { setSavingTemplate(false); }
+    };
+
+    const handleDeleteTemplate = async (templateId: string) => {
+        if (!auth.linkedGrainId) return;
+        setDeletingTemplateId(templateId);
+        try {
+            await organizationService.deleteEventTemplate(auth.linkedGrainId, templateId);
+            setTemplates(prev => prev.filter(t => t.id !== templateId));
+        } catch { /* ignore */ }
+        finally { setDeletingTemplateId(null); }
+    };
 
     const handleCreate = async () => {
         if (!auth.linkedGrainId || !createForm.title) { setError('Title is required.'); return; }
@@ -653,15 +710,51 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
             <OrgPendingBanner />
             {showCreate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                         <h3 className="text-lg font-bold text-stone-800">New Opportunity</h3>
-                        {draftRestored && (
-                            <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
-                                <span>Draft restored</span>
-                                <button onClick={() => { setCreateForm(DEFAULT_FORM); setDraftRestored(false); localStorage.removeItem(DRAFT_KEY); }} className="text-amber-500 hover:text-amber-700 underline">Discard</button>
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {draftRestored && (
+                                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                                    <span>Draft restored</span>
+                                    <button onClick={() => { setCreateForm(DEFAULT_FORM); setDraftRestored(false); localStorage.removeItem(DRAFT_KEY); }} className="text-amber-500 hover:text-amber-700 underline">Discard</button>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => setShowTemplatePanel(v => !v)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${showTemplatePanel ? 'bg-violet-50 border-violet-200 text-violet-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                            >
+                                <BookOpen className="w-3.5 h-3.5" />
+                                {templates.length > 0 ? `Load Template (${templates.length})` : 'Load Template'}
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Template panel */}
+                    {showTemplatePanel && (
+                        <div className="bg-violet-50 rounded-xl border border-violet-200 p-4 space-y-2">
+                            <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">Saved Templates</p>
+                            {templates.length === 0 ? (
+                                <p className="text-sm text-stone-400">No templates saved yet. Fill out the form below and save it as a template.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {templates.map(t => (
+                                        <div key={t.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-violet-100">
+                                            <div>
+                                                <p className="font-bold text-stone-800 text-sm">{t.name}</p>
+                                                {t.title && <p className="text-xs text-stone-400">{t.title} · {t.category}</p>}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => applyTemplate(t)} className="px-3 py-1 bg-violet-500 text-white text-xs font-bold rounded-lg hover:bg-violet-600">Use</button>
+                                                <button onClick={() => handleDeleteTemplate(t.id)} disabled={deletingTemplateId === t.id} className="px-2 py-1 text-rose-400 hover:text-rose-600 disabled:opacity-50">
+                                                    {deletingTemplateId === t.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div>
                         <label className="block text-xs font-bold text-stone-500 mb-1.5">Title <span className="text-rose-500">*</span></label>
                         <input placeholder="e.g. Park Cleanup Drive" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
@@ -690,8 +783,31 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                         </Suspense>
                     </div>
 
-                    <div className="flex gap-3 justify-end mt-4">
-                        <button onClick={() => { setShowCreate(false); setError(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                    {/* Save as Template */}
+                    {showSaveTemplate ? (
+                        <div className="flex items-center gap-3 bg-violet-50 rounded-xl px-4 py-3 border border-violet-200">
+                            <Bookmark className="w-4 h-4 text-violet-600 shrink-0" />
+                            <input
+                                value={templateName}
+                                onChange={e => setTemplateName(e.target.value)}
+                                placeholder="Template name (e.g. Weekly Bingo Night)…"
+                                className="flex-1 bg-transparent outline-none text-sm font-medium text-stone-700 placeholder-stone-400"
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveTemplate(); if (e.key === 'Escape') setShowSaveTemplate(false); }}
+                                autoFocus
+                            />
+                            <button onClick={handleSaveTemplate} disabled={savingTemplate || !templateName.trim()} className="px-3 py-1 bg-violet-500 text-white text-xs font-bold rounded-lg hover:bg-violet-600 disabled:opacity-50 flex items-center gap-1">
+                                {savingTemplate && <Loader2 className="w-3 h-3 animate-spin" />} Save
+                            </button>
+                            <button onClick={() => { setShowSaveTemplate(false); setTemplateName(''); }} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4" /></button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setShowSaveTemplate(true)} className="flex items-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-800 self-start">
+                            <Bookmark className="w-3.5 h-3.5" /> Save current form as template
+                        </button>
+                    )}
+
+                    <div className="flex gap-3 justify-end mt-2">
+                        <button onClick={() => { setShowCreate(false); setError(''); setShowSaveTemplate(false); setShowTemplatePanel(false); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
                         <button onClick={handleCreate} disabled={creating} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 flex items-center gap-2 disabled:bg-orange-300">
                             {creating && <Loader2 className="w-4 h-4 animate-spin" />}Create
                         </button>
@@ -886,6 +1002,19 @@ export function CoordApplications() {
     const selectAllPending = () => setSelectedApps(new Set(pendingAppsList.map(a => a.applicationId)));
     const deselectAll = () => setSelectedApps(new Set());
 
+    const handleSetBgc = async (volunteerId: string, status: string) => {
+        try {
+            await volunteerService.setBackgroundCheckStatus(volunteerId, status);
+            setVolunteerProfiles(prev => {
+                const map = new Map(prev);
+                const p = map.get(volunteerId);
+                if (p) map.set(volunteerId, { ...p, backgroundCheckStatus: status });
+                return map;
+            });
+            showToast(`BGC status updated to ${status} ✅`);
+        } catch { showToast('Failed to update BGC status'); }
+    };
+
     const statusColors: Record<string, string> = {
         Pending: 'bg-amber-100 text-amber-700', Approved: 'bg-emerald-100 text-emerald-700',
         Rejected: 'bg-rose-100 text-rose-700', Waitlisted: 'bg-blue-100 text-blue-700',
@@ -940,27 +1069,56 @@ export function CoordApplications() {
                     {filteredApps.map(app => {
                         const profile = volunteerProfiles.get(app.volunteerId);
                         const hasCredentials = (profile?.credentials?.length ?? 0) > 0;
+                        const bgcStatus = profile?.backgroundCheckStatus ?? 'NotSubmitted';
+                        const waiverSigned = !!profile?.waiverSignedAt;
+                        const bgcChip: Record<string, { label: string; cls: string }> = {
+                            NotSubmitted: { label: '🔴 BGC: Not Submitted', cls: 'bg-rose-50 text-rose-600 border-rose-200' },
+                            Pending: { label: '🟡 BGC: Pending', cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+                            Cleared: { label: '✅ BGC: Cleared', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                            Expired: { label: '🔴 BGC: Expired', cls: 'bg-rose-50 text-rose-600 border-rose-200' },
+                        };
+                        const chip = bgcChip[bgcStatus] ?? bgcChip['NotSubmitted'];
                         const isSelected = selectedApps.has(app.applicationId);
                         return (
-                            <div key={app.applicationId} onClick={() => app.status === 'Pending' && toggleSelect(app.applicationId)} className={`bg-white rounded-2xl p-6 shadow-sm border flex items-center justify-between transition-all cursor-pointer ${isSelected ? 'border-orange-300 bg-orange-50/40' : actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100 hover:border-stone-200'}`}>
-                                <div className="flex items-center gap-4">
+                            <div key={app.applicationId} onClick={() => app.status === 'Pending' && toggleSelect(app.applicationId)} className={`bg-white rounded-2xl p-6 shadow-sm border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all cursor-pointer ${isSelected ? 'border-orange-300 bg-orange-50/40' : actionId === app.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100 hover:border-stone-200'}`}>
+                                <div className="flex items-start gap-4">
                                     {app.status === 'Pending' && (
-                                        <div className="shrink-0" onClick={e => { e.stopPropagation(); toggleSelect(app.applicationId); }}>
+                                        <div className="shrink-0 mt-1" onClick={e => { e.stopPropagation(); toggleSelect(app.applicationId); }}>
                                             {isSelected ? <CheckSquare className="w-5 h-5 text-orange-500" /> : <Square className="w-5 h-5 text-stone-300" />}
                                         </div>
                                     )}
-                                    <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500">{app.volunteerName?.charAt(0) || '?'}</div>
-                                    <div>
+                                    <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-stone-500 shrink-0">{app.volunteerName?.charAt(0) || '?'}</div>
+                                    <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <h3 className="font-bold text-stone-800">{app.volunteerName} <span className="text-sm font-medium text-stone-400">applied for</span> {app.opportunityTitle}</h3>
                                             {hasCredentials ? (
-                                                <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200"><ShieldCheck className="w-3 h-3" /> Credentialed</span>
+                                                <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200"><ShieldCheck className="w-3 h-3" /> {profile!.credentials.length} Credentials</span>
                                             ) : (
                                                 <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-full border border-amber-200">⚠ No credentials</span>
                                             )}
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${chip.cls}`}>{chip.label}</span>
+                                            {waiverSigned
+                                                ? <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Waiver signed</span>
+                                                : <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-50 text-amber-600 border border-amber-200">⚠ Waiver not signed</span>
+                                            }
                                         </div>
                                         <p className="text-sm text-stone-400 mt-1">Shift: {app.shiftName} · Applied {new Date(app.appliedAt).toLocaleDateString()}</p>
-                                        <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-bold rounded ${statusColors[app.status] || 'bg-stone-100 text-stone-600'}`}>{app.status}</span>
+                                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded ${statusColors[app.status] || 'bg-stone-100 text-stone-600'}`}>{app.status}</span>
+                                            {profile && (
+                                                <select
+                                                    value={bgcStatus}
+                                                    onClick={e => e.stopPropagation()}
+                                                    onChange={e => { e.stopPropagation(); handleSetBgc(app.volunteerId, e.target.value); }}
+                                                    className="text-xs font-medium border border-stone-200 rounded-lg px-2 py-1 bg-white text-stone-600 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                                >
+                                                    <option value="NotSubmitted">BGC: Not Submitted</option>
+                                                    <option value="Pending">BGC: Pending</option>
+                                                    <option value="Cleared">BGC: Cleared</option>
+                                                    <option value="Expired">BGC: Expired</option>
+                                                </select>
+                                            )}
+                                        </div>
                                         {actionId === app.applicationId && <p className="text-xs text-orange-600 font-semibold mt-2">Processing review...</p>}
                                     </div>
                                 </div>
@@ -1676,12 +1834,32 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         )}
                     </div>
                     {opp.requiredSkillIds && opp.requiredSkillIds.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-100">
-                            <span className="text-xs font-bold text-stone-400 self-center mr-1">Required Skills:</span>
-                            {opp.requiredSkillIds.map(id => {
-                                const skill = displaySkills.find(s => s.id === id);
-                                return skill ? <span key={id} className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold border border-orange-200">{skill.name}</span> : null;
-                            })}
+                        <div className="mt-4 pt-4 border-t border-stone-100 space-y-3">
+                            {(() => {
+                                const reqSkills = opp.requiredSkillIds.map(id => displaySkills.find(s => s.id === id)).filter(Boolean) as Skill[];
+                                const trainingSkills = reqSkills.filter(s => s.category === 'Training');
+                                const regularSkills = reqSkills.filter(s => s.category !== 'Training');
+                                return (
+                                    <>
+                                        {trainingSkills.length > 0 && (
+                                            <div>
+                                                <span className="text-xs font-bold text-purple-600 uppercase tracking-wide mr-2">Required Training:</span>
+                                                <div className="inline-flex flex-wrap gap-2 mt-1">
+                                                    {trainingSkills.map(s => <span key={s.id} className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-bold border border-purple-200">{s.name}</span>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {regularSkills.length > 0 && (
+                                            <div>
+                                                <span className="text-xs font-bold text-orange-500 uppercase tracking-wide mr-2">Required Skills:</span>
+                                                <div className="inline-flex flex-wrap gap-2 mt-1">
+                                                    {regularSkills.map(s => <span key={s.id} className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold border border-orange-200">{s.name}</span>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
                     )}
                 </div>
@@ -1873,6 +2051,149 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     </div>
                 </div>
             </OppDetailModal>
+        </div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COORDINATOR REPORTS (Hours Export for Accreditation)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export function CoordReports() {
+    const auth = useAuth();
+    const [fromDate, setFromDate] = useState(() => {
+        const d = new Date(); d.setMonth(d.getMonth() - 3);
+        return d.toISOString().slice(0, 10);
+    });
+    const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [records, setRecords] = useState<AttendanceSummary[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [fetched, setFetched] = useState(false);
+
+    const fetchReport = useCallback(async () => {
+        if (!auth.linkedGrainId) return;
+        setLoading(true); setError('');
+        try {
+            const opps = await organizationService.getOpportunities(auth.linkedGrainId);
+            const from = new Date(fromDate).getTime();
+            const to = new Date(toDate + 'T23:59:59').getTime();
+            const filtered = opps.filter(o => {
+                if (!o.publishDate) return true;
+                const d = new Date(o.publishDate).getTime();
+                return d >= from && d <= to;
+            });
+            const allRecords = await Promise.all(
+                filtered.map(o => attendanceService.getByOpportunity(o.opportunityId).catch(() => [] as AttendanceSummary[]))
+            );
+            setRecords(allRecords.flat().filter(r => r.totalHours > 0));
+            setFetched(true);
+        } catch (err: any) {
+            setError(getErr(err, 'Failed to load report data'));
+        } finally { setLoading(false); }
+    }, [auth.linkedGrainId, fromDate, toDate]);
+
+    const handleExportCsv = () => {
+        const rows = records.map(r => ({
+            'Volunteer': r.volunteerName,
+            'Opportunity': r.opportunityTitle,
+            'Check-In': r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '',
+            'Check-Out': r.checkOutTime ? new Date(r.checkOutTime).toLocaleString() : '',
+            'Hours': r.totalHours.toFixed(2),
+            'Status': r.status,
+        }));
+        downloadCsv('volunteer-hours-' + fromDate + '-to-' + toDate + '.csv', rows);
+    };
+
+    const totalHours = records.reduce((s, r) => s + r.totalHours, 0);
+    const uniqueVolunteers = new Set(records.map(r => r.volunteerId)).size;
+    const uniqueOpps = new Set(records.map(r => r.opportunityId)).size;
+    const avgHours = uniqueVolunteers > 0 ? totalHours / uniqueVolunteers : 0;
+
+    const byOpp = records.reduce<Record<string, { title: string; records: AttendanceSummary[] }>>((acc, r) => {
+        if (!acc[r.opportunityId]) acc[r.opportunityId] = { title: r.opportunityTitle, records: [] };
+        acc[r.opportunityId].records.push(r);
+        return acc;
+    }, {});
+
+    return (
+        <div className="max-w-5xl mx-auto space-y-8">
+            <div className="flex justify-between items-start flex-wrap gap-4">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-stone-800">Hours Report</h1>
+                    <p className="text-stone-500 mt-1">Export volunteer hours for accreditation and compliance.</p>
+                </div>
+                {fetched && records.length > 0 && (
+                    <button onClick={handleExportCsv} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600">
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-36">
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">From</label>
+                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                </div>
+                <div className="flex-1 min-w-36">
+                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">To</label>
+                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                </div>
+                <button onClick={fetchReport} disabled={loading} className="px-6 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2 text-sm">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                    {loading ? 'Loading...' : 'Generate Report'}
+                </button>
+            </div>
+
+            {error && <div className="bg-rose-50 text-rose-600 rounded-2xl px-5 py-4 text-sm font-medium border border-rose-200">{error}</div>}
+
+            {fetched && (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {[
+                            { label: 'Total Hours', value: totalHours.toFixed(1), unit: 'hrs', cls: 'bg-blue-50 border-blue-100', valCls: 'text-blue-700' },
+                            { label: 'Volunteers', value: String(uniqueVolunteers), unit: 'people', cls: 'bg-violet-50 border-violet-100', valCls: 'text-violet-700' },
+                            { label: 'Events', value: String(uniqueOpps), unit: 'events', cls: 'bg-orange-50 border-orange-100', valCls: 'text-orange-600' },
+                            { label: 'Avg Hours', value: avgHours.toFixed(1), unit: '/volunteer', cls: 'bg-emerald-50 border-emerald-100', valCls: 'text-emerald-700' },
+                        ].map(c => (
+                            <div key={c.label} className={`rounded-2xl p-5 ${c.cls} border`}>
+                                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-1">{c.label}</p>
+                                <p className={`text-3xl font-extrabold ${c.valCls}`}>{c.value}</p>
+                                <p className="text-xs font-medium text-stone-400 mt-0.5">{c.unit}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {records.length === 0 ? (
+                        <div className="bg-white rounded-3xl p-10 text-center text-stone-400 border border-stone-100">No completed attendance records found for this period.</div>
+                    ) : (
+                        <div className="space-y-6">
+                            {Object.entries(byOpp).map(([oppId, { title, records: oppRecords }]) => {
+                                const oppHours = oppRecords.reduce((s, r) => s + r.totalHours, 0);
+                                return (
+                                    <div key={oppId} className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
+                                        <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100 bg-stone-50">
+                                            <h3 className="font-bold text-stone-800">{title}</h3>
+                                            <span className="text-sm font-bold text-orange-600">{oppHours.toFixed(1)} hrs - {oppRecords.length} volunteer{oppRecords.length !== 1 ? 's' : ''}</span>
+                                        </div>
+                                        <div className="divide-y divide-stone-50">
+                                            {oppRecords.map(r => (
+                                                <div key={r.attendanceId} className="flex items-center justify-between px-6 py-3 text-sm">
+                                                    <span className="font-medium text-stone-700">{r.volunteerName}</span>
+                                                    <div className="flex items-center gap-4 text-stone-400 text-xs">
+                                                        <span>{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-'}</span>
+                                                        <span className="font-bold text-stone-600">{r.totalHours.toFixed(2)} hrs</span>
+                                                        <span className={'px-2 py-0.5 rounded-full font-bold ' + (r.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{r.status}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }

@@ -7,3 +7,4 @@ public record UploadCredentialRequest(string CredentialUrl);
 public record FeedbackRequest(Guid OpportunityId, int Rating, string Comment);
 public record PrivacySettingsRequest(bool IsProfilePublic, bool AllowEmail, bool AllowPush);
 public record RegisterPushTokenRequest(string Token);
+public record SetBackgroundCheckRequest(string Status);

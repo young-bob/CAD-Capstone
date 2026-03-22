@@ -102,6 +102,20 @@ public class VolunteerGrain(
 
     public Task<List<Guid>> GetSkillIds() => Task.FromResult(state.State.SkillIds);
 
+    public async Task SetBackgroundCheckStatus(string status)
+    {
+        state.State.BackgroundCheckStatus = status;
+        await state.WriteStateAsync();
+        logger.LogInformation("Volunteer {Id} background check status set to {Status}", this.GetPrimaryKey(), status);
+    }
+
+    public async Task SignWaiver()
+    {
+        state.State.WaiverSignedAt = DateTime.UtcNow;
+        await state.WriteStateAsync();
+        logger.LogInformation("Volunteer {Id} signed waiver at {Time}", this.GetPrimaryKey(), state.State.WaiverSignedAt);
+    }
+
     private double CalculateImpactScore()
         => (state.State.TotalHours * 2) + (state.State.CompletedOpportunities * 10);
 }

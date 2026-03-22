@@ -86,6 +86,28 @@ public static class VolunteerEndpoints
                 return Results.Forbid();
             return Results.Ok(await queryService.GetByVolunteerAsync(id, skip ?? 0, take ?? 500));
         });
+
+        group.MapPost("/{id:guid}/background-check", async (Guid id, SetBackgroundCheckRequest req, HttpContext http, IGrainFactory grains) =>
+        {
+            if (!http.IsSystemAdmin() && !http.IsCoordinator())
+                return Results.Forbid();
+            var allowed = new[] { "NotSubmitted", "Pending", "Cleared", "Expired" };
+            if (!allowed.Contains(req.Status))
+                return Results.BadRequest(new { Error = "Invalid status. Use: NotSubmitted, Pending, Cleared, or Expired." });
+            var grain = grains.GetGrain<IVolunteerGrain>(id);
+            await grain.SetBackgroundCheckStatus(req.Status);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:guid}/waiver", async (Guid id, HttpContext http, IGrainFactory grains) =>
+        {
+            if (!http.IsSelfByGrainId(id))
+                return Results.Forbid();
+            var grain = grains.GetGrain<IVolunteerGrain>(id);
+            await grain.SignWaiver();
+            var profile = await grain.GetProfile();
+            return Results.Ok(new { signedAt = profile.WaiverSignedAt });
+        });
     }
 
 }

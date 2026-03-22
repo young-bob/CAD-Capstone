@@ -8,3 +8,16 @@ public record CreateOrgRequest(string Name, string Description, Guid CreatorUser
 public record ResubmitOrgRequest(string Name, string Description, string? ProofUrl = null);
 public record CreateOppRequest(string Title, string Description, string Category);
 public record InviteMemberRequest(string Email, OrgRole Role);
+
+public record SaveEventTemplateRequest(
+    string Name,
+    string Title,
+    string Description,
+    string Category,
+    string[] Tags,
+    string ApprovalPolicy,
+    string[] RequiredSkillIds,
+    double? Latitude,
+    double? Longitude,
+    int? RadiusMeters
+);

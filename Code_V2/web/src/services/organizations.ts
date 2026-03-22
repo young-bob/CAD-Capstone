@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole } from '../types';
+import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole, EventTemplate } from '../types';
 
 export const organizationService = {
     create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string; proofUrl?: string }): Promise<{ orgId: string }> => {
@@ -47,5 +47,20 @@ export const organizationService = {
     },
     resubmit: async (orgId: string, data: { name: string; description: string; proofUrl?: string }): Promise<void> => {
         await api.post(`/api/organizations/${orgId}/resubmit`, data);
+    },
+    getEventTemplates: async (orgId: string): Promise<EventTemplate[]> => {
+        const res = await api.get<EventTemplate[]>(`/api/organizations/${orgId}/event-templates`);
+        return res.data;
+    },
+    saveEventTemplate: async (orgId: string, data: {
+        name: string; title: string; description: string; category: string;
+        tags: string[]; approvalPolicy: string; requiredSkillIds: string[];
+        latitude: number | null; longitude: number | null; radiusMeters: number | null;
+    }): Promise<{ id: string }> => {
+        const res = await api.post<{ id: string }>(`/api/organizations/${orgId}/event-templates`, data);
+        return res.data;
+    },
+    deleteEventTemplate: async (orgId: string, templateId: string): Promise<void> => {
+        await api.delete(`/api/organizations/${orgId}/event-templates/${templateId}`);
     },
 };

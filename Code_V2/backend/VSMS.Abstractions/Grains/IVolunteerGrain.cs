@@ -35,4 +35,8 @@ public interface IVolunteerGrain : IGrainWithGuidKey
     Task RemoveSkill(Guid skillId);
     [AlwaysInterleave]
     Task<List<Guid>> GetSkillIds();
+
+    // Compliance
+    Task SetBackgroundCheckStatus(string status);
+    Task SignWaiver();
 }

@@ -1440,6 +1440,19 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
         finally { setUploadingCred(false); }
     };
 
+    // Waiver
+    const [signingWaiver, setSigningWaiver] = useState(false);
+    const handleSignWaiver = async () => {
+        if (!auth.linkedGrainId) return;
+        setSigningWaiver(true);
+        try {
+            await volunteerService.signWaiver(auth.linkedGrainId);
+            showToast('Waiver signed successfully ✅');
+            await load();
+        } catch (err: any) { setError(getErr(err, 'Failed to sign waiver')); }
+        finally { setSigningWaiver(false); }
+    };
+
     const handleRemoveSkill = async (skillId: string) => {
         if (!auth.userId) return;
         try {
@@ -1571,6 +1584,32 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                     </div>
                 )}
             </div>
+
+            {/* Liability Waiver */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                <h3 className="text-xl font-bold text-stone-800 mb-2">Liability Waiver</h3>
+                {profile?.waiverSignedAt ? (
+                    <div className="flex items-center gap-3 bg-emerald-50 rounded-2xl px-5 py-4 border border-emerald-200">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <div>
+                            <p className="font-bold text-emerald-700 text-sm">Waiver Signed</p>
+                            <p className="text-emerald-600 text-xs mt-0.5">Signed on {new Date(profile.waiverSignedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="bg-amber-50 rounded-2xl px-5 py-4 border border-amber-200 text-sm text-amber-800 leading-relaxed">
+                            <p className="font-bold mb-2">Volunteer Liability Waiver & Release of Liability</p>
+                            <p>By signing this waiver, I acknowledge that I am volunteering of my own free will and agree to release the organization and its coordinators from any liability for injury, loss, or damage arising from my participation in volunteer activities. I confirm that I am physically capable of performing the volunteering duties assigned to me, and I agree to follow all safety guidelines and instructions provided by the organization's staff.</p>
+                        </div>
+                        <button onClick={handleSignWaiver} disabled={signingWaiver}
+                            className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 text-sm">
+                            {signingWaiver ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
+                            I Agree &amp; Sign Waiver
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -1686,16 +1725,22 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     const [error, setError] = useState('');
     const [applying, setApplying] = useState<string | null>(null);
     const [toast, setToast] = useState('');
+    const [allSkills, setAllSkills] = useState<Skill[]>([]);
+    const [mySkillIds, setMySkillIds] = useState<Set<string>>(new Set());
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const [oppData, appData] = await Promise.all([
+            const [oppData, appData, skillsData, mySkillsData] = await Promise.all([
                 opportunityService.getById(oppId),
                 auth.linkedGrainId ? applicationService.getForVolunteer(auth.linkedGrainId) : Promise.resolve([]),
+                skillService.getAll(),
+                auth.userId ? skillService.getVolunteerSkills(auth.userId) : Promise.resolve([]),
             ]);
             const serverApps = (appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId);
             setOpp(oppData);
+            setAllSkills(skillsData || []);
+            setMySkillIds(new Set((mySkillsData || []).map((s: Skill) => s.id)));
             // Keep optimistic temp applications until projection/read model catches up.
             setMyApps(prev => {
                 const serverShiftIds = new Set(serverApps.map(a => a.shiftId));
@@ -1705,7 +1750,7 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
         } catch (err: any) {
             setError(getErr(err, 'Failed to load opportunity'));
         } finally { setLoading(false); }
-    }, [oppId, auth.linkedGrainId]);
+    }, [oppId, auth.linkedGrainId, auth.userId]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -1801,6 +1846,51 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                             </div>
                         )}
                     </div>
+
+                    {(() => {
+                        const requiredIds = opp.requiredSkillIds || [];
+                        if (requiredIds.length === 0) return null;
+                        const reqSkills = requiredIds.map(id => allSkills.find(s => s.id === id)).filter(Boolean) as Skill[];
+                        const trainingSkills = reqSkills.filter(s => s.category === 'Training');
+                        const regularSkills = reqSkills.filter(s => s.category !== 'Training');
+                        const missingTraining = trainingSkills.filter(s => !mySkillIds.has(s.id));
+                        return (
+                            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 space-y-4">
+                                <h2 className="text-lg font-bold text-stone-800">Requirements</h2>
+                                {missingTraining.length > 0 && (
+                                    <div className="flex items-start gap-3 bg-amber-50 rounded-2xl px-4 py-3 border border-amber-200">
+                                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-bold text-amber-700 text-sm">Missing Required Training</p>
+                                            <p className="text-amber-600 text-xs mt-0.5">You are missing: <span className="font-semibold">{missingTraining.map(s => s.name).join(', ')}</span>. You may still apply but the coordinator will review compliance.</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {trainingSkills.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-2">Required Training</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {trainingSkills.map(s => {
+                                                const has = mySkillIds.has(s.id);
+                                                return <span key={s.id} className={`px-3 py-1 rounded-full text-xs font-bold border ${has ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>{has ? '✓ ' : '⚠ '}{s.name}</span>;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                {regularSkills.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">Required Skills</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {regularSkills.map(s => {
+                                                const has = mySkillIds.has(s.id);
+                                                return <span key={s.id} className={`px-3 py-1 rounded-full text-xs font-bold border ${has ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-stone-50 text-stone-500 border-stone-200'}`}>{has ? '✓ ' : ''}{s.name}</span>;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {myApps.length > 0 && (
                         <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100">

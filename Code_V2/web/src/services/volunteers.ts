@@ -23,4 +23,11 @@ export const volunteerService = {
     submitFeedback: async (id: string, data: { opportunityId: string; rating: number; comment: string }): Promise<void> => {
         await api.post(`/api/volunteers/${id}/feedback`, data);
     },
+    setBackgroundCheckStatus: async (id: string, status: string): Promise<void> => {
+        await api.post(`/api/volunteers/${id}/background-check`, { status });
+    },
+    signWaiver: async (id: string): Promise<{ signedAt: string }> => {
+        const res = await api.post<{ signedAt: string }>(`/api/volunteers/${id}/waiver`);
+        return res.data;
+    },
 };

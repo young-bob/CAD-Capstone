@@ -30,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AttendanceReadModel> AttendanceReadModels => Set<AttendanceReadModel>();
     public DbSet<DisputeReadModel> DisputeReadModels => Set<DisputeReadModel>();
     public DbSet<CertificateTemplateEntity> CertificateTemplates => Set<CertificateTemplateEntity>();
+    public DbSet<EventTemplateEntity> EventTemplates => Set<EventTemplateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,5 +116,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasDatabaseName("IX_DisputeReadModels_RaisedAt");
 
         modelBuilder.Entity<CertificateTemplateEntity>().HasIndex(t => t.OrganizationId);
+        modelBuilder.Entity<EventTemplateEntity>().HasIndex(t => t.OrganizationId);
     }
 }

@@ -154,6 +154,62 @@ public static class OrganizationEndpoints
                 return Results.Forbid();
             return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
         });
+
+        // ── Event Templates ──────────────────────────────────────────────────
+
+        group.MapGet("/{id:guid}/event-templates", async (Guid id, HttpContext http, AppDbContext db) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+            var templates = await db.EventTemplates
+                .AsNoTracking()
+                .Where(t => t.OrganizationId == id)
+                .OrderByDescending(t => t.CreatedAt)
+                .Select(t => new
+                {
+                    t.Id, t.Name, t.Title, t.Description, t.Category,
+                    t.TagsJson, t.ApprovalPolicy, t.RequiredSkillIdsJson,
+                    t.Latitude, t.Longitude, t.RadiusMeters, t.CreatedAt
+                })
+                .ToListAsync();
+            return Results.Ok(templates);
+        });
+
+        group.MapPost("/{id:guid}/event-templates", async (Guid id, SaveEventTemplateRequest req, HttpContext http, AppDbContext db) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+            if (string.IsNullOrWhiteSpace(req.Name))
+                return Results.BadRequest(new { Error = "Template name is required." });
+            var entity = new VSMS.Infrastructure.Data.EfCoreQuery.Entities.EventTemplateEntity
+            {
+                OrganizationId = id,
+                Name = req.Name.Trim(),
+                Title = req.Title?.Trim() ?? string.Empty,
+                Description = req.Description?.Trim() ?? string.Empty,
+                Category = req.Category?.Trim() ?? string.Empty,
+                TagsJson = System.Text.Json.JsonSerializer.Serialize(req.Tags ?? []),
+                ApprovalPolicy = req.ApprovalPolicy ?? "ManualApprove",
+                RequiredSkillIdsJson = System.Text.Json.JsonSerializer.Serialize(req.RequiredSkillIds ?? []),
+                Latitude = req.Latitude,
+                Longitude = req.Longitude,
+                RadiusMeters = req.RadiusMeters,
+            };
+            db.EventTemplates.Add(entity);
+            await db.SaveChangesAsync();
+            return Results.Created($"/api/organizations/{id}/event-templates/{entity.Id}", new { id = entity.Id });
+        });
+
+        group.MapDelete("/{id:guid}/event-templates/{templateId:guid}", async (Guid id, Guid templateId, HttpContext http, AppDbContext db) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+            var entity = await db.EventTemplates.FirstOrDefaultAsync(t => t.Id == templateId && t.OrganizationId == id);
+            if (entity is null) return Results.NotFound();
+            db.EventTemplates.Remove(entity);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
     }
 
 }
