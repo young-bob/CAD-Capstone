@@ -40,12 +40,12 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
-import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail } from './pages/volunteer';
+import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail, VolOrgs } from './pages/volunteer';
 import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail, CoordReports, CoordVolunteers } from './pages/coordinator';
 import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills, AdminSystemInfo } from './pages/admin';
 
 // Views considered "deeper" than dashboard — navigate right when entering them
-const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills',
+const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills', 'orgs',
     'manage_events', 'org_applications', 'manage_templates', 'org_members', 'coord_reports', 'coord_volunteers',
     'admin_orgs', 'admin_disputes', 'admin_users', 'admin_skills', 'admin_system_info']);
 
@@ -148,6 +148,7 @@ function AppInner() {
                 case 'certificates': return <VolCertificates />;
                 case 'profile': return <VolProfile onNavigate={setCurrentView} />;
                 case 'skills': return <VolSkills />;
+                case 'orgs': return <VolOrgs />;
                 default: return <VolDashboard onNavigate={navigateTo} />;
             }
         }

@@ -83,6 +83,74 @@ public static class OrganizationEndpoints
         group.MapGet("/approved", async (int? skip, int? take, IOrganizationQueryService queryService) =>
             Results.Ok(await queryService.GetApprovedOrganizationsAsync(skip ?? 0, take ?? 500)));
 
+        group.MapGet("/recommend", async (Guid volunteerId, AppDbContext db, IGrainFactory grains) =>
+        {
+            var skillIds = await grains.GetGrain<IVolunteerGrain>(volunteerId).GetSkillIds();
+            var followedOrgIds = await db.VolunteerFollows
+                .AsNoTracking()
+                .Where(f => f.VolunteerGrainId == volunteerId)
+                .Select(f => f.OrgId)
+                .ToListAsync();
+            var approvedOrgIds = await db.OrganizationReadModels
+                .AsNoTracking()
+                .Where(o => o.Status == OrgStatus.Approved)
+                .Select(o => o.OrgId)
+                .ToListAsync();
+            var eligibleOrgIds = approvedOrgIds.Except(followedOrgIds).ToList();
+
+            List<(Guid OrgId, int Score)> scores;
+            if (skillIds.Count > 0)
+            {
+                var opps = await db.OpportunityReadModels
+                    .AsNoTracking()
+                    .Where(o => o.Status == OpportunityStatus.Published && eligibleOrgIds.Contains(o.OrganizationId))
+                    .Select(o => new { o.OrganizationId, o.RequiredSkillIds })
+                    .ToListAsync();
+                scores = opps
+                    .GroupBy(o => o.OrganizationId)
+                    .Select(g => (OrgId: g.Key, Score: g.Sum(o => o.RequiredSkillIds.Count(s => skillIds.Contains(s)))))
+                    .Where(x => x.Score > 0)
+                    .OrderByDescending(x => x.Score)
+                    .Take(5)
+                    .ToList();
+            }
+            else
+            {
+                scores = [];
+            }
+
+            // Fallback: if fewer than 5 skill-matched results, fill with newest approved orgs
+            var scoredOrgIds = scores.Select(x => x.OrgId).ToHashSet();
+            var fallbackCount = 5 - scores.Count;
+            if (fallbackCount > 0)
+            {
+                var fallbacks = await db.OrganizationReadModels
+                    .AsNoTracking()
+                    .Where(o => o.Status == OrgStatus.Approved && !followedOrgIds.Contains(o.OrgId) && !scoredOrgIds.Contains(o.OrgId))
+                    .OrderByDescending(o => o.CreatedAt)
+                    .Take(fallbackCount)
+                    .Select(o => new { o.OrgId })
+                    .ToListAsync();
+                scores.AddRange(fallbacks.Select(f => (f.OrgId, 0)));
+            }
+
+            var allOrgIds = scores.Select(x => x.OrgId).ToList();
+            var orgMap = await db.OrganizationReadModels
+                .AsNoTracking()
+                .Where(o => allOrgIds.Contains(o.OrgId))
+                .ToDictionaryAsync(o => o.OrgId);
+
+            var result = scores
+                .Where(x => orgMap.ContainsKey(x.OrgId))
+                .Select(x => new {
+                    OrgId = x.OrgId,
+                    orgMap[x.OrgId].Name,
+                    orgMap[x.OrgId].Description,
+                    MatchingOpportunities = x.Score
+                });
+            return Results.Ok(result);
+        });
+
         group.MapGet("/", async (OrgStatus? status, int? skip, int? take, IOrganizationQueryService queryService) =>
             Results.Ok(await queryService.GetAllOrganizationsAsync(status, skip ?? 0, take ?? 500)))
             .RequireAuthorization(p => p.RequireRole("SystemAdmin"));

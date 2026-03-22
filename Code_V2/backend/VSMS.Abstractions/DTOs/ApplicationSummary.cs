@@ -16,5 +16,6 @@ public record ApplicationSummary(
     ApplicationStatus Status,
     DateTime AppliedAt,
     string? AttendanceStatus = null, // null = no check-in record yet; values match AttendanceStatus enum names
-    string OrganizationName = ""
+    string OrganizationName = "",
+    Guid OrganizationId = default
 );

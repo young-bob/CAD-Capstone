@@ -7,7 +7,8 @@ import AttendanceHeatmap from '../../components/AttendanceHeatmap';
 import StreakCard, { computeStreak } from '../../components/StreakCard';
 import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
-import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift } from '../../types';
+import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift, OrganizationSummary, OrgRecommendation } from '../../types';
+import { organizationService } from '../../services/organizations';
 import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
@@ -179,6 +180,8 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [orgRecs, setOrgRecs] = useState<OrgRecommendation[]>([]);
+    const [followedOrgIdsDash, setFollowedOrgIdsDash] = useState<Set<string>>(new Set());
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -192,6 +195,10 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
             setProfile(p);
             setApps(a);
             setAttendance(at);
+            setFollowedOrgIdsDash(new Set(p.followedOrgIds ?? []));
+            organizationService.getRecommended(auth.linkedGrainId)
+                .then(recs => setOrgRecs(recs.filter(r => !p.followedOrgIds?.includes(r.orgId))))
+                .catch(() => {});
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
@@ -510,6 +517,42 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                     timestamp: a.checkInTime!,
                 })),
             ]} />
+
+            {/* Suggested Organizations */}
+            {orgRecs.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Building2 className="w-5 h-5 text-orange-500" /> Suggested Organizations</h3>
+                        <button onClick={() => onNavigate('orgs')} className="text-sm text-orange-500 font-semibold hover:underline">Browse all</button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {orgRecs.map(org => (
+                            <div key={org.orgId} className="border border-stone-100 dark:border-zinc-700 rounded-2xl p-4 flex flex-col gap-3 hover:border-orange-200 transition-colors">
+                                <div>
+                                    <p className="font-bold text-stone-800 dark:text-zinc-100 text-sm">{org.name}</p>
+                                    <p className="text-xs text-stone-400 mt-1 line-clamp-2">{org.description}</p>
+                                </div>
+                                {org.matchingOpportunities > 0 && (
+                                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 rounded-full px-2.5 py-1 w-fit">{org.matchingOpportunities} matching {org.matchingOpportunities === 1 ? 'opportunity' : 'opportunities'}</span>
+                                )}
+                                <button
+                                    onClick={async () => {
+                                        if (!auth.linkedGrainId) return;
+                                        try {
+                                            await volunteerService.followOrg(auth.linkedGrainId, org.orgId);
+                                            setFollowedOrgIdsDash(prev => new Set([...prev, org.orgId]));
+                                            setOrgRecs(prev => prev.filter(r => r.orgId !== org.orgId));
+                                        } catch { /* ignore */ }
+                                    }}
+                                    className="mt-auto px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-xs hover:bg-orange-600 w-fit flex items-center gap-1.5"
+                                >
+                                    <Heart className="w-3.5 h-3.5" /> Follow
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -958,13 +1001,22 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const [toast, setToast] = useState<{ message: string; actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[] } | null>(null);
     const [actionId, setActionId] = useState<string | null>(null);
     const [confirmWithdrawApp, setConfirmWithdrawApp] = useState<ApplicationSummary | null>(null);
+    const [followedOrgIds, setFollowedOrgIds] = useState<Set<string>>(new Set());
+    const [dismissedOrgs, setDismissedOrgs] = useState<Set<string>>(() => {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('vsms_dismiss_follow_'));
+        return new Set(keys.map(k => k.replace('vsms_dismiss_follow_', '')));
+    });
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const data = await applicationService.getForVolunteer(auth.linkedGrainId);
+            const [data, profile] = await Promise.all([
+                applicationService.getForVolunteer(auth.linkedGrainId),
+                volunteerService.getProfile(auth.linkedGrainId),
+            ]);
             setApps(data);
+            setFollowedOrgIds(new Set(profile.followedOrgIds ?? []));
         } catch (err: any) {
             setError(getErr(err, 'Failed to load applications'));
         } finally { setLoading(false); }
@@ -1111,6 +1163,40 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                 onCancel={() => setConfirmWithdrawApp(null)}
                 onConfirm={handleWithdrawConfirm}
             />
+            {/* Follow prompts for accepted orgs not yet followed */}
+            {!loading && (() => {
+                const seen = new Set<string>();
+                return apps
+                    .filter(a => a.status === 'Approved' && a.organizationId && !followedOrgIds.has(a.organizationId) && !dismissedOrgs.has(a.organizationId!))
+                    .filter(a => { if (seen.has(a.organizationId!)) return false; seen.add(a.organizationId!); return true; })
+                    .map(a => (
+                        <div key={a.organizationId} className="flex items-center justify-between gap-4 bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4">
+                            <div className="flex items-center gap-3">
+                                <Heart className="w-5 h-5 text-orange-500 shrink-0" />
+                                <p className="text-sm font-medium text-orange-800">You were accepted at <strong>{a.organizationName}</strong>! Follow them to get notified about future events.</p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <button
+                                    onClick={async () => {
+                                        if (!auth.linkedGrainId || !a.organizationId) return;
+                                        try {
+                                            await volunteerService.followOrg(auth.linkedGrainId, a.organizationId);
+                                            setFollowedOrgIds(prev => new Set([...prev, a.organizationId!]));
+                                        } catch { /* ignore */ }
+                                    }}
+                                    className="px-4 py-1.5 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600"
+                                >Follow</button>
+                                <button
+                                    onClick={() => {
+                                        localStorage.setItem(`vsms_dismiss_follow_${a.organizationId}`, '1');
+                                        setDismissedOrgs(prev => new Set([...prev, a.organizationId!]));
+                                    }}
+                                    className="text-stone-400 hover:text-stone-600 text-lg leading-none"
+                                >✕</button>
+                            </div>
+                        </div>
+                    ));
+            })()}
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : apps.length === 0 ? (
                 <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
                     <p className="text-stone-400 font-medium mb-5">No applications yet.</p>
@@ -1585,6 +1671,51 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                 )}
             </div>
 
+            {/* Notification Preferences */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                <h3 className="text-xl font-bold text-stone-800 mb-4">Notification Preferences</h3>
+                <p className="text-stone-500 text-sm mb-5">Choose how you'd like to be notified when organizations you follow post new opportunities.</p>
+                <div className="space-y-4">
+                    {[
+                        { key: 'allowEmailNotifications' as const, label: 'Email notifications', desc: 'Receive an email when a followed org opens a new event' },
+                        { key: 'allowPushNotifications' as const, label: 'App notifications', desc: 'Receive a push notification in the app' },
+                    ].map(({ key, label, desc }) => {
+                        const checked = profile?.[key] ?? true;
+                        const handleToggle = async () => {
+                            if (!auth.linkedGrainId || !profile) return;
+                            const next = { ...profile, [key]: !checked };
+                            setProfile(next);
+                            try {
+                                await volunteerService.updatePrivacySettings(auth.linkedGrainId, {
+                                    isProfilePublic: next.isProfilePublic,
+                                    allowEmail: next.allowEmailNotifications,
+                                    allowPush: next.allowPushNotifications,
+                                });
+                                showToast(`${label} ${!checked ? 'enabled' : 'disabled'}`);
+                            } catch {
+                                setProfile(profile); // revert
+                                showToast('Failed to update preference');
+                            }
+                        };
+                        return (
+                            <div key={key} className="flex items-center justify-between p-4 rounded-2xl bg-stone-50 border border-stone-100">
+                                <div>
+                                    <p className="font-semibold text-stone-700 text-sm">{label}</p>
+                                    <p className="text-xs text-stone-400 mt-0.5">{desc}</p>
+                                </div>
+                                <button
+                                    onClick={handleToggle}
+                                    className={`relative w-12 h-6 rounded-full transition-colors ${checked ? 'bg-orange-500' : 'bg-stone-200'}`}
+                                    aria-pressed={checked}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* Liability Waiver */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h3 className="text-xl font-bold text-stone-800 mb-2">Liability Waiver</h3>
@@ -1971,6 +2102,104 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                         })}
                     </div>
                 </>
+            )}
+        </div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VOLUNTEER ORGS BROWSE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export function VolOrgs() {
+    const auth = useAuth();
+    const [orgs, setOrgs] = useState<OrganizationSummary[]>([]);
+    const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
+    const [actionId, setActionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        setLoading(true);
+        Promise.all([
+            organizationService.listApproved(),
+            volunteerService.getProfile(auth.linkedGrainId),
+        ]).then(([list, profile]) => {
+            setOrgs(list);
+            setFollowedIds(new Set(profile.followedOrgIds ?? []));
+        }).catch(err => setError(getErr(err, 'Failed to load organizations')))
+          .finally(() => setLoading(false));
+    }, [auth.linkedGrainId]);
+
+    const handleToggleFollow = async (orgId: string) => {
+        if (!auth.linkedGrainId) return;
+        setActionId(orgId);
+        try {
+            if (followedIds.has(orgId)) {
+                await volunteerService.unfollowOrg(auth.linkedGrainId, orgId);
+                setFollowedIds(prev => { const n = new Set(prev); n.delete(orgId); return n; });
+            } else {
+                await volunteerService.followOrg(auth.linkedGrainId, orgId);
+                setFollowedIds(prev => new Set([...prev, orgId]));
+            }
+        } catch { /* ignore */ }
+        finally { setActionId(null); }
+    };
+
+    const filtered = orgs.filter(o =>
+        !search || o.name.toLowerCase().includes(search.toLowerCase()) || o.description.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-3xl font-extrabold text-stone-800 dark:text-zinc-100">Organizations</h1>
+                <p className="text-stone-500 mt-1 text-base">Follow organizations to be notified when they open new volunteer opportunities.</p>
+            </div>
+            <div className="relative">
+                <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                    value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Search organizations..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 bg-white dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm"
+                />
+            </div>
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} /> : filtered.length === 0 ? (
+                <Empty msg="No organizations found." />
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtered.map(org => {
+                        const following = followedIds.has(org.orgId);
+                        const busy = actionId === org.orgId;
+                        return (
+                            <div key={org.orgId} className="bg-white dark:bg-zinc-900 border border-stone-100 dark:border-zinc-800 rounded-2xl p-5 flex flex-col gap-4 shadow-sm hover:border-orange-200 transition-colors">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0">
+                                        <Building2 className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-stone-800 dark:text-zinc-100 text-sm leading-snug">{org.name}</p>
+                                        <p className="text-xs text-stone-400 mt-1 line-clamp-3">{org.description}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleToggleFollow(org.orgId)}
+                                    disabled={busy}
+                                    className={`mt-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
+                                        following
+                                            ? 'bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-rose-50 hover:text-rose-600'
+                                            : 'bg-orange-500 text-white hover:bg-orange-600'
+                                    }`}
+                                >
+                                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className={`w-4 h-4 ${following ? 'fill-current' : ''}`} />}
+                                    {following ? '✓ Following' : 'Follow'}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );

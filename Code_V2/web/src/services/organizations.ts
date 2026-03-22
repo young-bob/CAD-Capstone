@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole, EventTemplate, OrgVolunteerSummary } from '../types';
+import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole, EventTemplate, OrgVolunteerSummary, OrganizationSummary, OrgRecommendation } from '../types';
 
 export const organizationService = {
     create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string; proofUrl?: string }): Promise<{ orgId: string }> => {
@@ -65,6 +65,14 @@ export const organizationService = {
     },
     getVolunteers: async (orgId: string): Promise<OrgVolunteerSummary[]> => {
         const res = await api.get<OrgVolunteerSummary[]>(`/api/organizations/${orgId}/volunteers`);
+        return res.data;
+    },
+    listApproved: async (): Promise<OrganizationSummary[]> => {
+        const res = await api.get<OrganizationSummary[]>('/api/organizations/approved');
+        return res.data;
+    },
+    getRecommended: async (volunteerId: string): Promise<OrgRecommendation[]> => {
+        const res = await api.get<OrgRecommendation[]>(`/api/organizations/recommend?volunteerId=${volunteerId}`);
         return res.data;
     },
 };

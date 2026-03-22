@@ -167,14 +167,14 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
             .Join(dbContext.OpportunityReadModels,
                 a => a.OpportunityId,
                 o => o.OpportunityId,
-                (a, o) => new { a, OrganizationName = o.OrganizationName })
+                (a, o) => new { a, o.OrganizationName, o.OrganizationId })
             .OrderByDescending(x => x.a.AppliedAt)
             .Skip(safeSkip)
             .Take(safeTake)
             .Select(x => new ApplicationSummary(
                 x.a.ApplicationId, x.a.OpportunityId, x.a.ShiftId, x.a.OpportunityTitle, x.a.ShiftName,
                 x.a.ShiftStartTime, x.a.ShiftEndTime, x.a.VolunteerId, x.a.VolunteerName, x.a.Status, x.a.AppliedAt,
-                null, x.OrganizationName))
+                null, x.OrganizationName, x.OrganizationId))
             .ToListAsync();
     }
 

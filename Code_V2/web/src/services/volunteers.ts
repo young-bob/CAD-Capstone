@@ -30,6 +30,9 @@ export const volunteerService = {
         const res = await api.post<{ signedAt: string }>(`/api/volunteers/${id}/waiver`);
         return res.data;
     },
+    updatePrivacySettings: async (id: string, data: { isProfilePublic: boolean; allowEmail: boolean; allowPush: boolean }): Promise<void> => {
+        await api.put(`/api/volunteers/${id}/privacy`, { isProfilePublic: data.isProfilePublic, allowEmail: data.allowEmail, allowPush: data.allowPush });
+    },
     followOrg: async (volunteerGrainId: string, orgId: string): Promise<void> => {
         await api.post(`/api/volunteers/${volunteerGrainId}/follow/${orgId}`);
     },

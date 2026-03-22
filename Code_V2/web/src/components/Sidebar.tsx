@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
     Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus, Server,
-    ChevronLeft, ChevronRight, BarChart2, Heart
+    ChevronLeft, ChevronRight, BarChart2, Heart, Building2
 } from 'lucide-react';
 import type { ViewName } from '../types';
 import SidebarTooltip from './SidebarTooltip';
@@ -33,6 +33,7 @@ const VOLUNTEER_ITEMS: { section: string; items: NavItem[] }[] = [
         items: [
             { view: 'dashboard',     label: 'Dashboard',         icon: ({ className }) => <Menu className={className} /> },
             { view: 'opportunities', label: 'Find Opportunities', icon: ({ className }) => <Search className={className} /> },
+            { view: 'orgs',          label: 'Organizations',     icon: ({ className }) => <Building2 className={className} /> },
             { view: 'applications',  label: 'My Applications',   icon: ({ className }) => <Briefcase className={className} /> },
             { view: 'attendance',    label: 'Geo Check-in',      icon: ({ className }) => <MapPin className={className} /> },
         ],
@@ -40,9 +41,9 @@ const VOLUNTEER_ITEMS: { section: string; items: NavItem[] }[] = [
     {
         section: 'Personal & Assets',
         items: [
-            { view: 'certificates', label: 'Certificates', icon: ({ className }) => <Award className={className} /> },
-            { view: 'profile',      label: 'Profile',      icon: ({ className }) => <User className={className} /> },
-            { view: 'skills',       label: 'My Skills',    icon: ({ className }) => <Star className={className} /> },
+            { view: 'certificates', label: 'Certificates',   icon: ({ className }) => <Award className={className} /> },
+            { view: 'profile',      label: 'Profile',        icon: ({ className }) => <User className={className} /> },
+            { view: 'skills',       label: 'My Skills',      icon: ({ className }) => <Star className={className} /> },
         ],
     },
 ];

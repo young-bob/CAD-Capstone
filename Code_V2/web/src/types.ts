@@ -1,6 +1,6 @@
 export type ViewName =
     | 'landing' | 'login' | 'register'
-    | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills'
+    | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills' | 'orgs'
     | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports' | 'coord_volunteers'
     | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills' | 'admin_system_info';
 
@@ -165,6 +165,7 @@ export interface ApplicationSummary {
     appliedAt: string;
     attendanceStatus?: string; // Populated by coordinator view: Pending | CheckedIn | CheckedOut | Confirmed | etc.
     organizationName: string;
+    organizationId?: string;
 }
 
 // ─── Attendance ───────────────────────────────────────────────
@@ -226,6 +227,8 @@ export interface VolunteerProfile {
     backgroundCheckStatus: string;
     waiverSignedAt: string | null;
     followedOrgIds: string[];
+    allowEmailNotifications: boolean;
+    allowPushNotifications: boolean;
 }
 
 export interface OrgVolunteerSummary {
@@ -238,6 +241,13 @@ export interface OrgVolunteerSummary {
     backgroundCheckStatus: string;
     hasWaiver: boolean;
     skillCount: number;
+}
+
+export interface OrgRecommendation {
+    orgId: string;
+    name: string;
+    description: string;
+    matchingOpportunities: number;
 }
 
 // ─── Skill ────────────────────────────────────────────────────

@@ -1,13 +1,20 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using VSMS.Abstractions.Enums;
 using VSMS.Abstractions.Events;
+using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
 namespace VSMS.Infrastructure.EventHandlers;
 
-public class OpportunityEventHandlers(AppDbContext dbContext) :
+public class OpportunityEventHandlers(
+    AppDbContext dbContext,
+    IGrainFactory grains,
+    IEmailService email,
+    ILogger<OpportunityEventHandlers> logger) :
     IEventHandler<OpportunityCreatedEvent>,
     IEventHandler<OpportunityStatusChangedEvent>,
     IEventHandler<OpportunitySpotsUpdatedEvent>,
@@ -45,6 +52,41 @@ public class OpportunityEventHandlers(AppDbContext dbContext) :
         {
             opp.Status = domainEvent.Status;
             await dbContext.SaveChangesAsync();
+
+            // Notify followers when an opportunity is published
+            if (domainEvent.Status == OpportunityStatus.Published)
+            {
+                var followerIds = await dbContext.VolunteerFollows
+                    .AsNoTracking()
+                    .Where(f => f.OrgId == opp.OrganizationId)
+                    .Select(f => f.VolunteerGrainId)
+                    .ToListAsync();
+
+                if (followerIds.Count > 0)
+                {
+                    var notifGrain = grains.GetGrain<INotificationGrain>(Guid.Empty);
+                    var tasks = followerIds.Select(async grainId =>
+                    {
+                        try
+                        {
+                            var profile = await grains.GetGrain<IVolunteerGrain>(grainId).GetProfile();
+                            var msg = $"{opp.OrganizationName} just posted \"{opp.Title}\"";
+                            if (profile.AllowPushNotifications)
+                                await notifGrain.SendNotification(grainId, "NewOpportunity", msg);
+                            if (profile.AllowEmailNotifications && !string.IsNullOrWhiteSpace(profile.Email))
+                            {
+                                var html = $"<div style='font-family:sans-serif'><p>Hi {profile.FirstName},</p><p><strong>{opp.OrganizationName}</strong> just posted a new volunteer opportunity: <strong>{opp.Title}</strong>.</p><p>Log in to VSMS to view and apply.</p></div>";
+                                await email.SendAsync(profile.Email, $"New opportunity: {opp.Title}", html);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Failed to notify follower {VolunteerId} of opportunity {OppId}", grainId, domainEvent.OpportunityId);
+                        }
+                    });
+                    await Task.WhenAll(tasks);
+                }
+            }
         }
     }
 

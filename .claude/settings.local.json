@@ -16,7 +16,11 @@
       "Read(//c/Users/cczcx/.claude/plans/**)",
       "Bash(dotnet build --no-restore)",
       "Bash(dotnet build)",
-      "Bash(xargs grep -n \"Id\")"
+      "Bash(xargs grep -n \"Id\")",
+      "Bash(xargs grep -l \"NotificationGrain\\\\|INotificationGrain\")",
+      "Bash(xargs grep -l \"AllowEmailNotifications\\\\|AllowPushNotifications\")",
+      "Bash(xargs grep -l \"SendNotification\\\\|INotificationGrain\\\\|SendAsync\")",
+      "Bash(xargs grep -l \"record ApplicationSummary\\\\|class ApplicationSummary\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\cczcx\\.claude\\plans"
