@@ -23,4 +23,5 @@ export interface ApplicationSummary {
     volunteerName: string;
     status: ApplicationStatus;
     appliedAt: string;
+    organizationName: string;
 }

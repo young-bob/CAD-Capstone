@@ -164,6 +164,7 @@ export interface ApplicationSummary {
     status: ApplicationStatus;
     appliedAt: string;
     attendanceStatus?: string; // Populated by coordinator view: Pending | CheckedIn | CheckedOut | Confirmed | etc.
+    organizationName: string;
 }
 
 // ─── Attendance ───────────────────────────────────────────────

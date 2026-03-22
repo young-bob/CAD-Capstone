@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart } from 'lucide-react';
+import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2 } from 'lucide-react';
 import EventCalendar from '../../components/EventCalendar';
 import ImpactRing from '../../components/ImpactRing';
 import AttendanceHeatmap from '../../components/AttendanceHeatmap';
@@ -52,6 +52,10 @@ function getErr(err: any, fallback: string): string { const d = err?.response?.d
 function formatEventTitle(opportunityTitle: string, shiftName?: string | null): string {
     const cleanedShift = shiftName?.trim();
     return cleanedShift ? `${opportunityTitle} · ${cleanedShift}` : opportunityTitle;
+}
+function formatTimeRange(start: string, end: string): string {
+    const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+    return `${new Date(start).toLocaleTimeString([], opts)} – ${new Date(end).toLocaleTimeString([], opts)}`;
 }
 
 // ─── GPS Check-In Button ──────────────────────────────────────
@@ -1038,14 +1042,71 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
 
     const canWithdraw = (status: string) => ['Pending', 'Waitlisted', 'Approved', 'Promoted'].includes(status);
 
+    const groups = {
+        Upcoming: apps.filter(a => ['Approved', 'Pending', 'Promoted'].includes(a.status)),
+        Waitlisted: apps.filter(a => a.status === 'Waitlisted'),
+        Past: apps.filter(a => ['Completed', 'Rejected', 'Withdrawn', 'NoShow'].includes(a.status)),
+    };
+    type TabKey = keyof typeof groups;
+    const tabs: TabKey[] = (['Upcoming', 'Waitlisted', 'Past'] as TabKey[]).filter(t => groups[t].length > 0);
+    const [activeTab, setActiveTab] = useState<TabKey>('Upcoming');
+    const visibleTab: TabKey = tabs.includes(activeTab) ? activeTab : (tabs[0] ?? 'Upcoming');
+    const visibleApps = groups[visibleTab] ?? [];
+
+    const renderCard = (a: ApplicationSummary) => (
+        <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                    {a.organizationName && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <Building2 className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                            <p className="text-xs text-stone-400 truncate">{a.organizationName}</p>
+                        </div>
+                    )}
+                    <p className="font-bold text-stone-800 text-base leading-snug">{a.opportunityTitle}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                        <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <p className="text-sm text-stone-500">
+                            {a.shiftName && <span className="font-medium text-stone-600">{a.shiftName} · </span>}
+                            {a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                            {a.shiftStartTime && a.shiftEndTime && <span> · {formatTimeRange(a.shiftStartTime, a.shiftEndTime)}</span>}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                        <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <p className="text-xs text-stone-400">Applied: {new Date(a.appliedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                    </div>
+                    {actionId === a.applicationId && (
+                        <p className="text-xs text-orange-600 font-semibold mt-2">Processing your request...</p>
+                    )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0 sm:pt-1">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
+                    {a.status === 'Promoted' && (
+                        <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
+                            className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
+                            {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Accept Invitation
+                        </button>
+                    )}
+                    {canWithdraw(a.status) && (
+                        <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
+                            className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
+                            {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-6xl mx-auto space-y-6">
             <div><h1 className="text-3xl font-extrabold text-stone-800">My Applications</h1><p className="text-stone-500 mt-2 text-lg">Track the status of your applications.</p></div>
             {toast && <ActionToast message={toast.message} actions={toast.actions} onClose={() => setToast(null)} />}
             <ConfirmDialog
                 open={!!confirmWithdrawApp}
                 title="Withdraw Application"
-                message={confirmWithdrawApp ? `Withdraw "${formatEventTitle(confirmWithdrawApp.opportunityTitle, confirmWithdrawApp.shiftName)}"?` : ''}
+                message={confirmWithdrawApp ? `Withdraw from "${confirmWithdrawApp.opportunityTitle} — ${confirmWithdrawApp.shiftName}"?` : ''}
                 confirmLabel="Withdraw"
                 onCancel={() => setConfirmWithdrawApp(null)}
                 onConfirm={handleWithdrawConfirm}
@@ -1061,35 +1122,22 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-4">
-                    {apps.map(a => (
-                        <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-bold text-stone-800 truncate">{formatEventTitle(a.opportunityTitle, a.shiftName)}</p>
-                                <p className="text-sm text-stone-500 mt-0.5">{a.shiftStartTime ? new Date(a.shiftStartTime).toLocaleDateString() : ''}</p>
-                                <p className="text-xs text-stone-400 mt-1">Applied: {new Date(a.appliedAt).toLocaleDateString()}</p>
-                                {actionId === a.applicationId && (
-                                    <p className="text-xs text-orange-600 font-semibold mt-2">Processing your request...</p>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
-                                {a.status === 'Promoted' && (
-                                    <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
-                                        className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
-                                        {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Accept Invitation
-                                    </button>
-                                )}
-                                {canWithdraw(a.status) && (
-                                    <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
-                                        className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
-                                        {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <>
+                    <div className="flex gap-2 border-b border-stone-200">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 transition-colors ${visibleTab === tab ? 'border-orange-500 text-orange-600' : 'border-transparent text-stone-500 hover:text-stone-700'}`}
+                            >
+                                {tab} <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${visibleTab === tab ? 'bg-orange-100 text-orange-600' : 'bg-stone-100 text-stone-500'}`}>{groups[tab].length}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="space-y-4">
+                        {visibleApps.map(renderCard)}
+                    </div>
+                </>
             )}
         </div>
     );
@@ -1696,6 +1744,7 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                     volunteerName: 'You',
                     status: ApplicationStatus.Pending,
                     appliedAt: new Date().toISOString(),
+                    organizationName: '',
                 };
                 return [...prev, optimistic];
             });
