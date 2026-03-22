@@ -116,7 +116,7 @@ static async Task ApplySchemaPatchesAsync(AppDbContext db)
         // AddOrgProfileAndAnnouncements
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "WebsiteUrl"             character varying(500);""",
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "ContactEmail"           character varying(256);""",
-        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "Tags"                   text[] NOT NULL DEFAULT '{}';""",
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "Tags"                   text[] NOT NULL DEFAULT '{{}}';""",
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementText" character varying(600);""",
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementAt"   timestamp with time zone;""",
     };
