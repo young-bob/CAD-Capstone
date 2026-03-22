@@ -114,12 +114,41 @@ public static class OrganizationEndpoints
             return Results.Created($"/api/opportunities/{oppId}", new { OpportunityId = oppId });
         });
 
-        group.MapPost("/{id:guid}/members", async (Guid id, InviteMemberRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/members", async (Guid id, InviteMemberRequest req, HttpContext http, AppDbContext db, IGrainFactory grains, IEmailService emailService) =>
         {
             if (!await http.CanManageOrganizationAsync(db, id))
                 return Results.Forbid();
-            var grain = grains.GetGrain<IOrganizationGrain>(id);
-            await grain.InviteMember(req.Email, req.Role);
+
+            // Look up the coordinator by email — only coordinators can be added as members
+            var coordinator = await db.Coordinators
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.User.Email == req.Email && c.User.Role == "Coordinator");
+
+            if (coordinator == null)
+                return Results.NotFound(new { Error = "No coordinator account found with that email address." });
+
+            if (coordinator.OrganizationId.HasValue && coordinator.OrganizationId.Value != Guid.Empty)
+                return Results.Conflict(new { Error = "This coordinator already belongs to an organization." });
+
+            // Link in DB so CanManageOrganizationAsync passes for this user
+            coordinator.OrganizationId = id;
+            await db.SaveChangesAsync();
+
+            // Update grain state with proper UserId
+            var orgGrain = grains.GetGrain<IOrganizationGrain>(id);
+            await orgGrain.AddCoordinator(coordinator.UserId, coordinator.User.Email);
+
+            // Link the coordinator's own grain to this org
+            var coordGrain = grains.GetGrain<ICoordinatorGrain>(coordinator.GrainId);
+            await coordGrain.SetOrganization(id);
+
+            // Notify the added coordinator by email
+            var orgState = await orgGrain.GetState();
+            await emailService.SendAsync(
+                coordinator.User.Email,
+                $"You've been added to {orgState.Name} on VSMS",
+                $"<p>Hi,</p><p>You have been added as a coordinator of <strong>{orgState.Name}</strong> on VSMS. You can now manage events, applications, and volunteers for this organization.</p><p>Log in to your coordinator dashboard to get started.</p>");
+
             return Results.NoContent();
         });
 

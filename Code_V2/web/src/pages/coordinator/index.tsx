@@ -1241,7 +1241,7 @@ export function CoordMembers() {
                     )}
                     {isOrgApproved && (
                         <button onClick={() => setShowInvite(!showInvite)} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2">
-                            <Plus className="w-5 h-5" /> Invite Member
+                            <Plus className="w-5 h-5" /> Add Coordinator
                         </button>
                     )}
                 </div>
@@ -1253,11 +1253,12 @@ export function CoordMembers() {
 
             {showInvite && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 space-y-4">
-                    <h3 className="text-lg font-bold text-stone-800">Invite Member</h3>
+                    <h3 className="text-lg font-bold text-stone-800">Add Coordinator</h3>
+                    <p className="text-sm text-stone-500 -mt-2">The person must already have a coordinator account in the system.</p>
                     <form onSubmit={handleInvite} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-stone-600 mb-1">Email Address</label>
-                            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="volunteer@email.com" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                            <label className="block text-sm font-medium text-stone-600 mb-1">Coordinator Email</label>
+                            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="coordinator@email.com" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-stone-600 mb-2">Role</label>

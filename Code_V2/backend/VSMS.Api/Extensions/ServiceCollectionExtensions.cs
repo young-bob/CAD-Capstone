@@ -64,7 +64,24 @@ public static class ServiceCollectionExtensions
             builder.Configuration.GetSection("Minio"));
         builder.Services.AddSingleton<IFileStorageService, VSMS.Infrastructure.Storage.MinioFileStorageService>();
         builder.Services.AddSingleton<ISearchService, VSMS.Infrastructure.Notifications.NullSearchService>();
-        builder.Services.AddSingleton<IEmailService, NullEmailService>();
+
+        // Email: use Resend if API key is configured, otherwise log-only stub
+        builder.Services.AddHttpClient("Resend");
+        var resendApiKey = builder.Configuration["RESEND_API"] ?? string.Empty;
+        var fromAddress = builder.Configuration["Email:From"] ?? "VSMS <noreply@vsms.app>";
+        if (!string.IsNullOrWhiteSpace(resendApiKey))
+        {
+            builder.Services.AddSingleton<IEmailService>(sp =>
+                new VSMS.Infrastructure.Notifications.ResendEmailService(
+                    sp.GetRequiredService<IHttpClientFactory>(),
+                    resendApiKey, fromAddress,
+                    sp.GetRequiredService<ILogger<VSMS.Infrastructure.Notifications.ResendEmailService>>()));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IEmailService, NullEmailService>();
+        }
+
         builder.Services.AddSingleton<IRealTimePushService, ExpoPushService>();
 
         // EventBus: switchable via appsettings "EventBus:Provider"
