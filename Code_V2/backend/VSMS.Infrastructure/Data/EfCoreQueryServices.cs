@@ -164,12 +164,17 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
         return await dbContext.ApplicationReadModels
             .AsNoTracking()
             .Where(a => a.VolunteerId == volunteerId)
-            .OrderByDescending(a => a.AppliedAt)
+            .Join(dbContext.OpportunityReadModels,
+                a => a.OpportunityId,
+                o => o.OpportunityId,
+                (a, o) => new { a, OrganizationName = o.OrganizationName })
+            .OrderByDescending(x => x.a.AppliedAt)
             .Skip(safeSkip)
             .Take(safeTake)
-            .Select(a => new ApplicationSummary(
-                a.ApplicationId, a.OpportunityId, a.ShiftId, a.OpportunityTitle, a.ShiftName,
-                a.ShiftStartTime, a.ShiftEndTime, a.VolunteerId, a.VolunteerName, a.Status, a.AppliedAt))
+            .Select(x => new ApplicationSummary(
+                x.a.ApplicationId, x.a.OpportunityId, x.a.ShiftId, x.a.OpportunityTitle, x.a.ShiftName,
+                x.a.ShiftStartTime, x.a.ShiftEndTime, x.a.VolunteerId, x.a.VolunteerName, x.a.Status, x.a.AppliedAt,
+                null, x.OrganizationName))
             .ToListAsync();
     }
 
