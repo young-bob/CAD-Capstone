@@ -1,7 +1,7 @@
 export type ViewName =
     | 'landing' | 'login' | 'register'
     | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills' | 'orgs'
-    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports' | 'coord_volunteers'
+    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports' | 'coord_volunteers' | 'org_profile'
     | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills' | 'admin_system_info';
 
 

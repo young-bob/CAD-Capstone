@@ -70,6 +70,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
+    await ApplySchemaPatchesAsync(db);
     await ApplyPerformanceIndexesAsync(db);
 
     // Seed default SystemAdmin if none exists
@@ -91,6 +92,37 @@ using (var scope = app.Services.CreateScope())
         await db.SaveChangesAsync();
         app.Logger.LogInformation("Default SystemAdmin seeded: admin@vsms.com / Admin@123");
     }
+}
+
+static async Task ApplySchemaPatchesAsync(AppDbContext db)
+{
+    if (!db.Database.IsNpgsql()) return;
+
+    // Idempotent patches — safe to run on both fresh and existing databases.
+    // Covers schema added by EF migrations that EnsureCreatedAsync would skip.
+    var statements = new[]
+    {
+        // AddVolunteerFollowTable
+        """
+        CREATE TABLE IF NOT EXISTS "VolunteerFollows" (
+            "VolunteerGrainId" uuid NOT NULL,
+            "OrgId"            uuid NOT NULL,
+            "FollowedAt"       timestamp with time zone NOT NULL,
+            CONSTRAINT "PK_VolunteerFollows" PRIMARY KEY ("VolunteerGrainId", "OrgId")
+        );
+        """,
+        """CREATE INDEX IF NOT EXISTS "IX_VolunteerFollows_OrgId" ON "VolunteerFollows" ("OrgId");""",
+
+        // AddOrgProfileAndAnnouncements
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "WebsiteUrl"             character varying(500);""",
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "ContactEmail"           character varying(256);""",
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "Tags"                   text[] NOT NULL DEFAULT '{}';""",
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementText" character varying(600);""",
+        """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementAt"   timestamp with time zone;""",
+    };
+
+    foreach (var sql in statements)
+        await db.Database.ExecuteSqlRawAsync(sql);
 }
 
 static async Task ApplyPerformanceIndexesAsync(AppDbContext db)

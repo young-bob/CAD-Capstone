@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
+import { timeAgo } from '../../utils/timeAgo';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
 import StatusBadge from '../../components/StatusBadge';
@@ -87,19 +88,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     const [editDesc, setEditDesc] = useState('');
     const [saving, setSaving] = useState(false);
 
-    // Org Profile (website, contact, tags)
-    const AVAILABLE_TAGS = ['Environment','Education','Health','Animals','Community','Arts','Seniors','Youth','Disaster Relief','Food Security'];
-    const [profileWebsite, setProfileWebsite] = useState('');
-    const [profileEmail, setProfileEmail] = useState('');
-    const [profileTags, setProfileTags] = useState<string[]>([]);
-    const [savingProfile, setSavingProfile] = useState(false);
-    const [profileLoaded, setProfileLoaded] = useState(false);
-
-    // Announcements
-    const [announcements, setAnnouncements] = useState<{ id: string; text: string; createdAt: string }[]>([]);
-    const [annText, setAnnText] = useState('');
-    const [postingAnn, setPostingAnn] = useState(false);
-
     // Resubmit / edit application form (pending or rejected orgs)
     const [showResubmit, setShowResubmit] = useState(false);
     const [resubmitName, setResubmitName] = useState('');
@@ -131,20 +119,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
         } catch {
             setOpps([]); setApps([]);
         } finally { setLoading(false); }
-        // Load profile + announcements (non-blocking)
-        if (!profileLoaded) {
-            try {
-                const [orgData, anns] = await Promise.all([
-                    organizationService.getById(auth.linkedGrainId),
-                    organizationService.getAnnouncements(auth.linkedGrainId),
-                ]);
-                setProfileWebsite((orgData as any).websiteUrl ?? '');
-                setProfileEmail((orgData as any).contactEmail ?? '');
-                setProfileTags((orgData as any).tags ?? []);
-                setAnnouncements(anns ?? []);
-                setProfileLoaded(true);
-            } catch { /* non-critical */ }
-        }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
@@ -183,33 +157,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
             setShowEdit(false); showToast('Organization updated!'); refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
         finally { setSaving(false); }
-    };
-
-    const handleSaveProfile = async () => {
-        if (!auth.linkedGrainId) return;
-        setSavingProfile(true);
-        try {
-            await organizationService.updateProfile(auth.linkedGrainId, {
-                websiteUrl: profileWebsite.trim() || undefined,
-                contactEmail: profileEmail.trim() || undefined,
-                tags: profileTags,
-            });
-            showToast('Profile updated!');
-        } catch (err: any) { showToast(getErr(err, 'Failed to save profile')); }
-        finally { setSavingProfile(false); }
-    };
-
-    const handlePostAnnouncement = async () => {
-        if (!auth.linkedGrainId || !annText.trim()) return;
-        setPostingAnn(true);
-        try {
-            await organizationService.postAnnouncement(auth.linkedGrainId, annText.trim());
-            const updated = await organizationService.getAnnouncements(auth.linkedGrainId);
-            setAnnouncements(updated ?? []);
-            setAnnText('');
-            showToast('Announcement posted!');
-        } catch (err: any) { showToast(getErr(err, 'Failed to post announcement')); }
-        finally { setPostingAnn(false); }
     };
 
     const openResubmitForm = (prefill: boolean) => {
@@ -492,65 +439,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                 </>
             )}
 
-            {/* ── Org Profile Editor ─────────────────────────────────── */}
-            {isApproved && isPrimaryCoord && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Profile Card */}
-                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
-                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Globe className="w-4 h-4 text-orange-500" /> Public Profile</h3>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Website URL</label>
-                            <input value={profileWebsite} onChange={e => setProfileWebsite(e.target.value)} placeholder="https://yourorg.com" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Contact Email</label>
-                            <input value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="contact@yourorg.com" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> Category Tags</label>
-                            <div className="flex flex-wrap gap-2">
-                                {AVAILABLE_TAGS.map(tag => {
-                                    const selected = profileTags.includes(tag);
-                                    return (
-                                        <button key={tag} onClick={() => setProfileTags(prev => selected ? prev.filter(t => t !== tag) : [...prev, tag])}
-                                            className={`text-xs font-semibold px-3 py-1 rounded-full border transition-all ${selected ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 border-stone-200 dark:border-zinc-700 hover:border-orange-300'}`}>
-                                            {tag}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                        <button onClick={handleSaveProfile} disabled={savingProfile} className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                            {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />} Save Profile
-                        </button>
-                    </div>
-
-                    {/* Announcements Card */}
-                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
-                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Megaphone className="w-4 h-4 text-orange-500" /> Post Announcement</h3>
-                        <div>
-                            <textarea value={annText} onChange={e => setAnnText(e.target.value.slice(0, 500))} placeholder="Share an update with your followers…" rows={4}
-                                className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" />
-                            <p className="text-right text-xs text-stone-400 mt-1">{annText.length}/500</p>
-                        </div>
-                        <button onClick={handlePostAnnouncement} disabled={postingAnn || !annText.trim()} className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                            {postingAnn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />} Post Update
-                        </button>
-                        {announcements.length > 0 && (
-                            <div className="space-y-2 pt-1">
-                                <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">Recent</p>
-                                {announcements.slice(0, 3).map(a => (
-                                    <div key={a.id} className="bg-stone-50 dark:bg-zinc-800 rounded-xl p-3 text-xs text-stone-600 dark:text-zinc-300">
-                                        <p className="italic">"{a.text}"</p>
-                                        <p className="text-stone-400 mt-1">{new Date(a.createdAt).toLocaleDateString()}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
             {/* Edit Modal (approved orgs) */}
             {showEdit && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -620,20 +508,25 @@ function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
     const [instagram, setInstagram] = useState('');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<'tw'|'ig'|null>(null);
+    const [contextText, setContextText] = useState('');
+
+    useEffect(() => {
+        setContextText(`${opp.title} is a ${opp.category || 'volunteer'} opportunity organized by ${orgName}.`);
+    }, []);
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
 
     const fallback = () => {
         const tag = opp.category ? `#${opp.category.replace(/\s+/g,'')}` : '#volunteer';
         setTwitter(`Join us at ${orgName}! We need volunteers for "${opp.title}". Sign up today! ${tag} #volunteering`);
-        setInstagram(`🌟 ${orgName} is looking for passionate volunteers for our "${opp.title}" opportunity!\n\n${opp.title ? `This is a great chance to make a difference in your community.` : 'Be the change you want to see!'}\n\nVisit our profile to apply and be part of something meaningful. 💪\n\n${tag} #volunteering #community #giveback #makeadifference`);
+        setInstagram(`🌟 ${orgName} is looking for passionate volunteers for our "${opp.title}" opportunity!\n\n${contextText || 'This is a great chance to make a difference in your community.'}\n\nVisit our profile to apply and be part of something meaningful. 💪\n\n${tag} #volunteering #community #giveback #makeadifference`);
     };
 
     const generate = async () => {
         if (!apiKey) { fallback(); return; }
         setLoading(true);
         try {
-            const prompt = `Org: ${orgName}\nEvent: ${opp.title}\nCategory: ${opp.category || 'General'}\nDescription: ${('description' in opp ? (opp as any).description : '') || opp.title}`;
+            const prompt = `Org: ${orgName}\nEvent: ${opp.title}\nCategory: ${opp.category || 'General'}\nDescription: ${contextText || opp.title}`;
             const res = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
@@ -677,6 +570,10 @@ Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITT
                         <p className="text-xs text-stone-400 mt-0.5">"{opp.title}"</p>
                     </div>
                     <button onClick={onClose}><X className="w-5 h-5 text-stone-400" /></button>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Event description <span className="font-normal text-stone-400">(edit to improve results)</span></label>
+                    <textarea value={contextText} onChange={e => setContextText(e.target.value)} rows={3} className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 text-sm resize-none outline-none focus:ring-2 focus:ring-purple-400" />
                 </div>
                 {!twitter && !instagram ? (
                     <button onClick={generate} disabled={loading} className="w-full py-3 bg-gradient-to-r from-purple-500 to-violet-600 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
@@ -2498,6 +2395,249 @@ export function CoordReports() {
                         </div>
                     )}
                 </>
+            )}
+        </div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ORG PROFILE PAGE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const TAG_COLORS = [
+    'bg-orange-100 text-orange-700', 'bg-blue-100 text-blue-700',
+    'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700',
+    'bg-rose-100 text-rose-700',
+];
+const AVAILABLE_TAGS_LIST = ['Environment','Education','Health','Animals','Community','Arts','Seniors','Youth','Disaster Relief','Food Security'];
+
+export function OrgProfilePage() {
+    const auth = useAuth();
+    const [org, setOrg] = useState<OrgState | null>(null);
+    const [loadError, setLoadError] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState('');
+
+    // Profile edit state
+    const [editName, setEditName] = useState('');
+    const [editDesc, setEditDesc] = useState('');
+    const [savingInfo, setSavingInfo] = useState(false);
+
+    const [profileWebsite, setProfileWebsite] = useState('');
+    const [profileEmail, setProfileEmail] = useState('');
+    const [profileTags, setProfileTags] = useState<string[]>([]);
+    const [savingProfile, setSavingProfile] = useState(false);
+
+    const [announcements, setAnnouncements] = useState<{ id: string; text: string; createdAt: string }[]>([]);
+    const [annText, setAnnText] = useState('');
+    const [postingAnn, setPostingAnn] = useState(false);
+
+    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    useEffect(() => {
+        if (auth.loading) return;
+        if (!auth.linkedGrainId) { setLoading(false); return; }
+        setLoading(true);
+        setLoadError('');
+        organizationService.getById(auth.linkedGrainId)
+            .then(orgData => {
+                setOrg(orgData);
+                setEditName(orgData.name);
+                setEditDesc((orgData as any).description || '');
+                setProfileWebsite((orgData as any).websiteUrl ?? '');
+                setProfileEmail((orgData as any).contactEmail ?? '');
+                setProfileTags((orgData as any).tags ?? []);
+            })
+            .catch((err: any) => setLoadError(getErr(err, 'Failed to load organization')))
+            .finally(() => setLoading(false));
+        // Announcements loaded separately — failure doesn't block the page
+        organizationService.getAnnouncements(auth.linkedGrainId)
+            .then(anns => setAnnouncements(anns ?? []))
+            .catch(() => {});
+    }, [auth.linkedGrainId, auth.loading]);
+
+    const isApproved = org?.status === 'Approved';
+    const isPrimaryCoord = org?.members?.some(m => m.userId === auth.userId && m.role === OrgRole.Admin) ?? false;
+    const canEdit = isApproved && isPrimaryCoord;
+
+    const handleSaveInfo = async () => {
+        if (!auth.linkedGrainId || !editName.trim()) return;
+        setSavingInfo(true);
+        try {
+            await organizationService.updateInfo(auth.linkedGrainId, { name: editName, description: editDesc });
+            setOrg(prev => prev ? { ...prev, name: editName, description: editDesc } : prev);
+            showToast('Org info updated!');
+        } catch (err: any) { showToast(getErr(err, 'Failed to update info')); }
+        finally { setSavingInfo(false); }
+    };
+
+    const handleSaveProfile = async () => {
+        if (!auth.linkedGrainId) return;
+        setSavingProfile(true);
+        try {
+            await organizationService.updateProfile(auth.linkedGrainId, {
+                websiteUrl: profileWebsite.trim() || undefined,
+                contactEmail: profileEmail.trim() || undefined,
+                tags: profileTags,
+            });
+            showToast('Profile updated!');
+        } catch (err: any) { showToast(getErr(err, 'Failed to save profile')); }
+        finally { setSavingProfile(false); }
+    };
+
+    const handlePostAnnouncement = async () => {
+        if (!auth.linkedGrainId || !annText.trim()) return;
+        setPostingAnn(true);
+        try {
+            await organizationService.postAnnouncement(auth.linkedGrainId, annText.trim());
+            const updated = await organizationService.getAnnouncements(auth.linkedGrainId);
+            setAnnouncements(updated ?? []);
+            setAnnText('');
+            showToast('Announcement posted!');
+        } catch (err: any) { showToast(getErr(err, 'Failed to post')); }
+        finally { setPostingAnn(false); }
+    };
+
+    if (loading || auth.loading) return <Spinner />;
+    if (loadError) return <div className="max-w-2xl mx-auto"><ErrorBox msg={loadError} /></div>;
+    if (!org) return <div className="max-w-2xl mx-auto"><ErrorBox msg="No organization linked to your account." /></div>;
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-6">
+            {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+
+            <div>
+                <h1 className="text-2xl font-extrabold text-stone-800 dark:text-zinc-100">Org Profile</h1>
+                <p className="text-stone-500 text-sm mt-1">Manage how your organization appears to volunteers.</p>
+            </div>
+
+            {/* ── Public Preview ─────────────────────────────────────── */}
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                <p className="text-xs font-bold text-stone-400 dark:text-zinc-500 uppercase tracking-wide">Public Preview</p>
+                <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-xl font-extrabold text-stone-800 dark:text-zinc-100">{org.name}</h2>
+                            <p className="text-stone-500 dark:text-zinc-400 text-sm mt-1 leading-relaxed">{org.description || <span className="italic text-stone-400">No description yet.</span>}</p>
+                        </div>
+                        <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold ${org.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{org.status}</span>
+                    </div>
+                    {profileTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {profileTags.map((tag, i) => (
+                                <span key={tag} className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${TAG_COLORS[i % TAG_COLORS.length]}`}>{tag}</span>
+                            ))}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-4 text-xs text-stone-400">
+                        {profileWebsite && (
+                            <a href={profileWebsite} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-500 hover:text-blue-700 font-medium">
+                                <Globe className="w-3.5 h-3.5" /> Website
+                            </a>
+                        )}
+                        {profileEmail && (
+                            <a href={`mailto:${profileEmail}`} className="flex items-center gap-1 text-stone-500 hover:text-stone-700 font-medium">
+                                <Mail className="w-3.5 h-3.5" /> {profileEmail}
+                            </a>
+                        )}
+                    </div>
+                    {announcements[0] && (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 rounded-xl px-4 py-2.5 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                            <Megaphone className="w-4 h-4 shrink-0 mt-0.5" />
+                            <div>
+                                <span className="italic">"{announcements[0].text}"</span>
+                                <span className="text-amber-500 ml-2 text-xs">· {timeAgo(announcements[0].createdAt)}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {canEdit && (
+                <>
+                    {/* ── Edit Org Info ──────────────────────────────────── */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Pencil className="w-4 h-4 text-orange-500" /> Org Info</h3>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Organization Name</label>
+                            <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Organization name" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Description</label>
+                            <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Describe your organization" rows={3}
+                                className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" />
+                        </div>
+                        <button onClick={handleSaveInfo} disabled={savingInfo || !editName.trim()} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 text-sm">
+                            {savingInfo && <Loader2 className="w-4 h-4 animate-spin" />} Save Info
+                        </button>
+                    </div>
+
+                    {/* ── Public Profile ─────────────────────────────────── */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Globe className="w-4 h-4 text-orange-500" /> Public Profile</h3>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Website URL</label>
+                            <input value={profileWebsite} onChange={e => setProfileWebsite(e.target.value)} placeholder="https://yourorg.com"
+                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Contact Email</label>
+                            <input value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="contact@yourorg.com"
+                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> Category Tags</label>
+                            <div className="flex flex-wrap gap-2">
+                                {AVAILABLE_TAGS_LIST.map(tag => {
+                                    const selected = profileTags.includes(tag);
+                                    return (
+                                        <button key={tag} onClick={() => setProfileTags(prev => selected ? prev.filter(t => t !== tag) : [...prev, tag])}
+                                            className={`text-xs font-semibold px-3 py-1 rounded-full border transition-all ${selected ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 border-stone-200 dark:border-zinc-700 hover:border-orange-300'}`}>
+                                            {tag}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <button onClick={handleSaveProfile} disabled={savingProfile} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 text-sm">
+                            {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />} Save Profile
+                        </button>
+                    </div>
+
+                    {/* ── Announcements ──────────────────────────────────── */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Megaphone className="w-4 h-4 text-orange-500" /> Post Announcement</h3>
+                        <div>
+                            <textarea value={annText} onChange={e => setAnnText(e.target.value.slice(0, 500))} placeholder="Share an update with your followers…" rows={4}
+                                className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" />
+                            <p className="text-right text-xs text-stone-400 mt-1">{annText.length}/500</p>
+                        </div>
+                        <button onClick={handlePostAnnouncement} disabled={postingAnn || !annText.trim()} className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2 text-sm">
+                            {postingAnn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />} Post Update
+                        </button>
+                        {announcements.length > 0 && (
+                            <div className="space-y-2 pt-1">
+                                <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">Recent Announcements</p>
+                                {announcements.slice(0, 5).map(a => (
+                                    <div key={a.id} className="bg-stone-50 dark:bg-zinc-800 rounded-xl p-3 text-xs text-stone-600 dark:text-zinc-300">
+                                        <p className="italic">"{a.text}"</p>
+                                        <p className="text-stone-400 mt-1">{timeAgo(a.createdAt)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+
+            {!canEdit && isApproved && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-700 text-sm font-medium">
+                    Only the org admin can edit the profile.
+                </div>
+            )}
+            {!isApproved && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-700 text-sm font-medium">
+                    Profile editing is available after admin approval.
+                </div>
             )}
         </div>
     );

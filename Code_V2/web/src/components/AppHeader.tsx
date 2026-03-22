@@ -294,10 +294,10 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                             </div>
                             <div className="p-2">
                                 <button
-                                    onClick={() => { setShowAvatar(false); onNavigate('profile'); }}
+                                    onClick={() => { setShowAvatar(false); onNavigate(userRole === 'coordinator' ? 'org_profile' : 'profile'); }}
                                     className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-stone-600 hover:bg-stone-50 text-sm transition-colors"
                                 >
-                                    <User className="w-4 h-4" /> Profile
+                                    <User className="w-4 h-4" /> {userRole === 'coordinator' ? 'Org Profile' : 'Profile'}
                                 </button>
                                 <button
                                     onClick={() => { setShowAvatar(false); onLogout(); }}
