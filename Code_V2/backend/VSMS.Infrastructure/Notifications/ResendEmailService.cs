@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -12,11 +11,12 @@ namespace VSMS.Infrastructure.Notifications;
 /// Falls back to logging-only if key is absent.
 /// </summary>
 public class ResendEmailService(
-    IHttpClientFactory httpClientFactory,
     string apiKey,
     string fromAddress,
     ILogger<ResendEmailService> logger) : IEmailService
 {
+    private static readonly HttpClient _http = new();
+
     public async Task SendAsync(string to, string subject, string body)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -35,9 +35,10 @@ public class ResendEmailService(
 
         try
         {
-            var client = httpClientFactory.CreateClient("Resend");
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://api.resend.com/emails", content);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+            request.Headers.Add("Authorization", $"Bearer {apiKey}");
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _http.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {

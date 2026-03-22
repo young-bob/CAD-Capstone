@@ -13,7 +13,10 @@
       "Bash(npx vite build)",
       "Bash(xargs grep -l \"CreateOppRequest\\\\|CreateOrgRequest\")",
       "Bash(xargs cat)",
-      "Read(//c/Users/cczcx/.claude/plans/**)"
+      "Read(//c/Users/cczcx/.claude/plans/**)",
+      "Bash(dotnet build --no-restore)",
+      "Bash(dotnet build)",
+      "Bash(xargs grep -n \"Id\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\cczcx\\.claude\\plans"

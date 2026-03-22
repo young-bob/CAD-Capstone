@@ -73,7 +73,6 @@ public static class ServiceCollectionExtensions
         {
             builder.Services.AddSingleton<IEmailService>(sp =>
                 new VSMS.Infrastructure.Notifications.ResendEmailService(
-                    sp.GetRequiredService<IHttpClientFactory>(),
                     resendApiKey, fromAddress,
                     sp.GetRequiredService<ILogger<VSMS.Infrastructure.Notifications.ResendEmailService>>()));
         }

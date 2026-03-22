@@ -117,7 +117,7 @@ public static class VolunteerEndpoints
             if (!http.IsSelfByGrainId(id))
                 return Results.Forbid();
 
-            var orgExists = await db.OrganizationReadModels.AnyAsync(o => o.OrganizationId == orgId);
+            var orgExists = await db.OrganizationReadModels.AnyAsync(o => o.OrgId == orgId);
             if (!orgExists)
                 return Results.NotFound(new { Error = "Organization not found." });
 
