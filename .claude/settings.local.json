@@ -3,7 +3,14 @@
     "allow": [
       "Bash(npm install recharts)",
       "Bash(npm run build)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "Bash(xargs grep -l \"coordinator\\\\|event\")",
+      "Bash(xargs ls -lh)",
+      "Read(//c/Users/cczcx/Music/Capstone/CAD-Capstone/**)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(xargs wc -l)",
+      "Bash(grep -h \"^public.*Task\" \"/c/Users/cczcx/Music/Capstone/CAD-Capstone/Code_V2/backend/VSMS.Grains\"/*.cs)",
+      "Bash(npx vite build)"
     ]
   }
 }
