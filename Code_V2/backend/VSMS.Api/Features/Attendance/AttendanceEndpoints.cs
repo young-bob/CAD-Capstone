@@ -69,13 +69,24 @@ public static class AttendanceEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/{id:guid}/checkout", async (Guid id, HttpContext http, IGrainFactory grains) =>
+        group.MapPost("/{id:guid}/checkout", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
             var state = await grain.GetState();
-            if (!http.IsSelfByGrainId(state.VolunteerId))
-                return Results.Forbid();
+            var canAct = http.IsSelfByGrainId(state.VolunteerId)
+                || await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+            if (!canAct) return Results.Forbid();
             await grain.CheckOut();
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:guid}/coordinator-checkin", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
+                return Results.Forbid();
+            await grain.CoordinatorCheckIn();
             return Results.NoContent();
         });
 

@@ -26,6 +26,9 @@ export const attendanceService = {
     checkOut: async (id: string): Promise<void> => {
         await api.post(`/api/attendance/${id}/checkout`);
     },
+    coordinatorCheckIn: async (id: string): Promise<void> => {
+        await api.post(`/api/attendance/${id}/coordinator-checkin`);
+    },
     dispute: async (id: string, data: { reason: string; evidenceUrl: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/dispute`, data);
     },

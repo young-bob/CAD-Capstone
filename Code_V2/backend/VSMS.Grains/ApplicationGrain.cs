@@ -73,7 +73,7 @@ public class ApplicationGrain(
 
     public async Task Reject(string reason)
     {
-        EnsureStatus(ApplicationStatus.Pending);
+        EnsureStatus(ApplicationStatus.Pending, ApplicationStatus.Promoted);
         state.State.Status = ApplicationStatus.Rejected;
         await state.WriteStateAsync();
 
@@ -133,7 +133,7 @@ public class ApplicationGrain(
 
     public async Task MarkAsNoShow()
     {
-        EnsureStatus(ApplicationStatus.Approved);
+        EnsureStatus(ApplicationStatus.Approved, ApplicationStatus.Promoted);
         state.State.Status = ApplicationStatus.NoShow;
         await state.WriteStateAsync();
 
@@ -151,15 +151,29 @@ public class ApplicationGrain(
         EnsureStatus(ApplicationStatus.Promoted);
         state.State.Status = ApplicationStatus.Approved;
         state.State.ExpirationTime = null;
+
+        // Create attendance record (same as Approve — waitlist path also needs one)
+        var attendanceId = state.State.AttendanceRecordId == Guid.Empty
+            ? Guid.NewGuid()
+            : state.State.AttendanceRecordId;
+
+        if (state.State.AttendanceRecordId == Guid.Empty)
+        {
+            state.State.AttendanceRecordId = attendanceId;
+        }
+
         await state.WriteStateAsync();
 
         // Cancel the timeout reminder
         var reminder = await this.GetReminder("AcceptanceTimeout");
         if (reminder != null) await this.UnregisterReminder(reminder);
 
+        var attendanceGrain = grainFactory.GetGrain<IAttendanceRecordGrain>(attendanceId);
+        await attendanceGrain.Initialize(state.State.VolunteerId, this.GetPrimaryKey(), state.State.OpportunityId, state.State.ShiftId);
+
         await eventBus.PublishAsync(new ApplicationStatusChangedEvent(this.GetPrimaryKey(), ApplicationStatus.Approved));
 
-        logger.LogInformation("Application {Id} invitation accepted", this.GetPrimaryKey());
+        logger.LogInformation("Application {Id} invitation accepted, attendance record {AttId} created", this.GetPrimaryKey(), attendanceId);
     }
 
     public Task<ApplicationState> GetState() => Task.FromResult(state.State);

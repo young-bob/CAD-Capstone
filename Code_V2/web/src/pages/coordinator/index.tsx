@@ -1546,6 +1546,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
     const [actionId, setActionId] = useState<string | null>(null);
+    const [attendanceRecords, setAttendanceRecords] = useState<AttendanceSummary[]>([]);
 
     // Add Shift
     const [showAddShift, setShowAddShift] = useState(false);
@@ -1630,8 +1631,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const [d, a] = await Promise.all([opportunityService.getById(oppId), applicationService.getForOpportunity(oppId)]);
-            setOpp(d); setApps(a);
+            const [d, a, att] = await Promise.all([
+                opportunityService.getById(oppId),
+                applicationService.getForOpportunity(oppId),
+                attendanceService.getByOpportunity(oppId),
+            ]);
+            setOpp(d); setApps(a); setAttendanceRecords(att);
         } catch (err: any) { setError(getErr(err, 'Failed to load')); }
         finally { setLoading(false); }
     }, [oppId]);
@@ -1749,13 +1754,43 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const doApprove = async (id: string) => { setActionId(id); try { await applicationService.approve(id); showToast('Approved ✅'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
     const doReject = async (id: string) => { setActionId(id); try { await applicationService.reject(id, 'Rejected'); showToast('Rejected'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
     const doNoShow = async (appId: string) => { setActionId(appId + '_ns'); try { await applicationService.markNoShow(appId); showToast('No-show marked'); setTimeout(() => load(), 600); } catch { showToast('Failed'); } finally { setActionId(null); } };
+    const doInitAndCheckIn = async (app: ApplicationSummary) => {
+        setActionId(app.volunteerId + '_init');
+        try {
+            const attId = crypto.randomUUID();
+            await attendanceService.init(attId, { volunteerId: app.volunteerId, applicationId: app.applicationId, opportunityId: app.opportunityId });
+            await attendanceService.coordinatorCheckIn(attId);
+            showToast(`${app.volunteerName || 'Volunteer'} checked in ✅`);
+            setTimeout(() => load(), 600);
+        } catch (err: any) { showToast(getErr(err, 'Failed to check in')); }
+        finally { setActionId(null); }
+    };
+
+    const doCoordCheckIn = async (record: AttendanceSummary) => {
+        setActionId(record.attendanceId + '_cin');
+        try {
+            await attendanceService.coordinatorCheckIn(record.attendanceId);
+            showToast('Checked in ✅');
+            setTimeout(() => load(), 600);
+        } catch (err: any) { showToast(getErr(err, 'Failed to check in')); }
+        finally { setActionId(null); }
+    };
+
+    const doCoordCheckOut = async (record: AttendanceSummary) => {
+        setActionId(record.attendanceId + '_cout');
+        try {
+            await attendanceService.checkOut(record.attendanceId);
+            showToast('Checked out ✅');
+            setTimeout(() => load(), 600);
+        } catch (err: any) { showToast(getErr(err, 'Failed to check out')); }
+        finally { setActionId(null); }
+    };
+
     const doConfirm = async (app: ApplicationSummary) => {
         setActionId(app.volunteerId + '_a');
         try {
-            // Look up the attendance record for this volunteer in this opportunity
-            const records = await attendanceService.getByOpportunity(app.opportunityId);
-            const record = records.find(r => r.volunteerId === app.volunteerId);
-            if (!record) { showToast('No attendance record found — volunteer must check in first'); return; }
+            const record = attendanceRecords.find(r => r.volunteerId === app.volunteerId);
+            if (!record) { showToast('No attendance record found — check in first'); return; }
             await attendanceService.confirm(record.attendanceId, { supervisorId: oppId, rating: 5 });
             showToast('Attendance confirmed ✅');
             setTimeout(() => load(), 600);
@@ -1950,35 +1985,72 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     </div>
                 )}
 
-                {/* Confirmed Volunteers */}
+                {/* Attendance Management */}
                 {confirmedApps.length > 0 && (
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                        <h2 className="text-xl font-bold text-stone-800 mb-4">Confirmed Volunteers ({confirmedApps.length})</h2>
-                        {confirmedApps.map(app => (
-                            <div key={app.applicationId} className="flex items-start justify-between py-3 border-b border-stone-50 last:border-0">
-                                <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
-                                <div className="flex flex-wrap gap-2 justify-end">
-                                    {app.attendanceStatus === 'Confirmed' ? (
-                                        <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm">✅ Confirmed</span>
-                                    ) : app.attendanceStatus === 'CheckedOut' || app.attendanceStatus === 'Resolved' ? (
-                                        <button onClick={() => doConfirm(app)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-sm hover:bg-blue-100 disabled:opacity-50">Confirm Attend</button>
-                                    ) : (
-                                        <span className="px-3 py-1.5 bg-stone-100 text-stone-400 rounded-lg text-sm">Awaiting Check-in</span>
-                                    )}
-                                    {app.attendanceStatus !== 'Confirmed' && (
-                                        <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
-                                    )}
-                                    {app.attendanceStatus === 'Confirmed' && (
-                                        <button 
-                                            onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)} 
-                                            disabled={issuedCerts.has(app.volunteerId)}
-                                            className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1 disabled:opacity-50 disabled:bg-stone-100 disabled:text-stone-400">
-                                            <Award className="w-3.5 h-3.5" /> {issuedCerts.has(app.volunteerId) ? 'Issued' : 'Certificate'}
-                                        </button>
-                                    )}
-                                </div>
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-xl font-bold text-stone-800">Attendance Management ({confirmedApps.length})</h2>
+                            <div className="flex gap-2 text-xs font-bold">
+                                <span className="px-2 py-1 bg-stone-100 text-stone-500 rounded-lg">{attendanceRecords.filter(r => r.status === 'Pending').length} pending</span>
+                                <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedIn').length} in</span>
+                                <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedOut' || r.status === 'Resolved').length} out</span>
+                                <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg">{attendanceRecords.filter(r => r.status === 'Confirmed').length} confirmed</span>
                             </div>
-                        ))}
+                        </div>
+                        {confirmedApps.map(app => {
+                            const rec = attendanceRecords.find(r => r.volunteerId === app.volunteerId);
+                            const status = rec?.status;
+                            return (
+                                <div key={app.applicationId} className="flex items-start justify-between py-3.5 border-b border-stone-50 last:border-0 gap-4">
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-stone-800 truncate">{app.volunteerName || app.volunteerId.substring(0, 12)}</p>
+                                        <p className="text-xs text-stone-400 mt-0.5">{app.shiftName}</p>
+                                        {rec?.checkInTime && (
+                                            <p className="text-xs text-stone-400 mt-0.5">
+                                                In: {new Date(rec.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {rec.checkOutTime && <> · Out: {new Date(rec.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · <span className="font-bold text-emerald-600">{rec.totalHours.toFixed(1)}h</span></>}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 justify-end shrink-0">
+                                        {!rec && (
+                                            <button onClick={() => doInitAndCheckIn(app)} disabled={actionId === app.volunteerId + '_init'} className="px-3 py-1.5 bg-blue-500 text-white font-bold rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-1">
+                                                {actionId === app.volunteerId + '_init' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Check In
+                                            </button>
+                                        )}
+                                        {status === 'Pending' && (
+                                            <button onClick={() => doCoordCheckIn(rec!)} disabled={actionId === rec!.attendanceId + '_cin'} className="px-3 py-1.5 bg-blue-500 text-white font-bold rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-1">
+                                                {actionId === rec!.attendanceId + '_cin' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Check In
+                                            </button>
+                                        )}
+                                        {status === 'CheckedIn' && (
+                                            <button onClick={() => doCoordCheckOut(rec!)} disabled={actionId === rec!.attendanceId + '_cout'} className="px-3 py-1.5 bg-amber-500 text-white font-bold rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1">
+                                                {actionId === rec!.attendanceId + '_cout' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Check Out
+                                            </button>
+                                        )}
+                                        {(status === 'CheckedOut' || status === 'Resolved') && (
+                                            <button onClick={() => doConfirm(app)} disabled={actionId === app.volunteerId + '_a'} className="px-3 py-1.5 bg-emerald-500 text-white font-bold rounded-lg text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
+                                                {actionId === app.volunteerId + '_a' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Confirm
+                                            </button>
+                                        )}
+                                        {status === 'Confirmed' && (
+                                            <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm">✅ Confirmed</span>
+                                        )}
+                                        {status !== 'Confirmed' && (
+                                            <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
+                                        )}
+                                        {status === 'Confirmed' && (
+                                            <button
+                                                onClick={() => openCert(app.volunteerId, app.volunteerName || app.volunteerId)}
+                                                disabled={issuedCerts.has(app.volunteerId)}
+                                                className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1 disabled:opacity-50 disabled:bg-stone-100 disabled:text-stone-400">
+                                                <Award className="w-3.5 h-3.5" /> {issuedCerts.has(app.volunteerId) ? 'Issued' : 'Certificate'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </>)}

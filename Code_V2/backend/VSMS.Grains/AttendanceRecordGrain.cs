@@ -129,6 +129,34 @@ public class AttendanceRecordGrain(
             state.State.VolunteerId, state.State.OpportunityId);
     }
 
+    public async Task CoordinatorCheckIn()
+    {
+        if (state.State.Status != AttendanceStatus.Pending)
+            throw new InvalidOperationException($"Cannot check in with status: {state.State.Status}");
+
+        var oppState = await grainFactory.GetGrain<IOpportunityGrain>(state.State.OpportunityId).GetState();
+
+        state.State.VerifiedTime = new TimeRecord { CheckInTime = DateTime.UtcNow };
+        state.State.CheckInSnapshot = new GeoFenceSettings { Latitude = 0, Longitude = 0 };
+        state.State.ProofPhotoUrl = "coordinator-check-in";
+        state.State.Status = AttendanceStatus.CheckedIn;
+        await state.WriteStateAsync();
+
+        var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId).GetProfile();
+        var volunteerName = string.IsNullOrWhiteSpace(volProfile.FirstName) ? "Unknown Volunteer" : $"{volProfile.FirstName} {volProfile.LastName}".Trim();
+
+        await eventBus.PublishAsync(new AttendanceRecordedEvent(
+            this.GetPrimaryKey(), state.State.OpportunityId, state.State.VolunteerId,
+            volunteerName, oppState.Info.Title,
+            AttendanceStatus.CheckedIn, state.State.VerifiedTime.CheckInTime, null, 0
+        ));
+
+        await this.RegisterOrUpdateReminder("AutoCheckout", TimeSpan.FromHours(8), TimeSpan.FromHours(8));
+
+        logger.LogInformation("Coordinator checked in volunteer {VolunteerId} to {OpportunityId}",
+            state.State.VolunteerId, state.State.OpportunityId);
+    }
+
     public async Task CheckOut(DateTime? timeOut = null)
     {
         if (state.State.Status != AttendanceStatus.CheckedIn)
