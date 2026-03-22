@@ -75,4 +75,14 @@ export const organizationService = {
         const res = await api.get<OrgRecommendation[]>(`/api/organizations/recommend?volunteerId=${volunteerId}`);
         return res.data;
     },
+    updateProfile: async (orgId: string, data: { websiteUrl?: string; contactEmail?: string; tags: string[] }): Promise<void> => {
+        await api.put(`/api/organizations/${orgId}/profile`, data);
+    },
+    postAnnouncement: async (orgId: string, text: string): Promise<void> => {
+        await api.post(`/api/organizations/${orgId}/announcements`, { text });
+    },
+    getAnnouncements: async (orgId: string): Promise<{ id: string; text: string; createdAt: string }[]> => {
+        const res = await api.get(`/api/organizations/${orgId}/announcements`);
+        return res.data;
+    },
 };

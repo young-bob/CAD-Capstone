@@ -4,6 +4,8 @@ namespace VSMS.Abstractions.Events;
 
 public record OrganizationCreatedEvent(Guid OrgId, string Name, string Description, OrgStatus Status, DateTime CreatedAt);
 public record OrganizationStatusChangedEvent(Guid OrgId, OrgStatus Status);
+public record OrganizationProfileUpdatedEvent(Guid OrgId, string? WebsiteUrl, string? ContactEmail, List<string> Tags);
+public record OrganizationAnnouncementPostedEvent(Guid OrgId, Guid AnnouncementId, string Text, DateTime CreatedAt);
 
 public record OpportunityCreatedEvent(Guid OpportunityId, Guid OrganizationId, string Title, string Category, OpportunityStatus Status, DateTime PublishDate, int TotalSpots, double? Latitude = null, double? Longitude = null);
 public record OpportunityStatusChangedEvent(Guid OpportunityId, OpportunityStatus Status);

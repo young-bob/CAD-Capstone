@@ -1,5 +1,6 @@
 using Orleans;
 using VSMS.Abstractions.Enums;
+using VSMS.Abstractions.States;
 
 namespace VSMS.Abstractions.Grains;
 
@@ -15,7 +16,10 @@ public interface IOrganizationGrain : IGrainWithGuidKey
     Task<bool> IsVolunteerBlocked(Guid volunteerId);
     Task SetStatus(OrgStatus status);
     Task<List<Guid>> GetOpportunities();
-    Task<States.OrganizationState> GetState();
+    Task<OrganizationState> GetState();
     Task UpdateInfo(string name, string description);
     Task Resubmit(string name, string description, string? proofUrl);
+    Task UpdateProfile(string? websiteUrl, string? contactEmail, List<string> tags);
+    Task PostAnnouncement(string text);
+    Task<List<OrgAnnouncement>> GetAnnouncements();
 }

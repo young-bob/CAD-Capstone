@@ -126,6 +126,29 @@ public class OrganizationGrain(
         logger.LogInformation("Organization {OrgId} resubmitted with name {Name}", this.GetPrimaryKey(), name);
     }
 
+    public async Task UpdateProfile(string? websiteUrl, string? contactEmail, List<string> tags)
+    {
+        EnsureApproved();
+        state.State.WebsiteUrl = websiteUrl;
+        state.State.ContactEmail = contactEmail;
+        state.State.Tags = tags;
+        await state.WriteStateAsync();
+        await eventBus.PublishAsync(new OrganizationProfileUpdatedEvent(this.GetPrimaryKey(), websiteUrl, contactEmail, tags));
+    }
+
+    public async Task PostAnnouncement(string text)
+    {
+        EnsureApproved();
+        var announcement = new OrgAnnouncement(Guid.NewGuid(), text, DateTime.UtcNow);
+        state.State.Announcements.Insert(0, announcement);
+        if (state.State.Announcements.Count > 10)
+            state.State.Announcements.RemoveAt(10);
+        await state.WriteStateAsync();
+        await eventBus.PublishAsync(new OrganizationAnnouncementPostedEvent(this.GetPrimaryKey(), announcement.Id, text, announcement.CreatedAt));
+    }
+
+    public Task<List<OrgAnnouncement>> GetAnnouncements() => Task.FromResult(state.State.Announcements);
+
     private void EnsureApproved()
     {
         if (state.State.Status != OrgStatus.Approved)

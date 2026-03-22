@@ -8,5 +8,10 @@ public record OrganizationSummary(
     string Name,
     string Description,
     OrgStatus Status,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? WebsiteUrl = null,
+    string? ContactEmail = null,
+    List<string>? Tags = null,
+    string? LatestAnnouncementText = null,
+    DateTime? LatestAnnouncementAt = null
 );

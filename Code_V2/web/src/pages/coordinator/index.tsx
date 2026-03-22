@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
@@ -87,6 +87,19 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     const [editDesc, setEditDesc] = useState('');
     const [saving, setSaving] = useState(false);
 
+    // Org Profile (website, contact, tags)
+    const AVAILABLE_TAGS = ['Environment','Education','Health','Animals','Community','Arts','Seniors','Youth','Disaster Relief','Food Security'];
+    const [profileWebsite, setProfileWebsite] = useState('');
+    const [profileEmail, setProfileEmail] = useState('');
+    const [profileTags, setProfileTags] = useState<string[]>([]);
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [profileLoaded, setProfileLoaded] = useState(false);
+
+    // Announcements
+    const [announcements, setAnnouncements] = useState<{ id: string; text: string; createdAt: string }[]>([]);
+    const [annText, setAnnText] = useState('');
+    const [postingAnn, setPostingAnn] = useState(false);
+
     // Resubmit / edit application form (pending or rejected orgs)
     const [showResubmit, setShowResubmit] = useState(false);
     const [resubmitName, setResubmitName] = useState('');
@@ -118,6 +131,20 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
         } catch {
             setOpps([]); setApps([]);
         } finally { setLoading(false); }
+        // Load profile + announcements (non-blocking)
+        if (!profileLoaded) {
+            try {
+                const [orgData, anns] = await Promise.all([
+                    organizationService.getById(auth.linkedGrainId),
+                    organizationService.getAnnouncements(auth.linkedGrainId),
+                ]);
+                setProfileWebsite((orgData as any).websiteUrl ?? '');
+                setProfileEmail((orgData as any).contactEmail ?? '');
+                setProfileTags((orgData as any).tags ?? []);
+                setAnnouncements(anns ?? []);
+                setProfileLoaded(true);
+            } catch { /* non-critical */ }
+        }
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
@@ -156,6 +183,33 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
             setShowEdit(false); showToast('Organization updated!'); refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed to update')); }
         finally { setSaving(false); }
+    };
+
+    const handleSaveProfile = async () => {
+        if (!auth.linkedGrainId) return;
+        setSavingProfile(true);
+        try {
+            await organizationService.updateProfile(auth.linkedGrainId, {
+                websiteUrl: profileWebsite.trim() || undefined,
+                contactEmail: profileEmail.trim() || undefined,
+                tags: profileTags,
+            });
+            showToast('Profile updated!');
+        } catch (err: any) { showToast(getErr(err, 'Failed to save profile')); }
+        finally { setSavingProfile(false); }
+    };
+
+    const handlePostAnnouncement = async () => {
+        if (!auth.linkedGrainId || !annText.trim()) return;
+        setPostingAnn(true);
+        try {
+            await organizationService.postAnnouncement(auth.linkedGrainId, annText.trim());
+            const updated = await organizationService.getAnnouncements(auth.linkedGrainId);
+            setAnnouncements(updated ?? []);
+            setAnnText('');
+            showToast('Announcement posted!');
+        } catch (err: any) { showToast(getErr(err, 'Failed to post announcement')); }
+        finally { setPostingAnn(false); }
     };
 
     const openResubmitForm = (prefill: boolean) => {
@@ -438,6 +492,65 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                 </>
             )}
 
+            {/* ── Org Profile Editor ─────────────────────────────────── */}
+            {isApproved && isPrimaryCoord && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Profile Card */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Globe className="w-4 h-4 text-orange-500" /> Public Profile</h3>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Website URL</label>
+                            <input value={profileWebsite} onChange={e => setProfileWebsite(e.target.value)} placeholder="https://yourorg.com" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-1">Contact Email</label>
+                            <input value={profileEmail} onChange={e => setProfileEmail(e.target.value)} placeholder="contact@yourorg.com" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-500 dark:text-zinc-400 mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> Category Tags</label>
+                            <div className="flex flex-wrap gap-2">
+                                {AVAILABLE_TAGS.map(tag => {
+                                    const selected = profileTags.includes(tag);
+                                    return (
+                                        <button key={tag} onClick={() => setProfileTags(prev => selected ? prev.filter(t => t !== tag) : [...prev, tag])}
+                                            className={`text-xs font-semibold px-3 py-1 rounded-full border transition-all ${selected ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 border-stone-200 dark:border-zinc-700 hover:border-orange-300'}`}>
+                                            {tag}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <button onClick={handleSaveProfile} disabled={savingProfile} className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
+                            {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />} Save Profile
+                        </button>
+                    </div>
+
+                    {/* Announcements Card */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-stone-100 dark:border-zinc-800 space-y-4">
+                        <h3 className="font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Megaphone className="w-4 h-4 text-orange-500" /> Post Announcement</h3>
+                        <div>
+                            <textarea value={annText} onChange={e => setAnnText(e.target.value.slice(0, 500))} placeholder="Share an update with your followers…" rows={4}
+                                className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" />
+                            <p className="text-right text-xs text-stone-400 mt-1">{annText.length}/500</p>
+                        </div>
+                        <button onClick={handlePostAnnouncement} disabled={postingAnn || !annText.trim()} className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
+                            {postingAnn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />} Post Update
+                        </button>
+                        {announcements.length > 0 && (
+                            <div className="space-y-2 pt-1">
+                                <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">Recent</p>
+                                {announcements.slice(0, 3).map(a => (
+                                    <div key={a.id} className="bg-stone-50 dark:bg-zinc-800 rounded-xl p-3 text-xs text-stone-600 dark:text-zinc-300">
+                                        <p className="italic">"{a.text}"</p>
+                                        <p className="text-stone-400 mt-1">{new Date(a.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Edit Modal (approved orgs) */}
             {showEdit && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -499,6 +612,113 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// AI SOCIAL POST MODAL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+interface SocialPostModalProps { opp: OpportunitySummary; orgName: string; onClose: () => void; }
+function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
+    const [twitter, setTwitter] = useState('');
+    const [instagram, setInstagram] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [copied, setCopied] = useState<'tw'|'ig'|null>(null);
+
+    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
+
+    const fallback = () => {
+        const tag = opp.category ? `#${opp.category.replace(/\s+/g,'')}` : '#volunteer';
+        setTwitter(`Join us at ${orgName}! We need volunteers for "${opp.title}". Sign up today! ${tag} #volunteering`);
+        setInstagram(`🌟 ${orgName} is looking for passionate volunteers for our "${opp.title}" opportunity!\n\n${opp.title ? `This is a great chance to make a difference in your community.` : 'Be the change you want to see!'}\n\nVisit our profile to apply and be part of something meaningful. 💪\n\n${tag} #volunteering #community #giveback #makeadifference`);
+    };
+
+    const generate = async () => {
+        if (!apiKey) { fallback(); return; }
+        setLoading(true);
+        try {
+            const prompt = `Org: ${orgName}\nEvent: ${opp.title}\nCategory: ${opp.category || 'General'}\nDescription: ${('description' in opp ? (opp as any).description : '') || opp.title}`;
+            const res = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true',
+                },
+                body: JSON.stringify({
+                    model: 'claude-haiku-4-5-20251001',
+                    max_tokens: 600,
+                    stream: false,
+                    system: `You are a social media copywriter for nonprofits. Given a volunteer opportunity, generate:
+1. Twitter/X version: ≤280 chars with 2–3 hashtags
+2. Instagram/LinkedIn version: 3–4 engaging sentences + call to action + 4–5 hashtags
+Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITTER:" and "INSTAGRAM:" labels on separate lines.`,
+                    messages: [{ role: 'user', content: prompt }],
+                }),
+            });
+            const data = await res.json();
+            const text: string = data?.content?.[0]?.text ?? '';
+            const twMatch = text.match(/TWITTER:\s*([\s\S]*?)(?=INSTAGRAM:|$)/i);
+            const igMatch = text.match(/INSTAGRAM:\s*([\s\S]*)/i);
+            setTwitter(twMatch ? twMatch[1].trim() : text.slice(0, 280));
+            setInstagram(igMatch ? igMatch[1].trim() : text);
+        } catch { fallback(); }
+        finally { setLoading(false); }
+    };
+
+    const copyTo = async (text: string, key: 'tw'|'ig') => {
+        await navigator.clipboard.writeText(text);
+        setCopied(key); setTimeout(() => setCopied(null), 1500);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-2xl max-w-lg w-full space-y-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-lg font-bold text-stone-800 dark:text-zinc-100 flex items-center gap-2"><Sparkles className="w-4 h-4 text-purple-500" /> Generate Social Post</h3>
+                        <p className="text-xs text-stone-400 mt-0.5">"{opp.title}"</p>
+                    </div>
+                    <button onClick={onClose}><X className="w-5 h-5 text-stone-400" /></button>
+                </div>
+                {!twitter && !instagram ? (
+                    <button onClick={generate} disabled={loading} className="w-full py-3 bg-gradient-to-r from-purple-500 to-violet-600 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        {loading ? 'Generating…' : 'Generate with AI'}
+                    </button>
+                ) : (
+                    <>
+                        <div className="space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Twitter / X</p>
+                                    <button onClick={() => copyTo(twitter, 'tw')} className="text-xs text-stone-400 hover:text-stone-700 flex items-center gap-1">
+                                        {copied === 'tw' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                        {copied === 'tw' ? 'Copied!' : 'Copy'}
+                                    </button>
+                                </div>
+                                <textarea value={twitter} onChange={e => setTwitter(e.target.value)} rows={3} className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 text-sm resize-none outline-none focus:ring-2 focus:ring-purple-400" />
+                                <p className="text-right text-xs text-stone-400 mt-0.5">{twitter.length}/280</p>
+                            </div>
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Instagram / LinkedIn</p>
+                                    <button onClick={() => copyTo(instagram, 'ig')} className="text-xs text-stone-400 hover:text-stone-700 flex items-center gap-1">
+                                        {copied === 'ig' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                        {copied === 'ig' ? 'Copied!' : 'Copy'}
+                                    </button>
+                                </div>
+                                <textarea value={instagram} onChange={e => setInstagram(e.target.value)} rows={5} className="w-full px-3 py-2 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800 dark:text-zinc-100 text-sm resize-none outline-none focus:ring-2 focus:ring-purple-400" />
+                            </div>
+                        </div>
+                        <button onClick={() => { setTwitter(''); setInstagram(''); generate(); }} disabled={loading} className="text-xs text-purple-500 hover:text-purple-700 font-bold flex items-center gap-1 disabled:opacity-50">
+                            <RefreshCw className="w-3 h-3" /> Regenerate
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MANAGE EVENTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 interface CoordManageEventsProps { onViewDetail?: (id: string) => void; }
@@ -524,6 +744,8 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [templateName, setTemplateName] = useState('');
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+    const [socialPostOpp, setSocialPostOpp] = useState<OpportunitySummary | null>(null);
+    const [orgName, setOrgName] = useState('');
 
     // Restore draft on mount
     useEffect(() => {
@@ -558,7 +780,11 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         } catch (err: any) {
             setError(getErr(err, 'Failed to load events'));
         } finally { setLoading(false); }
-    }, [auth.linkedGrainId]);
+        // Fetch org name for Social Post modal
+        if (!orgName) {
+            organizationService.getById(auth.linkedGrainId).then(o => setOrgName(o.name)).catch(() => {});
+        }
+    }, [auth.linkedGrainId, orgName]);
 
     useEffect(() => { load(); }, [load]);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
@@ -870,6 +1096,9 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                                                     Recover
                                                 </button>
                                             )}
+                                            <button onClick={(e) => { e.stopPropagation(); setSocialPostOpp(o); }} title="Generate Social Post" className="text-purple-400 hover:text-purple-600 transition-colors ml-1">
+                                                <Sparkles className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -879,6 +1108,9 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                 </div>
             )}
             </div>
+            {socialPostOpp && (
+                <SocialPostModal opp={socialPostOpp} orgName={orgName} onClose={() => setSocialPostOpp(null)} />
+            )}
         </div>
     );
 }

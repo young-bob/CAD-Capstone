@@ -300,6 +300,11 @@ export interface OrganizationSummary {
     status: string;
     createdAt: string;
     proofUrl?: string;
+    websiteUrl?: string;
+    contactEmail?: string;
+    tags?: string[];
+    latestAnnouncementText?: string;
+    latestAnnouncementAt?: string;
 }
 
 export interface UserRecord {

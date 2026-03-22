@@ -20,7 +20,12 @@
       "Bash(xargs grep -l \"NotificationGrain\\\\|INotificationGrain\")",
       "Bash(xargs grep -l \"AllowEmailNotifications\\\\|AllowPushNotifications\")",
       "Bash(xargs grep -l \"SendNotification\\\\|INotificationGrain\\\\|SendAsync\")",
-      "Bash(xargs grep -l \"record ApplicationSummary\\\\|class ApplicationSummary\")"
+      "Bash(xargs grep -l \"record ApplicationSummary\\\\|class ApplicationSummary\")",
+      "Bash(dotnet ef migrations add AddOrgProfileAndAnnouncements --project VSMS.Infrastructure --startup-project VSMS.Api)",
+      "Bash(dotnet build --no-restore -q)",
+      "Bash(dotnet build VSMS.sln --no-restore -q)",
+      "Bash(dotnet build -q)",
+      "Bash(Remove-Item -Force \"c:/Users/cczcx/Music/Capstone/CAD-Capstone/Code_V2/backend/VSMS.Infrastructure/obj/Debug/net10.0/VSMS.Infrastructure.csproj.CoreCompileInputs.cache\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\cczcx\\.claude\\plans"

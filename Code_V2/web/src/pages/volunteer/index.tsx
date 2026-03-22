@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2 } from 'lucide-react';
+import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2, ExternalLink, Mail } from 'lucide-react';
 import EventCalendar from '../../components/EventCalendar';
 import ImpactRing from '../../components/ImpactRing';
 import AttendanceHeatmap from '../../components/AttendanceHeatmap';
@@ -9,6 +9,7 @@ import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
 import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift, OrganizationSummary, OrgRecommendation } from '../../types';
 import { organizationService } from '../../services/organizations';
+import { timeAgo } from '../../utils/timeAgo';
 import { ApplicationStatus, AttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { volunteerService } from '../../services/volunteers';
@@ -2173,17 +2174,49 @@ export function VolOrgs() {
                     {filtered.map(org => {
                         const following = followedIds.has(org.orgId);
                         const busy = actionId === org.orgId;
+                        const tagColors = ['bg-amber-100 text-amber-700','bg-teal-100 text-teal-700','bg-purple-100 text-purple-700','bg-rose-100 text-rose-700','bg-blue-100 text-blue-700'];
                         return (
-                            <div key={org.orgId} className="bg-white dark:bg-zinc-900 border border-stone-100 dark:border-zinc-800 rounded-2xl p-5 flex flex-col gap-4 shadow-sm hover:border-orange-200 transition-colors">
+                            <div key={org.orgId} className="bg-white dark:bg-zinc-900 border border-stone-100 dark:border-zinc-800 rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:border-orange-200 transition-colors">
+                                {/* Header */}
                                 <div className="flex items-start gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0">
                                         <Building2 className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-stone-800 dark:text-zinc-100 text-sm leading-snug">{org.name}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-bold text-stone-800 dark:text-zinc-100 text-sm leading-snug">{org.name}</p>
+                                            {org.websiteUrl && (
+                                                <a href={org.websiteUrl} target="_blank" rel="noreferrer" title="Visit website" onClick={e => e.stopPropagation()} className="text-stone-400 hover:text-orange-500 transition-colors">
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                            {org.contactEmail && (
+                                                <a href={`mailto:${org.contactEmail}`} title={org.contactEmail} onClick={e => e.stopPropagation()} className="text-stone-400 hover:text-orange-500 transition-colors">
+                                                    <Mail className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-stone-400 mt-1 line-clamp-3">{org.description}</p>
                                     </div>
                                 </div>
+                                {/* Tags */}
+                                {org.tags && org.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {org.tags.map((tag, i) => (
+                                            <span key={tag} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tagColors[i % tagColors.length]}`}>{tag}</span>
+                                        ))}
+                                    </div>
+                                )}
+                                {/* Latest Announcement */}
+                                {org.latestAnnouncementText && (
+                                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                                        <span className="mr-1">📢</span>
+                                        <span className="italic">"{org.latestAnnouncementText}"</span>
+                                        {org.latestAnnouncementAt && (
+                                            <span className="ml-1 text-amber-500 not-italic">· {timeAgo(org.latestAnnouncementAt)}</span>
+                                        )}
+                                    </div>
+                                )}
                                 <button
                                     onClick={() => handleToggleFollow(org.orgId)}
                                     disabled={busy}

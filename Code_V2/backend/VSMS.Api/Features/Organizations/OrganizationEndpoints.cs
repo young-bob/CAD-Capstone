@@ -384,8 +384,36 @@ public static class OrganizationEndpoints
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
+
+        // ── Org Profile ───────────────────────────────────────────────────────
+
+        group.MapPut("/{id:guid}/profile", async (Guid id, UpdateProfileRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+            await grains.GetGrain<IOrganizationGrain>(id).UpdateProfile(req.WebsiteUrl, req.ContactEmail, req.Tags ?? []);
+            return Results.NoContent();
+        });
+
+        // ── Announcements ─────────────────────────────────────────────────────
+
+        group.MapPost("/{id:guid}/announcements", async (Guid id, PostAnnouncementRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+            if (string.IsNullOrWhiteSpace(req.Text))
+                return Results.BadRequest(new { Error = "Announcement text is required." });
+            await grains.GetGrain<IOrganizationGrain>(id).PostAnnouncement(req.Text.Trim());
+            return Results.NoContent();
+        });
+
+        group.MapGet("/{id:guid}/announcements", async (Guid id, IGrainFactory grains) =>
+            Results.Ok(await grains.GetGrain<IOrganizationGrain>(id).GetAnnouncements()))
+            .AllowAnonymous();
     }
 
 }
 
 public record UpdateOrgRequest(string Name, string Description);
+public record UpdateProfileRequest(string? WebsiteUrl, string? ContactEmail, List<string>? Tags);
+public record PostAnnouncementRequest(string Text);

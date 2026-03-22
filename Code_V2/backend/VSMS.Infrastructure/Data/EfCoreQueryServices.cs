@@ -31,7 +31,7 @@ public class EfCoreOrganizationQueryService(AppDbContext dbContext) : IOrganizat
             .OrderByDescending(o => o.CreatedAt)
             .Skip(safeSkip)
             .Take(safeTake)
-            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
+            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt, o.WebsiteUrl, o.ContactEmail, o.Tags, o.LatestAnnouncementText, o.LatestAnnouncementAt))
             .ToListAsync();
     }
 
@@ -44,7 +44,7 @@ public class EfCoreOrganizationQueryService(AppDbContext dbContext) : IOrganizat
             .OrderByDescending(o => o.CreatedAt)
             .Skip(safeSkip)
             .Take(safeTake)
-            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
+            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt, o.WebsiteUrl, o.ContactEmail, o.Tags, o.LatestAnnouncementText, o.LatestAnnouncementAt))
             .ToListAsync();
     }
 
@@ -61,7 +61,7 @@ public class EfCoreOrganizationQueryService(AppDbContext dbContext) : IOrganizat
             .OrderByDescending(o => o.CreatedAt)
             .Skip(safeSkip)
             .Take(safeTake)
-            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
+            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt, o.WebsiteUrl, o.ContactEmail, o.Tags, o.LatestAnnouncementText, o.LatestAnnouncementAt))
             .ToListAsync();
     }
 
@@ -70,7 +70,7 @@ public class EfCoreOrganizationQueryService(AppDbContext dbContext) : IOrganizat
         return await dbContext.OrganizationReadModels
             .AsNoTracking()
             .Where(o => o.OrgId == orgId)
-            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt))
+            .Select(o => new OrganizationSummary(o.OrgId, o.Name, o.Description, o.Status, o.CreatedAt, o.WebsiteUrl, o.ContactEmail, o.Tags, o.LatestAnnouncementText, o.LatestAnnouncementAt))
             .FirstOrDefaultAsync();
     }
 }
