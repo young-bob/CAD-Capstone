@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole, EventTemplate } from '../types';
+import type { OrgState, OpportunitySummary, ApplicationSummary, OrgRole, EventTemplate, OrgVolunteerSummary } from '../types';
 
 export const organizationService = {
     create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string; proofUrl?: string }): Promise<{ orgId: string }> => {
@@ -62,5 +62,9 @@ export const organizationService = {
     },
     deleteEventTemplate: async (orgId: string, templateId: string): Promise<void> => {
         await api.delete(`/api/organizations/${orgId}/event-templates/${templateId}`);
+    },
+    getVolunteers: async (orgId: string): Promise<OrgVolunteerSummary[]> => {
+        const res = await api.get<OrgVolunteerSummary[]>(`/api/organizations/${orgId}/volunteers`);
+        return res.data;
     },
 };

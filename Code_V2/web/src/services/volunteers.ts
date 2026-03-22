@@ -30,4 +30,10 @@ export const volunteerService = {
         const res = await api.post<{ signedAt: string }>(`/api/volunteers/${id}/waiver`);
         return res.data;
     },
+    followOrg: async (volunteerGrainId: string, orgId: string): Promise<void> => {
+        await api.post(`/api/volunteers/${volunteerGrainId}/follow/${orgId}`);
+    },
+    unfollowOrg: async (volunteerGrainId: string, orgId: string): Promise<void> => {
+        await api.delete(`/api/volunteers/${volunteerGrainId}/follow/${orgId}`);
+    },
 };

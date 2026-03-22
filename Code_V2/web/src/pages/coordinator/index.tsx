@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import OrgHealthCard from '../../components/OrgHealthCard';
 import EventKanbanPreview from '../../components/EventKanbanPreview';
 import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
-import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, CertificateTemplate, EventTemplate, OrgState, OpportunityState, Shift, Skill, VolunteerProfile } from '../../types';
+import type { ViewName, OpportunitySummary, ApplicationSummary, AttendanceSummary, CertificateTemplate, EventTemplate, OrgState, OpportunityState, Shift, Skill, VolunteerProfile, OrgVolunteerSummary } from '../../types';
 import { OrgRole, ApplicationStatus, OpportunityStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { organizationService } from '../../services/organizations';
@@ -2266,6 +2266,117 @@ export function CoordReports() {
                         </div>
                     )}
                 </>
+            )}
+        </div>
+    );
+}
+
+// ─── Volunteer Roster ─────────────────────────────────────────────────────────
+
+const BGC_CHIP: Record<string, string> = {
+    NotSubmitted: 'bg-stone-100 text-stone-500',
+    Pending:      'bg-yellow-100 text-yellow-700',
+    Cleared:      'bg-emerald-100 text-emerald-700',
+    Expired:      'bg-rose-100 text-rose-700',
+};
+
+export function CoordVolunteers() {
+    const auth = useAuth();
+    const [volunteers, setVolunteers] = useState<OrgVolunteerSummary[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [tab, setTab] = useState<'engaged' | 'following'>('engaged');
+
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        setLoading(true);
+        organizationService.getVolunteers(auth.linkedGrainId)
+            .then(setVolunteers)
+            .catch(e => setError(e?.response?.data?.error ?? 'Failed to load volunteers'))
+            .finally(() => setLoading(false));
+    }, [auth.linkedGrainId]);
+
+    const engaged = volunteers.filter(v => v.relationship === 'Engaged' || v.relationship === 'Both');
+    const following = volunteers.filter(v => v.relationship === 'Following' || v.relationship === 'Both');
+    const shown = tab === 'engaged' ? engaged : following;
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-2xl font-extrabold text-stone-800">Volunteer Roster</h1>
+                <p className="text-stone-500 text-sm mt-1">Volunteers engaged with your org's events, and those who follow your organization.</p>
+            </div>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                    { label: 'Total Volunteers', value: new Set(volunteers.map(v => v.grainId)).size, color: 'text-orange-600' },
+                    { label: 'Engaged', value: engaged.length, color: 'text-blue-600' },
+                    { label: 'Following', value: following.length, color: 'text-purple-600' },
+                    { label: 'BGC Cleared', value: volunteers.filter(v => v.backgroundCheckStatus === 'Cleared').length, color: 'text-emerald-600' },
+                ].map(({ label, value, color }) => (
+                    <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
+                        <p className={`text-2xl font-extrabold ${color}`}>{value}</p>
+                        <p className="text-xs text-stone-500 mt-0.5">{label}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-stone-200 pb-0">
+                {(['engaged', 'following'] as const).map(t => (
+                    <button
+                        key={t}
+                        onClick={() => setTab(t)}
+                        className={`px-4 py-2 text-sm font-bold rounded-t-xl transition-colors capitalize ${tab === t ? 'bg-orange-100 text-orange-700 border-b-2 border-orange-500' : 'text-stone-500 hover:text-stone-700'}`}
+                    >
+                        {t === 'engaged' ? `Engaged (${engaged.length})` : `Following (${following.length})`}
+                    </button>
+                ))}
+            </div>
+
+            {loading ? (
+                <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 text-orange-400 animate-spin" /></div>
+            ) : error ? (
+                <div className="bg-rose-50 text-rose-700 rounded-2xl px-5 py-4 text-sm font-medium">{error}</div>
+            ) : shown.length === 0 ? (
+                <div className="text-center py-16 text-stone-400">
+                    <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">{tab === 'engaged' ? 'No volunteers have engaged with your events yet.' : 'No volunteers are following your organization yet.'}</p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {shown.map(v => (
+                        <div key={v.grainId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-stone-800">{v.name || '(No name)'}</p>
+                                    {(v.relationship === 'Both') && (
+                                        <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <Heart className="w-3 h-3 fill-current" /> Also following
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-stone-400 mt-0.5">{v.email}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                {tab === 'engaged' && (
+                                    <>
+                                        <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">{v.orgHours.toFixed(1)} hrs</span>
+                                        <span className="bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full font-bold">{v.orgEventsAttended} event{v.orgEventsAttended !== 1 ? 's' : ''}</span>
+                                    </>
+                                )}
+                                <span className={`px-2.5 py-1 rounded-full font-bold ${BGC_CHIP[v.backgroundCheckStatus] ?? BGC_CHIP.NotSubmitted}`}>
+                                    BGC: {v.backgroundCheckStatus}
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-full font-bold ${v.hasWaiver ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {v.hasWaiver ? '✓ Waiver' : '⚠ No Waiver'}
+                                </span>
+                                <span className="bg-stone-100 text-stone-500 px-2.5 py-1 rounded-full font-bold">{v.skillCount} skill{v.skillCount !== 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     );

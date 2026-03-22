@@ -1,7 +1,7 @@
 export type ViewName =
     | 'landing' | 'login' | 'register'
     | 'dashboard' | 'opportunities' | 'applications' | 'attendance' | 'certificates' | 'profile' | 'skills'
-    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports'
+    | 'manage_events' | 'org_applications' | 'manage_templates' | 'org_members' | 'coord_reports' | 'coord_volunteers'
     | 'admin_orgs' | 'admin_disputes' | 'admin_users' | 'admin_skills' | 'admin_system_info';
 
 
@@ -225,6 +225,19 @@ export interface VolunteerProfile {
     isInitialized: boolean;
     backgroundCheckStatus: string;
     waiverSignedAt: string | null;
+    followedOrgIds: string[];
+}
+
+export interface OrgVolunteerSummary {
+    grainId: string;
+    name: string;
+    email: string;
+    relationship: 'Engaged' | 'Following' | 'Both';
+    orgHours: number;
+    orgEventsAttended: number;
+    backgroundCheckStatus: string;
+    hasWaiver: boolean;
+    skillCount: number;
 }
 
 // ─── Skill ────────────────────────────────────────────────────

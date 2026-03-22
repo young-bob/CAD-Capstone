@@ -116,6 +116,18 @@ public class VolunteerGrain(
         logger.LogInformation("Volunteer {Id} signed waiver at {Time}", this.GetPrimaryKey(), state.State.WaiverSignedAt);
     }
 
+    public async Task FollowOrg(Guid orgId)
+    {
+        state.State.FollowedOrgIds.Add(orgId);
+        await state.WriteStateAsync();
+    }
+
+    public async Task UnfollowOrg(Guid orgId)
+    {
+        state.State.FollowedOrgIds.Remove(orgId);
+        await state.WriteStateAsync();
+    }
+
     private double CalculateImpactScore()
         => (state.State.TotalHours * 2) + (state.State.CompletedOpportunities * 10);
 }

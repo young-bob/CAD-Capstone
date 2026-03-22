@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<DisputeReadModel> DisputeReadModels => Set<DisputeReadModel>();
     public DbSet<CertificateTemplateEntity> CertificateTemplates => Set<CertificateTemplateEntity>();
     public DbSet<EventTemplateEntity> EventTemplates => Set<EventTemplateEntity>();
+    public DbSet<VolunteerFollowEntity> VolunteerFollows => Set<VolunteerFollowEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,5 +118,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<CertificateTemplateEntity>().HasIndex(t => t.OrganizationId);
         modelBuilder.Entity<EventTemplateEntity>().HasIndex(t => t.OrganizationId);
+
+        modelBuilder.Entity<VolunteerFollowEntity>()
+            .HasKey(f => new { f.VolunteerGrainId, f.OrgId });
+        modelBuilder.Entity<VolunteerFollowEntity>()
+            .HasIndex(f => f.OrgId)
+            .HasDatabaseName("IX_VolunteerFollows_OrgId");
     }
 }

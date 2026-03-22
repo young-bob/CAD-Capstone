@@ -39,4 +39,8 @@ public interface IVolunteerGrain : IGrainWithGuidKey
     // Compliance
     Task SetBackgroundCheckStatus(string status);
     Task SignWaiver();
+
+    // Org following
+    Task FollowOrg(Guid orgId);
+    Task UnfollowOrg(Guid orgId);
 }

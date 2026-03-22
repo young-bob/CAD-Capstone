@@ -1,6 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
 using VSMS.Api.Extensions;
+using VSMS.Infrastructure.Data.EfCoreQuery;
+using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
 namespace VSMS.Api.Features.Volunteers;
 
@@ -107,6 +110,44 @@ public static class VolunteerEndpoints
             await grain.SignWaiver();
             var profile = await grain.GetProfile();
             return Results.Ok(new { signedAt = profile.WaiverSignedAt });
+        });
+
+        group.MapPost("/{id:guid}/follow/{orgId:guid}", async (Guid id, Guid orgId, HttpContext http, IGrainFactory grains, AppDbContext db) =>
+        {
+            if (!http.IsSelfByGrainId(id))
+                return Results.Forbid();
+
+            var orgExists = await db.OrganizationReadModels.AnyAsync(o => o.OrganizationId == orgId);
+            if (!orgExists)
+                return Results.NotFound(new { Error = "Organization not found." });
+
+            var already = await db.VolunteerFollows.AnyAsync(f => f.VolunteerGrainId == id && f.OrgId == orgId);
+            if (!already)
+            {
+                db.VolunteerFollows.Add(new VolunteerFollowEntity { VolunteerGrainId = id, OrgId = orgId });
+                await db.SaveChangesAsync();
+            }
+
+            var grain = grains.GetGrain<IVolunteerGrain>(id);
+            await grain.FollowOrg(orgId);
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/{id:guid}/follow/{orgId:guid}", async (Guid id, Guid orgId, HttpContext http, IGrainFactory grains, AppDbContext db) =>
+        {
+            if (!http.IsSelfByGrainId(id))
+                return Results.Forbid();
+
+            var row = await db.VolunteerFollows.FirstOrDefaultAsync(f => f.VolunteerGrainId == id && f.OrgId == orgId);
+            if (row != null)
+            {
+                db.VolunteerFollows.Remove(row);
+                await db.SaveChangesAsync();
+            }
+
+            var grain = grains.GetGrain<IVolunteerGrain>(id);
+            await grain.UnfollowOrg(orgId);
+            return Results.NoContent();
         });
     }
 

@@ -184,6 +184,83 @@ public static class OrganizationEndpoints
             return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
         });
 
+        group.MapGet("/{id:guid}/volunteers", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOrganizationAsync(db, id))
+                return Results.Forbid();
+
+            // Org's opportunity IDs (for joining attendance + applications)
+            var orgOppIds = await db.OpportunityReadModels
+                .AsNoTracking()
+                .Where(o => o.OrganizationId == id)
+                .Select(o => o.OpportunityId)
+                .ToListAsync();
+
+            // Engaged: distinct volunteer grain IDs from non-rejected applications
+            var engagedIds = await db.ApplicationReadModels
+                .AsNoTracking()
+                .Where(a => orgOppIds.Contains(a.OpportunityId) &&
+                            a.Status != Abstractions.Enums.ApplicationStatus.Rejected)
+                .Select(a => a.VolunteerId)
+                .Distinct()
+                .ToListAsync();
+
+            // Per-org hours + event count per volunteer from attendance
+            var orgHoursMap = await db.AttendanceReadModels
+                .AsNoTracking()
+                .Where(a => orgOppIds.Contains(a.OpportunityId) && a.TotalHours > 0)
+                .GroupBy(a => a.VolunteerId)
+                .Select(g => new { VolunteerId = g.Key, Hours = g.Sum(a => a.TotalHours), Events = g.Count() })
+                .ToDictionaryAsync(x => x.VolunteerId, x => (x.Hours, x.Events));
+
+            // Followers
+            var followerIds = await db.VolunteerFollows
+                .AsNoTracking()
+                .Where(f => f.OrgId == id)
+                .Select(f => f.VolunteerGrainId)
+                .ToListAsync();
+
+            // Merge all grain IDs with relationship labels
+            var allIds = new Dictionary<Guid, string>();
+            foreach (var gid in engagedIds) allIds[gid] = "Engaged";
+            foreach (var gid in followerIds)
+            {
+                if (allIds.ContainsKey(gid))
+                    allIds[gid] = "Both";
+                else
+                    allIds[gid] = "Following";
+            }
+
+            // Load grain profiles in parallel
+            var profileTasks = allIds.Keys.Select(async gid =>
+            {
+                try
+                {
+                    var profile = await grains.GetGrain<IVolunteerGrain>(gid).GetProfile();
+                    var (hours, events) = orgHoursMap.TryGetValue(gid, out var h) ? h : (0.0, 0);
+                    return (object)new
+                    {
+                        GrainId = gid,
+                        Name = $"{profile.FirstName} {profile.LastName}".Trim(),
+                        profile.Email,
+                        Relationship = allIds[gid],
+                        OrgHours = Math.Round(hours, 2),
+                        OrgEventsAttended = events,
+                        profile.BackgroundCheckStatus,
+                        HasWaiver = profile.WaiverSignedAt.HasValue,
+                        SkillCount = profile.SkillIds.Count
+                    };
+                }
+                catch
+                {
+                    return null;
+                }
+            });
+
+            var results = await Task.WhenAll(profileTasks);
+            return Results.Ok(results.Where(r => r != null));
+        });
+
         // ── Event Templates ──────────────────────────────────────────────────
 
         group.MapGet("/{id:guid}/event-templates", async (Guid id, HttpContext http, AppDbContext db) =>

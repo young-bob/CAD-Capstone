@@ -1727,20 +1727,26 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     const [toast, setToast] = useState('');
     const [allSkills, setAllSkills] = useState<Skill[]>([]);
     const [mySkillIds, setMySkillIds] = useState<Set<string>>(new Set());
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const [oppData, appData, skillsData, mySkillsData] = await Promise.all([
+            const [oppData, appData, skillsData, mySkillsData, profileData] = await Promise.all([
                 opportunityService.getById(oppId),
                 auth.linkedGrainId ? applicationService.getForVolunteer(auth.linkedGrainId) : Promise.resolve([]),
                 skillService.getAll(),
                 auth.userId ? skillService.getVolunteerSkills(auth.userId) : Promise.resolve([]),
+                auth.linkedGrainId ? volunteerService.getProfile(auth.linkedGrainId) : Promise.resolve(null),
             ]);
             const serverApps = (appData as ApplicationSummary[]).filter((a: ApplicationSummary) => a.opportunityId === oppId);
             setOpp(oppData);
             setAllSkills(skillsData || []);
             setMySkillIds(new Set((mySkillsData || []).map((s: Skill) => s.id)));
+            if (profileData && oppData.organizationId) {
+                setIsFollowing((profileData.followedOrgIds || []).includes(oppData.organizationId));
+            }
             // Keep optimistic temp applications until projection/read model catches up.
             setMyApps(prev => {
                 const serverShiftIds = new Set(serverApps.map(a => a.shiftId));
@@ -1811,6 +1817,23 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
 
     const appliedShiftIds = new Set(myApps.map((a: ApplicationSummary) => a.shiftId));
 
+    const handleToggleFollow = async () => {
+        if (!auth.linkedGrainId || !opp?.organizationId) return;
+        setFollowLoading(true);
+        try {
+            if (isFollowing) {
+                await volunteerService.unfollowOrg(auth.linkedGrainId, opp.organizationId);
+                setIsFollowing(false);
+                showToast('Unfollowed organization');
+            } else {
+                await volunteerService.followOrg(auth.linkedGrainId, opp.organizationId);
+                setIsFollowing(true);
+                showToast('Now following this organization!');
+            }
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to update follow status'));
+        } finally { setFollowLoading(false); }
+    };
 
     const statusColors: Record<string, string> = {
         Published: 'bg-emerald-100 text-emerald-700',
@@ -1843,6 +1866,22 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
                         {opp.info.tags?.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-4">
                                 {opp.info.tags.map((tag: string) => <span key={tag} className="text-xs font-bold bg-stone-100 text-stone-500 px-3 py-1 rounded-full">{tag}</span>)}
+                            </div>
+                        )}
+                        {opp.organizationId && (
+                            <div className="flex items-center justify-between mt-5 pt-5 border-t border-stone-100">
+                                <div className="flex items-center gap-2 text-sm text-stone-500">
+                                    <Building2 className="w-4 h-4 text-orange-400" />
+                                    <span className="font-medium">Follow this organization to join their volunteer pool</span>
+                                </div>
+                                <button
+                                    onClick={handleToggleFollow}
+                                    disabled={followLoading}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isFollowing ? 'bg-emerald-100 text-emerald-700 hover:bg-rose-50 hover:text-rose-600' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}
+                                >
+                                    {followLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isFollowing ? <Heart className="w-4 h-4 fill-current" /> : <Heart className="w-4 h-4" />}
+                                    {isFollowing ? 'Following' : 'Follow Org'}
+                                </button>
                             </div>
                         )}
                     </div>

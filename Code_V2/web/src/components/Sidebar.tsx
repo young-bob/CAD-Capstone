@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
     Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus, Server,
-    ChevronLeft, ChevronRight, BarChart2
+    ChevronLeft, ChevronRight, BarChart2, Heart
 } from 'lucide-react';
 import type { ViewName } from '../types';
 import SidebarTooltip from './SidebarTooltip';
@@ -56,6 +56,7 @@ const COORDINATOR_ITEMS: { section: string; items: NavItem[] }[] = [
             { view: 'org_applications',  label: 'Applications',    icon: ({ className }) => <Users className={className} /> },
             { view: 'org_members',       label: 'Members',         icon: ({ className }) => <UserPlus className={className} /> },
             { view: 'manage_templates',  label: 'Cert Templates',  icon: ({ className }) => <FileCheck className={className} /> },
+            { view: 'coord_volunteers',   label: 'Volunteers',      icon: ({ className }) => <Heart className={className} /> },
             { view: 'coord_reports',     label: 'Hours Report',    icon: ({ className }) => <BarChart2 className={className} /> },
         ],
     },

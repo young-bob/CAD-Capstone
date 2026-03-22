@@ -11,7 +11,12 @@
       "Bash(xargs wc -l)",
       "Bash(grep -h \"^public.*Task\" \"/c/Users/cczcx/Music/Capstone/CAD-Capstone/Code_V2/backend/VSMS.Grains\"/*.cs)",
       "Bash(npx vite build)",
-      "Bash(xargs grep -l \"CreateOppRequest\\\\|CreateOrgRequest\")"
+      "Bash(xargs grep -l \"CreateOppRequest\\\\|CreateOrgRequest\")",
+      "Bash(xargs cat)",
+      "Read(//c/Users/cczcx/.claude/plans/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\cczcx\\.claude\\plans"
     ]
   }
 }
