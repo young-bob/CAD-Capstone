@@ -45,4 +45,7 @@ export const attendanceService = {
     resolveDispute: async (id: string, data: { resolverId: string; resolution: string; adjustedHours: number }): Promise<void> => {
         await api.post(`/api/attendance/${id}/resolve`, data);
     },
+    markUnderReview: async (id: string, coordinatorId: string): Promise<void> => {
+        await api.post(`/api/attendance/${id}/review`, { coordinatorId });
+    },
 };

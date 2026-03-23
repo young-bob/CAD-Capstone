@@ -129,6 +129,16 @@ public static class AttendanceEndpoints
             await grain.ResolveDispute(req.ResolverId, req.Resolution, req.AdjustedHours);
             return Results.NoContent();
         });
+
+        group.MapPost("/{id:guid}/review", async (Guid id, MarkUnderReviewRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
+                return Results.Forbid();
+            await grain.MarkDisputeUnderReview(req.CoordinatorId);
+            return Results.NoContent();
+        });
     }
 
 }

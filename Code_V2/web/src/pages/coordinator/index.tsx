@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw, User, AlertTriangle, Phone } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import { timeAgo } from '../../utils/timeAgo';
@@ -24,6 +24,80 @@ import { useCountUp } from '../../hooks/useCountUp';
 import { useDarkMode } from '../../hooks/useTheme';
 import { useInfiniteList } from '../../hooks/useInfiniteList';
 const MapPicker = lazy(() => import('../../components/MapPicker'));
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FEATURE HELPERS (shared across components)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Feature 2: ICS Calendar Export
+function exportToCalendar(title: string, shifts: Array<{name: string, startTime: string, endTime: string}>) {
+    const fmt = (d: string) => new Date(d).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const events = shifts.map(s => [
+        'BEGIN:VEVENT',
+        `DTSTART:${fmt(s.startTime)}`,
+        `DTEND:${fmt(s.endTime)}`,
+        `SUMMARY:${title} - ${s.name}`,
+        'DESCRIPTION:VSMS volunteer shift',
+        `UID:${crypto.randomUUID()}@vsms`,
+        'END:VEVENT'
+    ].join('\r\n')).join('\r\n');
+    const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VSMS//EN\r\n${events}\r\nEND:VCALENDAR`;
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `${title.replace(/\s+/g, '-')}.ics`; a.click();
+}
+
+// Feature 3: Shift overlap detection
+function shiftsOverlap(existStart: string, existEnd: string, newStart: string, newEnd: string): boolean {
+    return new Date(existStart) < new Date(newEnd) && new Date(existEnd) > new Date(newStart);
+}
+
+// Feature 4: Shift Reminders
+interface ShiftReminder { shiftId: string; oppId: string; shiftName: string; startTime: string; reminderHours: number; dismissed: boolean }
+const REMINDER_KEY = (orgId: string) => `vsms_reminders_${orgId}`;
+function getReminders(orgId: string): ShiftReminder[] { try { return JSON.parse(localStorage.getItem(REMINDER_KEY(orgId)) || '[]'); } catch { return []; } }
+function saveReminders(orgId: string, reminders: ShiftReminder[]) { localStorage.setItem(REMINDER_KEY(orgId), JSON.stringify(reminders)); }
+
+// Feature 8: Communication History
+interface MsgRecord { to: string; toName: string; oppTitle: string; text: string; ts: number }
+const MSG_KEY = (orgId: string) => `vsms_msg_history_${orgId}`;
+function getMsgHistory(orgId: string): MsgRecord[] { try { return JSON.parse(localStorage.getItem(MSG_KEY(orgId)) || '[]'); } catch { return []; } }
+function addMsgToHistory(orgId: string, rec: MsgRecord) {
+    const history = getMsgHistory(orgId);
+    history.unshift(rec);
+    if (history.length > 200) history.pop();
+    localStorage.setItem(MSG_KEY(orgId), JSON.stringify(history));
+}
+
+// Feature 9: Star rendering
+function renderStars(avg: number, count: number): React.ReactNode {
+    const full = Math.round(avg);
+    return <div className="flex items-center gap-1">
+        {[1,2,3,4,5].map(i => <Star key={i} size={14} className={i <= full ? 'text-amber-400 fill-amber-400' : 'text-gray-300'} />)}
+        <span className="text-xs text-gray-500 ml-1">{avg.toFixed(1)} ({count} ratings)</span>
+    </div>;
+}
+
+// Feature 10: Trend chip
+function TrendChip({ pct }: { pct: number | null }) {
+    if (pct === null) return <span className="text-xs text-gray-400">—</span>;
+    const up = pct >= 0;
+    return <span className={`text-xs font-medium ${up ? 'text-emerald-600' : 'text-rose-500'}`}>
+        {up ? '↑' : '↓'} {Math.abs(pct)}%
+    </span>;
+}
+
+// Feature 6: Skills match badge
+function skillMatchBadge(required: string[], volunteerId: string, profiles: Map<string, any>): React.ReactNode {
+    if (required.length === 0) return null;
+    const profile = profiles.get(volunteerId);
+    if (!profile) return null;
+    const volSkills: string[] = profile.skillIds ?? [];
+    const matched = required.filter(id => volSkills.includes(id));
+    const ratio = matched.length / required.length;
+    const color = ratio >= 0.8 ? 'bg-green-100 text-green-700' : ratio >= 0.4 ? 'bg-yellow-100 text-yellow-700' : 'bg-stone-100 text-stone-500';
+    return <span className={`text-xs px-1.5 py-0.5 rounded-full ${color}`}>🎯 {matched.length}/{required.length} skills</span>;
+}
 
 function Spinner() { return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-400 animate-spin" /></div>; }
 function StatNum({ value, decimals = 0 }: { value: number; decimals?: number }) {
@@ -203,6 +277,47 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
             }));
     }, [apps]);
 
+    // Feature 10: Trend computations
+    const { thisWeekAppCount, lastWeekAppCount, thisWeekPendingCount, lastWeekPendingCount, thisWeekActiveCount, lastWeekActiveCount, dailyCounts } = useMemo(() => {
+        const now = Date.now();
+        const day = 86400000;
+        const thisWeekApps = apps.filter(a => now - new Date(a.appliedAt).getTime() < 7 * day);
+        const lastWeekApps = apps.filter(a => { const age = now - new Date(a.appliedAt).getTime(); return age >= 7 * day && age < 14 * day; });
+        const daily: { day: string; count: number }[] = [];
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        for (let i = 6; i >= 0; i--) {
+            const start = now - (i + 1) * day;
+            const end = now - i * day;
+            const count = apps.filter(a => { const t = new Date(a.appliedAt).getTime(); return t >= start && t < end; }).length;
+            const d = new Date(now - i * day);
+            daily.push({ day: dayNames[d.getDay()], count });
+        }
+        return {
+            thisWeekAppCount: thisWeekApps.length,
+            lastWeekAppCount: lastWeekApps.length,
+            thisWeekPendingCount: thisWeekApps.filter(a => a.status === 'Pending').length,
+            lastWeekPendingCount: lastWeekApps.filter(a => a.status === 'Pending').length,
+            thisWeekActiveCount: opps.filter(o => o.status === 'Published').length,
+            lastWeekActiveCount: opps.filter(o => o.status === 'Published').length,
+            dailyCounts: daily,
+        };
+    }, [apps, opps]);
+
+    const trendPct = (curr: number, prev: number) => prev === 0 ? null : Math.round(((curr - prev) / prev) * 100);
+
+    // Feature 4: Due reminders
+    const [dueReminders, setDueReminders] = useState<ShiftReminder[]>([]);
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        const now = Date.now();
+        const reminders = getReminders(auth.linkedGrainId);
+        const due = reminders.filter(r => {
+            const startMs = new Date(r.startTime).getTime();
+            return !r.dismissed && now >= startMs - r.reminderHours * 3600000 && now < startMs;
+        });
+        setDueReminders(due);
+    }, [auth.linkedGrainId, org]);
+
     const statusConfig: Record<string, { color: string; bg: string; icon: string; msg: string }> = {
         PendingApproval: { color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', icon: '⏳', msg: 'Your organization is pending admin approval. You cannot create events until approved.' },
         Approved: { color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: '✅', msg: 'Your organization is approved and active.' },
@@ -333,12 +448,28 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
             {isApproved && (
                 <>
                     {/* Zone B: KPI cards */}
+                    {dueReminders.length > 0 && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                            <Bell className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="text-amber-700 text-sm font-bold">Upcoming Shift Reminders</p>
+                                <div className="mt-1 space-y-1">
+                                    {dueReminders.map(r => (
+                                        <div key={r.shiftId} className="flex items-center justify-between gap-2">
+                                            <p className="text-xs text-amber-600">{r.shiftName} — {new Date(r.startTime).toLocaleString()}</p>
+                                            <button onClick={() => { if (!auth.linkedGrainId) return; const updated = getReminders(auth.linkedGrainId).map(x => x.shiftId === r.shiftId ? { ...x, dismissed: true } : x); saveReminders(auth.linkedGrainId, updated); setDueReminders(prev => prev.filter(x => x.shiftId !== r.shiftId)); }} className="text-xs text-amber-500 hover:text-amber-700 font-bold shrink-0">Dismiss</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
-                            { label: 'Active Events', numVal: opps.filter(o => o.status === 'Published').length, icon: Briefcase, gradient: 'from-blue-500 to-cyan-400', target: 'manage_events' as ViewName },
-                            { label: 'Pending Applications', numVal: pendingApps, icon: Users, gradient: 'from-amber-400 to-orange-500', target: 'org_applications' as ViewName },
-                            { label: 'Total Applicants', numVal: apps.length, icon: Clock, gradient: 'from-emerald-500 to-teal-400', target: 'org_applications' as ViewName },
-                            { label: 'Members', numVal: org.members?.length ?? 0, icon: Award, gradient: 'from-rose-500 to-pink-500', target: 'org_members' as ViewName },
+                            { label: 'Active Events', numVal: opps.filter(o => o.status === 'Published').length, trend: trendPct(thisWeekActiveCount, lastWeekActiveCount), icon: Briefcase, gradient: 'from-blue-500 to-cyan-400', target: 'manage_events' as ViewName },
+                            { label: 'Pending Applications', numVal: pendingApps, trend: trendPct(thisWeekPendingCount, lastWeekPendingCount), icon: Users, gradient: 'from-amber-400 to-orange-500', target: 'org_applications' as ViewName },
+                            { label: 'Total Applicants', numVal: apps.length, trend: trendPct(thisWeekAppCount, lastWeekAppCount), icon: Clock, gradient: 'from-emerald-500 to-teal-400', target: 'org_applications' as ViewName },
+                            { label: 'Members', numVal: org.members?.length ?? 0, trend: null, icon: Award, gradient: 'from-rose-500 to-pink-500', target: 'org_members' as ViewName },
                         ].map((s, i) => (
                             <button key={i} onClick={() => onNavigate(s.target)}
                                 className="bg-white rounded-2xl p-5 shadow-level-1 border border-stone-100 flex flex-col items-start text-left card-interactive group animate-content-reveal"
@@ -346,6 +477,7 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                                 <div className={`bg-gradient-to-br ${s.gradient} p-3 rounded-xl text-white mb-3 shadow-sm group-hover:scale-110 transition-transform`}><s.icon className="w-5 h-5" /></div>
                                 <div className="text-2xl font-black text-stone-800"><StatNum value={s.numVal} /></div>
                                 <div className="text-xs font-medium text-stone-400 mt-0.5">{s.label}</div>
+                                <div className="mt-1"><TrendChip pct={s.trend} /></div>
                             </button>
                         ))}
                     </div>
@@ -399,6 +531,23 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
+                        {/* Feature 10: 7-day sparkline */}
+                        <div className="mt-6 border-t border-stone-100 pt-4">
+                            <p className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-3">7-Day Application Trend</p>
+                            <ResponsiveContainer width="100%" height={60}>
+                                <AreaChart data={dailyCounts} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#a8a29e' }} axisLine={false} tickLine={false} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11 }} />
+                                    <Area type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} fill="url(#sparkGrad)" dot={false} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
 
                     {/* Upcoming workload */}
@@ -648,6 +797,7 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
     const [socialPostOpp, setSocialPostOpp] = useState<OpportunitySummary | null>(null);
     const [orgName, setOrgName] = useState('');
+    const [cloningId, setCloningId] = useState<string | null>(null);
 
     // Restore draft on mount
     useEffect(() => {
@@ -795,6 +945,16 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         } catch (err: any) {
             setError(getErr(err, 'Failed to recover'));
         } finally { setRecoveringId(null); }
+    };
+
+    const handleClone = async (id: string) => {
+        setCloningId(id);
+        try {
+            await opportunityService.clone(id);
+            setTimeout(() => { void load(); }, 600);
+        } catch (err: any) {
+            setError(getErr(err, 'Failed to clone'));
+        } finally { setCloningId(null); }
     };
 
     const handleGetLocation = () => {
@@ -1001,6 +1161,9 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                                             <button onClick={(e) => { e.stopPropagation(); setSocialPostOpp(o); }} title="Generate Social Post" className="text-purple-400 hover:text-purple-600 transition-colors ml-1">
                                                 <Sparkles className="w-4 h-4" />
                                             </button>
+                                            <button onClick={(e) => { e.stopPropagation(); handleClone(o.opportunityId); }} disabled={cloningId === o.opportunityId} title="Clone event" className="p-1 text-stone-400 hover:text-blue-600 transition-colors disabled:opacity-50">
+                                                {cloningId === o.opportunityId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1172,6 +1335,18 @@ export function CoordApplications() {
     const [msgText, setMsgText] = useState('');
     const [sending, setSending] = useState(false);
     const [viewProfileId, setViewProfileId] = useState<string | null>(null);
+    const [showMsgHistory, setShowMsgHistory] = useState(false);
+    const [msgHistory, setMsgHistory] = useState<MsgRecord[]>([]);
+    const [volunteerAttendance, setVolunteerAttendance] = useState<Map<string, AttendanceSummary[]>>(new Map());
+
+    // Feature 9: Load attendance for viewed volunteer profile
+    useEffect(() => {
+        if (!viewProfileId) return;
+        if (volunteerAttendance.has(viewProfileId)) return;
+        attendanceService.getByVolunteer(viewProfileId)
+            .then(records => setVolunteerAttendance(prev => new Map(prev).set(viewProfileId, records)))
+            .catch(() => {});
+    }, [viewProfileId]);
 
     const doSendMsg = async () => {
         if (!msgApp || !msgText.trim()) return;
@@ -1182,6 +1357,10 @@ export function CoordApplications() {
                 targetStatus: 'All',
                 targetIds: [msgApp.volunteerId],
             });
+            // Feature 8: save to history
+            if (auth.linkedGrainId) {
+                addMsgToHistory(auth.linkedGrainId, { to: msgApp.volunteerId, toName: msgApp.volunteerName ?? 'Volunteer', oppTitle: msgApp.opportunityTitle, text: msgText, ts: Date.now() });
+            }
             showToast(`Message sent to ${res.sent} volunteer${res.sent !== 1 ? 's' : ''} 📣`);
             setMsgApp(null);
             setMsgText('');
@@ -1397,6 +1576,14 @@ export function CoordApplications() {
                                             <p className="text-xs text-amber-500 font-semibold">Impact</p>
                                         </div>
                                     </div>
+                                    {/* Feature 9: Ratings */}
+                                    {(() => {
+                                        const attRecords = volunteerAttendance.get(viewProfileId) ?? [];
+                                        const rated = attRecords.filter(r => (r as any).supervisorRating > 0);
+                                        if (rated.length === 0) return <p className="text-xs text-stone-400">No ratings yet</p>;
+                                        const avg = rated.reduce((s, r) => s + ((r as any).supervisorRating as number), 0) / rated.length;
+                                        return renderStars(avg, rated.length);
+                                    })()}
                                     <div className="flex flex-wrap gap-2">
                                         {vp.backgroundCheckStatus === 'Cleared'
                                             ? <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✅ BGC Cleared</span>
@@ -1432,19 +1619,38 @@ export function CoordApplications() {
                     </div>
                 );
             })()}
-            {msgApp && (
-                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
-                        <div className="flex items-center justify-between"><h3 className="text-lg font-bold text-stone-800">Message Volunteer</h3><button onClick={() => setMsgApp(null)} className="p-1 text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button></div>
-                        <p className="text-sm text-stone-500">To: <span className="font-bold text-stone-700">{msgApp.volunteerName}</span> · {msgApp.opportunityTitle}</p>
-                        <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={4} placeholder="Write your message here…" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm resize-none" />
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => setMsgApp(null)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
-                            <button onClick={doSendMsg} disabled={sending || !msgText.trim()} className="px-5 py-2.5 bg-violet-500 text-white font-bold rounded-xl hover:bg-violet-600 disabled:opacity-50 flex items-center gap-2">{sending && <Loader2 className="w-4 h-4 animate-spin" />}<Bell className="w-4 h-4" /> Send</button>
+            {msgApp && (() => {
+                // Feature 8: load history filtered to this volunteer when modal opens
+                const volHistory = auth.linkedGrainId ? getMsgHistory(auth.linkedGrainId).filter(h => h.to === msgApp.volunteerId).slice(0, 10) : [];
+                return (
+                    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
+                            <div className="flex items-center justify-between"><h3 className="text-lg font-bold text-stone-800">Message Volunteer</h3><button onClick={() => setMsgApp(null)} className="p-1 text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button></div>
+                            <p className="text-sm text-stone-500">To: <span className="font-bold text-stone-700">{msgApp.volunteerName}</span> · {msgApp.opportunityTitle}</p>
+                            {volHistory.length > 0 && (
+                                <div>
+                                    <button onClick={() => setShowMsgHistory(v => !v)} className="text-xs font-bold text-violet-500 hover:text-violet-700">{showMsgHistory ? 'Hide history' : `Show history (${volHistory.length})`}</button>
+                                    {showMsgHistory && (
+                                        <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                                            {volHistory.map((h, i) => (
+                                                <div key={i} className="bg-stone-50 rounded-lg px-3 py-2 text-xs text-stone-600">
+                                                    <div className="flex justify-between text-stone-400 mb-0.5"><span>{h.toName}</span><span>{new Date(h.ts).toLocaleDateString()}</span></div>
+                                                    <p className="truncate">{h.text.slice(0, 60)}{h.text.length > 60 ? '…' : ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={4} placeholder="Write your message here…" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm resize-none" />
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => { setMsgApp(null); setShowMsgHistory(false); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                                <button onClick={doSendMsg} disabled={sending || !msgText.trim()} className="px-5 py-2.5 bg-violet-500 text-white font-bold rounded-xl hover:bg-violet-600 disabled:opacity-50 flex items-center gap-2">{sending && <Loader2 className="w-4 h-4 animate-spin" />}<Bell className="w-4 h-4" /> Send</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 }
@@ -1866,6 +2072,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [repeatMode, setRepeatMode] = useState<'none' | 'weekly' | 'monthly'>('none');
     const [repeatUntil, setRepeatUntil] = useState('');
     const [addingProgress, setAddingProgress] = useState('');
+    const [shiftConflictWarning, setShiftConflictWarning] = useState<string | null>(null);
+    const [shiftConflictConfirmed, setShiftConflictConfirmed] = useState(false);
+
+    // Feature 4: Shift reminders
+    const [showReminderPicker, setShowReminderPicker] = useState<string | null>(null);
+    const [reminderToast, setReminderToast] = useState('');
 
     // Cancel
     const [showCancel, setShowCancel] = useState(false);
@@ -1926,6 +2138,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [notifyMsg, setNotifyMsg] = useState('');
     const [notifyTarget, setNotifyTarget] = useState<'Approved' | 'All'>('Approved');
     const [notifying, setNotifying] = useState(false);
+    const [showNotifyHistory, setShowNotifyHistory] = useState(false);
 
     // Live check-in mode
     const [liveMode, setLiveMode] = useState(false);
@@ -1942,6 +2155,23 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [resolveRec, setResolveRec] = useState<AttendanceSummary | null>(null);
     const [resolveForm, setResolveForm] = useState({ resolution: '', adjustedHours: '' });
     const [resolving, setResolving] = useState(false);
+
+    // Feature 5: Dispute workflow
+    const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+    const doMarkUnderReview = async (rec: AttendanceSummary) => {
+        setReviewingId(rec.attendanceId);
+        try {
+            await attendanceService.markUnderReview(rec.attendanceId, auth.linkedGrainId ?? oppId);
+            showToast('Marked as Under Review');
+            setTimeout(() => load(), 600);
+        } catch (err: any) { showToast(getErr(err, 'Failed')); }
+        finally { setReviewingId(null); }
+    };
+
+    // Feature 6 & 7: Volunteer profiles for skill matching and conflict detection
+    const [detailVolunteerProfiles, setDetailVolunteerProfiles] = useState<Map<string, VolunteerProfile>>(new Map());
+    const [volunteerOtherApps, setVolunteerOtherApps] = useState<Map<string, ApplicationSummary[]>>(new Map());
 
     // Certificate
     const [showCert, setShowCert] = useState(false);
@@ -1967,6 +2197,26 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
     useEffect(() => { load(); }, [load]);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
+
+    // Feature 6 & 7: Load volunteer profiles and other apps after apps load
+    useEffect(() => {
+        if (apps.length === 0) return;
+        const uniqueIds = [...new Set(apps.map(a => a.volunteerId))];
+        // Load profiles for skill matching
+        Promise.allSettled(uniqueIds.map(id => volunteerService.getProfile(id).then(p => [id, p] as const)))
+            .then(results => {
+                const map = new Map<string, VolunteerProfile>();
+                results.forEach(r => { if (r.status === 'fulfilled') map.set(r.value[0], r.value[1]); });
+                setDetailVolunteerProfiles(map);
+            });
+        // Load other approved applications for conflict checking
+        Promise.allSettled(uniqueIds.map(id => applicationService.getForVolunteer(id).then(a => [id, a] as const)))
+            .then(results => {
+                const map = new Map<string, ApplicationSummary[]>();
+                results.forEach(r => { if (r.status === 'fulfilled') map.set(r.value[0], r.value[1]); });
+                setVolunteerOtherApps(map);
+            });
+    }, [apps]);
 
     const refreshAttendance = useCallback(async () => {
         try {
@@ -2039,7 +2289,19 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     };
 
     const doAddShift = async () => {
-        if (!shiftName || !shiftStart || !shiftEnd) return; setAddingShift(true);
+        if (!shiftName || !shiftStart || !shiftEnd) return;
+        // Feature 3: conflict check
+        if (!shiftConflictConfirmed && opp) {
+            const conflicts = (opp.shifts || []).filter(s => shiftsOverlap(s.startTime, s.endTime, shiftStart, shiftEnd));
+            if (conflicts.length > 0) {
+                const names = conflicts.map(s => `${s.name} (${new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}–${new Date(s.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`).join(', ');
+                setShiftConflictWarning(`Overlaps with: ${names}`);
+                return;
+            }
+        }
+        setShiftConflictWarning(null);
+        setShiftConflictConfirmed(false);
+        setAddingShift(true);
         try {
             const baseStart = new Date(shiftStart);
             const baseEnd = new Date(shiftEnd);
@@ -2207,6 +2469,10 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         setNotifying(true);
         try {
             const res = await opportunityService.notifyVolunteers(oppId, { message: notifyMsg, targetStatus: notifyTarget });
+            // Feature 8: save bulk message to history
+            if (auth.linkedGrainId && opp) {
+                addMsgToHistory(auth.linkedGrainId, { to: 'all', toName: 'All Volunteers', oppTitle: opp.info.title, text: notifyMsg, ts: Date.now() });
+            }
             setNotifyMsg('');
             showToast(`Message sent to ${res.sent} volunteer${res.sent !== 1 ? 's' : ''} 📣`);
             setShowNotify(false);
@@ -2222,6 +2488,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     return (
         <div className="max-w-5xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
+            {reminderToast && <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{reminderToast}</div>}
             <button onClick={onBack} className="flex items-center gap-2 text-stone-500 hover:text-orange-600 font-bold transition-colors"><ChevronLeft className="w-5 h-5" /> Back to Events</button>
 
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : opp && (<>
@@ -2245,6 +2512,9 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         <button onClick={openSkills} className="px-5 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 border border-orange-200 flex items-center gap-2"><Star className="w-4 h-4" /> Required Skills ({opp.requiredSkillIds?.length || 0})</button>
                         {(opp.status === 'Published' || opp.status === 'InProgress') && apps.length > 0 && (
                             <button onClick={() => setShowNotify(true)} className="px-5 py-2.5 bg-violet-50 text-violet-600 font-bold rounded-xl hover:bg-violet-100 border border-violet-200 flex items-center gap-2"><Bell className="w-4 h-4" /> Notify Volunteers</button>
+                        )}
+                        {opp.shifts.length > 0 && (
+                            <button onClick={() => exportToCalendar(opp.info.title, opp.shifts)} className="px-5 py-2.5 bg-teal-50 text-teal-600 font-bold rounded-xl hover:bg-teal-100 border border-teal-200 flex items-center gap-2"><CalendarDays className="w-4 h-4" /> Export .ics</button>
                         )}
                     </div>
                     {opp.requiredSkillIds && opp.requiredSkillIds.length > 0 && (
@@ -2317,9 +2587,19 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                 )}
                             </div>
                             {addingProgress && <p className="text-xs text-orange-600 font-semibold">{addingProgress}</p>}
+                            {shiftConflictWarning && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 font-medium">
+                                    <span className="font-bold">Warning:</span> {shiftConflictWarning}
+                                </div>
+                            )}
                             <div className="flex gap-3 justify-end">
-                                <button onClick={() => { setShowAddShift(false); setRepeatMode('none'); setRepeatUntil(''); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
-                                <button onClick={doAddShift} disabled={addingShift || !shiftName || !shiftStart || !shiftEnd} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">{addingShift && <Loader2 className="w-3 h-3 animate-spin" />} {repeatMode !== 'none' && repeatUntil ? 'Add Series' : 'Add'}</button>
+                                <button onClick={() => { setShowAddShift(false); setRepeatMode('none'); setRepeatUntil(''); setShiftConflictWarning(null); setShiftConflictConfirmed(false); }} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl text-sm hover:bg-stone-200">Cancel</button>
+                                {shiftConflictWarning && !shiftConflictConfirmed && (
+                                    <button onClick={() => { setShiftConflictConfirmed(true); void doAddShift(); }} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-sm hover:bg-amber-600">Save Anyway</button>
+                                )}
+                                {!shiftConflictWarning && (
+                                    <button onClick={doAddShift} disabled={addingShift || !shiftName || !shiftStart || !shiftEnd} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2">{addingShift && <Loader2 className="w-3 h-3 animate-spin" />} {repeatMode !== 'none' && repeatUntil ? 'Add Series' : 'Add'}</button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2350,7 +2630,25 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                                 <p className="text-sm text-stone-400 mt-0.5">📅 {new Date(s.startTime).toLocaleString()} — {new Date(s.endTime).toLocaleString()}</p>
                                                 <p className="text-sm text-stone-400">👥 {s.currentCount}/{s.maxCapacity} filled</p>
                                             </div>
-                                            <div className="flex gap-2 shrink-0 ml-3">
+                                            <div className="flex gap-2 shrink-0 ml-3 relative">
+                                                {/* Feature 4: Reminder bell */}
+                                                <button onClick={() => setShowReminderPicker(v => v === s.shiftId ? null : s.shiftId)} className="p-2 text-stone-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors" title="Set reminder"><Bell className="w-4 h-4" /></button>
+                                                {showReminderPicker === s.shiftId && (
+                                                    <div className="absolute right-0 top-10 bg-white border border-stone-200 rounded-xl shadow-lg z-30 p-2 min-w-[180px]">
+                                                        <p className="text-xs font-bold text-stone-500 px-2 py-1 uppercase tracking-wide">Remind me</p>
+                                                        {[{ label: '24 hours before', hours: 24 }, { label: '48 hours before', hours: 48 }, { label: '1 week before', hours: 168 }].map(opt => (
+                                                            <button key={opt.hours} onClick={() => {
+                                                                if (!auth.linkedGrainId) return;
+                                                                const reminders = getReminders(auth.linkedGrainId).filter(r => r.shiftId !== s.shiftId);
+                                                                reminders.push({ shiftId: s.shiftId, oppId: oppId, shiftName: s.name, startTime: s.startTime, reminderHours: opt.hours, dismissed: false });
+                                                                saveReminders(auth.linkedGrainId, reminders);
+                                                                setShowReminderPicker(null);
+                                                                setReminderToast('Reminder set!');
+                                                                setTimeout(() => setReminderToast(''), 2000);
+                                                            }} className="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 rounded-lg">{opt.label}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <button onClick={() => openEditShift(s)} className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit shift"><Pencil className="w-4 h-4" /></button>
                                                 <button onClick={() => doDeleteShift(s.shiftId)} disabled={deletingShiftId === s.shiftId} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50" title="Delete shift">{deletingShiftId === s.shiftId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
                                             </div>
@@ -2367,15 +2665,35 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                 {pendingApps.length > 0 && (
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                         <h2 className="text-xl font-bold text-stone-800 mb-4">Pending Applications ({pendingApps.length})</h2>
-                        {pendingApps.map(app => (
-                            <div key={app.applicationId} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
-                                <div><p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p><p className="text-sm text-stone-400">{app.shiftName}</p></div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => doApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm hover:bg-emerald-100 disabled:opacity-50">Approve</button>
-                                    <button onClick={() => doReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 disabled:opacity-50">Reject</button>
+                        {pendingApps.map(app => {
+                            // Feature 6: Skill match badge
+                            const skillBadge = skillMatchBadge(opp?.requiredSkillIds ?? [], app.volunteerId, detailVolunteerProfiles);
+                            // Feature 7: Volunteer conflict check
+                            const otherApps = volunteerOtherApps.get(app.volunteerId) ?? [];
+                            const approvedOtherApps = otherApps.filter(a => (a.status === 'Approved' || a.status === 'Promoted') && a.applicationId !== app.applicationId);
+                            const hasConflict = opp ? approvedOtherApps.some(oa => {
+                                const appShift = opp.shifts.find(s => s.shiftId === app.shiftId);
+                                const otherShift = opp.shifts.find(s => s.shiftId === oa.shiftId);
+                                if (!appShift || !otherShift) return false;
+                                return shiftsOverlap(otherShift.startTime, otherShift.endTime, appShift.startTime, appShift.endTime);
+                            }) : false;
+                            return (
+                                <div key={app.applicationId} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-bold text-stone-800">{app.volunteerName || app.volunteerId.substring(0, 12)}</p>
+                                            {skillBadge}
+                                            {hasConflict && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">⚠ May have conflict</span>}
+                                        </div>
+                                        <p className="text-sm text-stone-400">{app.shiftName}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => doApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm hover:bg-emerald-100 disabled:opacity-50">Approve</button>
+                                        <button onClick={() => doReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 disabled:opacity-50">Reject</button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
                 {pendingApps.length === 0 && <Empty msg="No pending applications." />}
@@ -2446,9 +2764,22 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                             <button onClick={() => openAdjust(rec)} className="px-3 py-1.5 bg-blue-50 text-blue-600 font-bold rounded-lg text-sm hover:bg-blue-100 flex items-center gap-1"><Pencil className="w-3 h-3" /> Adjust</button>
                                         )}
                                         {status === 'Disputed' && rec && (
-                                            <button onClick={() => { setResolveRec(rec); setResolveForm({ resolution: '', adjustedHours: String((rec.totalHours ?? 0).toFixed(2)) }); setShowResolve(true); }} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 flex items-center gap-1">
-                                                <AlertTriangle className="w-3 h-3" /> Resolve Dispute
-                                            </button>
+                                            <>
+                                                {/* Feature 5: Dispute pipeline display */}
+                                                <div className="flex items-center gap-1 text-xs font-bold">
+                                                    <span className="px-2 py-1 rounded-lg bg-rose-100 text-rose-700">Open</span>
+                                                    <span className="text-stone-300">→</span>
+                                                    <span className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700">Under Review</span>
+                                                    <span className="text-stone-300">→</span>
+                                                    <span className="px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">Resolved</span>
+                                                </div>
+                                                <button onClick={() => doMarkUnderReview(rec)} disabled={reviewingId === rec.attendanceId} className="px-3 py-1.5 bg-amber-50 text-amber-700 font-bold rounded-lg text-sm hover:bg-amber-100 flex items-center gap-1 disabled:opacity-50">
+                                                    {reviewingId === rec.attendanceId ? <Loader2 className="w-3 h-3 animate-spin" /> : <AlertTriangle className="w-3 h-3" />} Mark Under Review
+                                                </button>
+                                                <button onClick={() => { setResolveRec(rec); setResolveForm({ resolution: '', adjustedHours: String((rec.totalHours ?? 0).toFixed(2)) }); setShowResolve(true); }} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 flex items-center gap-1">
+                                                    <AlertTriangle className="w-3 h-3" /> Resolve Dispute
+                                                </button>
+                                            </>
                                         )}
                                         {status !== 'Confirmed' && (
                                             <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
@@ -2557,6 +2888,26 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
             <OppDetailModal show={showNotify} onClose={() => setShowNotify(false)} title="Notify Volunteers">
                 <div className="space-y-4">
+                    {/* Feature 8: Message history */}
+                    {auth.linkedGrainId && (() => {
+                        const history = getMsgHistory(auth.linkedGrainId).filter(h => h.oppTitle === opp?.info.title).slice(0, 10);
+                        if (history.length === 0) return null;
+                        return (
+                            <div>
+                                <button onClick={() => setShowNotifyHistory(v => !v)} className="text-xs font-bold text-violet-500 hover:text-violet-700">{showNotifyHistory ? 'Hide history' : `Show history (${history.length})`}</button>
+                                {showNotifyHistory && (
+                                    <div className="mt-2 space-y-1.5 max-h-36 overflow-y-auto">
+                                        {history.map((h, i) => (
+                                            <div key={i} className="bg-stone-50 rounded-lg px-3 py-2 text-xs text-stone-600">
+                                                <div className="flex justify-between text-stone-400 mb-0.5"><span>To: {h.toName}</span><span>{new Date(h.ts).toLocaleDateString()}</span></div>
+                                                <p className="truncate">{h.text.slice(0, 60)}{h.text.length > 60 ? '…' : ''}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                     <div>
                         <label className="text-sm font-bold text-stone-600 mb-2 block">Send to</label>
                         <select value={notifyTarget} onChange={e => setNotifyTarget(e.target.value as 'Approved' | 'All')} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm">

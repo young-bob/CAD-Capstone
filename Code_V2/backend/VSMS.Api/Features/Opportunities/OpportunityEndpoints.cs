@@ -246,6 +246,38 @@ public static class OpportunityEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/{id:guid}/clone", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            if (!await http.CanManageOpportunityAsync(db, id, grains))
+                return Results.Forbid();
+
+            var source = await grains.GetGrain<IOpportunityGrain>(id).GetState();
+            var orgGrain = grains.GetGrain<IOrganizationGrain>(source.OrganizationId);
+            var newId = await orgGrain.CreateOpportunity(
+                source.Info.Title + " (Copy)",
+                source.Info.Description,
+                source.Info.Category);
+
+            var newGrain = grains.GetGrain<IOpportunityGrain>(newId);
+
+            if (source.GeoFence is { } geo)
+                await newGrain.SetGeoFence(geo.Latitude, geo.Longitude, geo.RadiusMeters);
+
+            if (source.RequiredSkillIds.Count > 0)
+                await newGrain.SetRequiredSkills(source.RequiredSkillIds);
+
+            // Clone shifts, offset so the first shift starts 7 days from now
+            if (source.Shifts.Count > 0)
+            {
+                var firstStart = source.Shifts.Min(s => s.StartTime);
+                var offset = DateTime.UtcNow.AddDays(7) - firstStart;
+                foreach (var shift in source.Shifts.OrderBy(s => s.StartTime))
+                    await newGrain.AddShift(shift.Name, shift.StartTime + offset, shift.EndTime + offset, shift.MaxCapacity);
+            }
+
+            return Results.Ok(new { opportunityId = newId });
+        });
+
         group.MapPost("/{id:guid}/notify", async (Guid id, NotifyVolunteersRequest req, HttpContext http, AppDbContext db, IGrainFactory grains, IApplicationQueryService queryService) =>
         {
             if (!await http.CanManageOpportunityAsync(db, id, grains))

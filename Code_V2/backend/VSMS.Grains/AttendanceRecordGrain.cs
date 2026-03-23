@@ -231,9 +231,29 @@ public class AttendanceRecordGrain(
             $"Dispute raised for attendance {this.GetPrimaryKey()}: {reason}");
     }
 
-    public async Task ResolveDispute(Guid resolverId, string resolution, double adjustedHours)
+    public async Task MarkDisputeUnderReview(Guid coordinatorId)
     {
         if (state.State.Status != AttendanceStatus.Disputed)
+            throw new InvalidOperationException("No active dispute to review.");
+
+        if (state.State.DisputeLog != null)
+            state.State.DisputeLog.Status = DisputeStatus.UnderReview;
+
+        state.State.Modifications.Add(new AuditLog
+        {
+            OperatorId = coordinatorId,
+            Action = "MarkedUnderReview",
+            Reason = "Dispute marked under review by coordinator"
+        });
+        await state.WriteStateAsync();
+
+        logger.LogInformation("Attendance {Id} dispute marked under review by coordinator {CoordId}",
+            this.GetPrimaryKey(), coordinatorId);
+    }
+
+    public async Task ResolveDispute(Guid resolverId, string resolution, double adjustedHours)
+    {
+        if (state.State.Status is not (AttendanceStatus.Disputed))
             throw new InvalidOperationException("No active dispute to resolve.");
 
         if (state.State.DisputeLog != null)

@@ -78,4 +78,8 @@ export const opportunityService = {
         const res = await api.post<{ sent: number }>(`/api/opportunities/${id}/notify`, data);
         return res.data;
     },
+    clone: async (id: string): Promise<{ opportunityId: string }> => {
+        const res = await api.post<{ opportunityId: string }>(`/api/opportunities/${id}/clone`);
+        return res.data;
+    },
 };
