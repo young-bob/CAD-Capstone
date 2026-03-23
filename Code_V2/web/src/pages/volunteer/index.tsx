@@ -183,6 +183,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const [error, setError] = useState('');
     const [orgRecs, setOrgRecs] = useState<OrgRecommendation[]>([]);
     const [followedOrgIdsDash, setFollowedOrgIdsDash] = useState<Set<string>>(new Set());
+    const [showAllActivity, setShowAllActivity] = useState(false);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -499,25 +500,38 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 </div>
             </div>
 
-            <ActivityFeed items={[
-                ...apps.map((a): ActivityItem => ({
-                    id: `app-${a.applicationId}`,
-                    type: a.status === 'Approved' ? 'approved'
-                        : a.status === 'Rejected' ? 'rejected'
-                        : a.status === 'Completed' ? 'completed'
-                        : 'applied',
-                    label: formatEventTitle(a.opportunityTitle, a.shiftName),
-                    sub: a.status === 'Pending' ? 'Application submitted' : `Status: ${a.status}`,
-                    timestamp: a.appliedAt,
-                })),
-                ...attendance.filter(a => a.checkInTime).map((a): ActivityItem => ({
-                    id: `att-${a.attendanceId}`,
-                    type: a.checkOutTime ? 'checked_out' : 'checked_in',
-                    label: a.opportunityTitle ?? 'Volunteer shift',
-                    sub: a.checkOutTime ? `Checked out · ${(a.totalHours ?? 0).toFixed(1)} hrs` : 'Checked in',
-                    timestamp: a.checkInTime!,
-                })),
-            ]} />
+            {(() => {
+                const allActivityItems: ActivityItem[] = [
+                    ...apps.map((a): ActivityItem => ({
+                        id: `app-${a.applicationId}`,
+                        type: a.status === 'Approved' ? 'approved'
+                            : a.status === 'Rejected' ? 'rejected'
+                            : a.status === 'Completed' ? 'completed'
+                            : 'applied',
+                        label: formatEventTitle(a.opportunityTitle, a.shiftName),
+                        sub: a.status === 'Pending' ? 'Application submitted' : `Status: ${a.status}`,
+                        timestamp: a.appliedAt,
+                    })),
+                    ...attendance.filter(a => a.checkInTime).map((a): ActivityItem => ({
+                        id: `att-${a.attendanceId}`,
+                        type: a.checkOutTime ? 'checked_out' : 'checked_in',
+                        label: a.opportunityTitle ?? 'Volunteer shift',
+                        sub: a.checkOutTime ? `Checked out · ${(a.totalHours ?? 0).toFixed(1)} hrs` : 'Checked in',
+                        timestamp: a.checkInTime!,
+                    })),
+                ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                const visibleItems = showAllActivity ? allActivityItems : allActivityItems.slice(0, 5);
+                return (<>
+                    <ActivityFeed items={visibleItems} />
+                    {allActivityItems.length > 5 && (
+                        <div className="text-center">
+                            <button onClick={() => setShowAllActivity(v => !v)} className="text-sm text-orange-600 font-bold hover:underline">
+                                {showAllActivity ? 'Show less' : `Show all ${allActivityItems.length} activities`}
+                            </button>
+                        </div>
+                    )}
+                </>);
+            })()}
 
             {/* Suggested Organizations */}
             {orgRecs.length > 0 && (

@@ -407,17 +407,22 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
                         {upcomingWorkload.length === 0 ? (
                             <p className="text-sm text-stone-400">No upcoming shifts yet.</p>
                         ) : (
-                            <div className="divide-y divide-stone-50">
-                                {upcomingWorkload.map(app => (
-                                    <div key={app.applicationId} className="py-3 flex items-center justify-between gap-3">
-                                        <div>
-                                            <p className="font-semibold text-stone-800 text-sm">{app.opportunityTitle}</p>
-                                            <p className="text-xs text-stone-400 mt-0.5">{app.shiftName} · {formatDateTime(app.shiftStartTime)} · {app.volunteerName}</p>
+                            <>
+                                <div className="divide-y divide-stone-50">
+                                    {upcomingWorkload.slice(0, 5).map(app => (
+                                        <div key={app.applicationId} className="py-3 flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold text-stone-800 text-sm">{app.opportunityTitle}</p>
+                                                <p className="text-xs text-stone-400 mt-0.5">{app.shiftName} · {formatDateTime(app.shiftStartTime)} · {app.volunteerName}</p>
+                                            </div>
+                                            <StatusBadge status={app.status} />
                                         </div>
-                                        <StatusBadge status={app.status} />
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                                {upcomingWorkload.length > 5 && (
+                                    <p className="text-xs text-stone-400 mt-3 text-center">+{upcomingWorkload.length - 5} more shifts — check Manage Events for full list</p>
+                                )}
+                            </>
                         )}
                     </div>
 
@@ -1022,8 +1027,14 @@ export function CoordApplications() {
     const [error, setError] = useState('');
     const [actionId, setActionId] = useState<string | null>(null);
     const [toast, setToast] = useState('');
-    const nonWaitlistedApps = apps.filter(a => a.status !== 'Waitlisted' && a.status !== 'Promoted');
-    const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(nonWaitlistedApps);
+    const [appTab, setAppTab] = useState<'pending' | 'waitlisted' | 'approved' | 'rejected'>('pending');
+    const tabApps = apps.filter(a => {
+        if (appTab === 'pending') return a.status === 'Pending';
+        if (appTab === 'waitlisted') return a.status === 'Waitlisted' || a.status === 'Promoted';
+        if (appTab === 'approved') return a.status === 'Approved' || a.status === 'Promoted';
+        return a.status === 'Rejected' || a.status === 'NoShow' || a.status === 'Withdrawn';
+    });
+    const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(tabApps);
     const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [volunteerProfiles, setVolunteerProfiles] = useState<Map<string, VolunteerProfile>>(new Map());
@@ -1130,6 +1141,8 @@ export function CoordApplications() {
 
     const pendingAppsList = apps.filter(a => a.status === 'Pending');
     const waitlistedApps = apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted');
+    const approvedCount = apps.filter(a => a.status === 'Approved' || a.status === 'Promoted').length;
+    const rejectedCount = apps.filter(a => a.status === 'Rejected' || a.status === 'NoShow' || a.status === 'Withdrawn').length;
     const selectAllPending = () => setSelectedApps(new Set(pendingAppsList.map(a => a.applicationId)));
     const deselectAll = () => setSelectedApps(new Set());
 
@@ -1201,20 +1214,14 @@ export function CoordApplications() {
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            <div className="flex justify-between items-start">
-                <div><h1 className="text-3xl font-extrabold text-stone-800">Review Applications</h1><p className="text-stone-500 mt-2 text-lg">Approve or reject volunteer requests.</p></div>
+            <div className="flex justify-between items-start flex-wrap gap-3">
+                <div><h1 className="text-3xl font-extrabold text-stone-800">Applications</h1><p className="text-stone-500 mt-1">Manage volunteer applications for your events.</p></div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowCredOnly(v => !v)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${showCredOnly ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700'}`}
-                    >
+                    <button onClick={() => setShowCredOnly(v => !v)} className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${showCredOnly ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700'}`}>
                         <ShieldCheck className="w-4 h-4" /> {showCredOnly ? 'Credentialed only' : 'All applicants'}
                     </button>
                     {apps.length > 0 && (
-                        <button
-                            onClick={() => downloadCsv('applications', apps.map(a => ({ Volunteer: a.volunteerName, Opportunity: a.opportunityTitle, Shift: a.shiftName, Status: a.status, Applied: new Date(a.appliedAt).toLocaleDateString() })))}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors"
-                        >
+                        <button onClick={() => downloadCsv('applications', apps.map(a => ({ Volunteer: a.volunteerName, Opportunity: a.opportunityTitle, Shift: a.shiftName, Status: a.status, Applied: new Date(a.appliedAt).toLocaleDateString() })))} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 text-sm font-medium transition-colors">
                             <Download className="w-4 h-4" /> Export CSV
                         </button>
                     )}
@@ -1222,6 +1229,21 @@ export function CoordApplications() {
             </div>
             <OrgPendingBanner />
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
+
+            {/* Status Tabs */}
+            <div className="flex gap-1 bg-stone-100 rounded-2xl p-1">
+                {([
+                    { key: 'pending', label: 'Pending', count: pendingAppsList.length, color: 'bg-amber-500' },
+                    { key: 'waitlisted', label: 'Waitlist', count: waitlistedApps.length, color: 'bg-blue-500' },
+                    { key: 'approved', label: 'Approved', count: approvedCount, color: 'bg-emerald-500' },
+                    { key: 'rejected', label: 'Rejected', count: rejectedCount, color: 'bg-stone-400' },
+                ] as const).map(tab => (
+                    <button key={tab.key} onClick={() => { setAppTab(tab.key); setSelectedApps(new Set()); }} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${appTab === tab.key ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                        {tab.label}
+                        {tab.count > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full text-white ${tab.color}`}>{tab.count}</span>}
+                    </button>
+                ))}
+            </div>
             {selectedApps.size > 0 && (
                 <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3">
                     <span className="text-orange-700 font-bold text-sm">{selectedApps.size} selected ({selectedPendingCount} pending)</span>
@@ -1232,16 +1254,15 @@ export function CoordApplications() {
                     </div>
                 </div>
             )}
-            {pendingAppsList.length > 1 && selectedApps.size === 0 && (
+            {appTab === 'pending' && pendingAppsList.length > 1 && selectedApps.size === 0 && (
                 <div className="flex items-center gap-2 text-sm text-stone-400">
                     <button onClick={selectAllPending} className="text-orange-600 font-bold hover:underline">Select all {pendingAppsList.length} pending</button>
                 </div>
             )}
-            {!loading && waitlistedApps.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-3xl p-6 space-y-3">
-                    <h2 className="text-lg font-bold text-blue-800">Waitlist ({waitlistedApps.length})</h2>
+            {appTab === 'waitlisted' && !loading && waitlistedApps.length > 0 && (
+                <div className="space-y-3">
                     {waitlistedApps.map((app, idx) => (
-                        <div key={app.applicationId} className="bg-white rounded-2xl px-5 py-3 border border-blue-100 flex items-center justify-between gap-4">
+                        <div key={app.applicationId} className="bg-white rounded-2xl px-5 py-4 border border-stone-100 shadow-sm flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-sm font-bold text-blue-400 w-6 text-center">#{idx + 1}</span>
                                 <div>
@@ -1259,7 +1280,7 @@ export function CoordApplications() {
                     ))}
                 </div>
             )}
-            {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
+            {loading ? <Spinner /> : appTab === 'waitlisted' ? null : tabApps.length === 0 ? <Empty msg={`No ${appTab} applications.`} /> : (
                 <div className="grid gap-4">
                     {filteredApps.map(app => {
                         const profile = volunteerProfiles.get(app.volunteerId);
@@ -2097,6 +2118,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setNotifying(false); }
     };
 
+    const [detailTab, setDetailTab] = useState<'overview' | 'applications' | 'attendance'>('overview');
     const pendingApps = apps.filter(a => a.status === 'Pending');
     const confirmedApps = apps.filter(a => a.status === 'Approved' || a.status === 'Promoted');
     const statusColors: Record<string, string> = { Published: 'bg-emerald-100 text-emerald-700', Draft: 'bg-stone-100 text-stone-500', InProgress: 'bg-blue-100 text-blue-700', Completed: 'bg-emerald-100 text-emerald-700', Cancelled: 'bg-rose-100 text-rose-700' };
@@ -2160,8 +2182,22 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     )}
                 </div>
 
-                {/* Shifts */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
+                {/* Tab Bar */}
+                <div className="flex gap-1 bg-stone-100 rounded-2xl p-1">
+                    {([
+                        { key: 'overview', label: 'Overview & Shifts', badge: opp.shifts.length, badgeColor: 'bg-stone-400' },
+                        { key: 'applications', label: 'Applications', badge: pendingApps.length, badgeColor: pendingApps.length > 0 ? 'bg-amber-500' : 'bg-stone-400' },
+                        { key: 'attendance', label: 'Attendance', badge: attendanceRecords.filter(r => r.status === 'CheckedIn').length, badgeColor: 'bg-blue-500' },
+                    ] as const).map(tab => (
+                        <button key={tab.key} onClick={() => setDetailTab(tab.key)} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${detailTab === tab.key ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}>
+                            {tab.label}
+                            {tab.badge > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full text-white ${tab.badgeColor}`}>{tab.badge}</span>}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Shifts (Overview tab) */}
+                {detailTab === 'overview' && <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                     <div className="flex justify-between items-center mb-5">
                         <h2 className="text-xl font-bold text-stone-800">Shifts</h2>
                         <button onClick={() => setShowAddShift(!showAddShift)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-bold rounded-xl text-sm hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Shift</button>
@@ -2228,9 +2264,10 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                             ))}
                         </div>
                     )}
-                </div>
+                </div>}
 
-                {/* Pending Apps */}
+                {/* Applications tab */}
+                {detailTab === 'applications' && (<>
                 {pendingApps.length > 0 && (
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                         <h2 className="text-xl font-bold text-stone-800 mb-4">Pending Applications ({pendingApps.length})</h2>
@@ -2245,9 +2282,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         ))}
                     </div>
                 )}
+                {pendingApps.length === 0 && <Empty msg="No pending applications." />}
+                </>)}
 
-                {/* Attendance Management */}
-                {confirmedApps.length > 0 && (
+                {/* Attendance tab */}
+                {detailTab === 'attendance' && confirmedApps.length === 0 && <Empty msg="No approved volunteers yet." />}
+                {detailTab === 'attendance' && confirmedApps.length > 0 && (
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
                         <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
                             <div className="flex items-center gap-3">
@@ -2431,6 +2471,8 @@ export function CoordReports() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [fetched, setFetched] = useState(false);
+    const [collapsedOpps, setCollapsedOpps] = useState<Set<string>>(new Set());
+    const toggleCollapse = (id: string) => setCollapsedOpps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
     const fetchReport = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -2528,27 +2570,33 @@ export function CoordReports() {
                     {records.length === 0 ? (
                         <div className="bg-white rounded-3xl p-10 text-center text-stone-400 border border-stone-100">No completed attendance records found for this period.</div>
                     ) : (
-                        <div className="space-y-6">
-                            {Object.entries(byOpp).map(([oppId, { title, records: oppRecords }]) => {
+                        <div className="space-y-4">
+                            {Object.entries(byOpp).map(([oid, { title, records: oppRecords }]) => {
                                 const oppHours = oppRecords.reduce((s, r) => s + r.totalHours, 0);
+                                const collapsed = collapsedOpps.has(oid);
                                 return (
-                                    <div key={oppId} className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
-                                        <div className="flex justify-between items-center px-6 py-4 border-b border-stone-100 bg-stone-50">
+                                    <div key={oid} className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
+                                        <button onClick={() => toggleCollapse(oid)} className="w-full flex justify-between items-center px-6 py-4 bg-stone-50 hover:bg-stone-100 transition-colors text-left">
                                             <h3 className="font-bold text-stone-800">{title}</h3>
-                                            <span className="text-sm font-bold text-orange-600">{oppHours.toFixed(1)} hrs - {oppRecords.length} volunteer{oppRecords.length !== 1 ? 's' : ''}</span>
-                                        </div>
-                                        <div className="divide-y divide-stone-50">
-                                            {oppRecords.map(r => (
-                                                <div key={r.attendanceId} className="flex items-center justify-between px-6 py-3 text-sm">
-                                                    <span className="font-medium text-stone-700">{r.volunteerName}</span>
-                                                    <div className="flex items-center gap-4 text-stone-400 text-xs">
-                                                        <span>{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-'}</span>
-                                                        <span className="font-bold text-stone-600">{r.totalHours.toFixed(2)} hrs</span>
-                                                        <span className={'px-2 py-0.5 rounded-full font-bold ' + (r.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{r.status}</span>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <span className="text-sm font-bold text-orange-600">{oppHours.toFixed(1)} hrs · {oppRecords.length} volunteer{oppRecords.length !== 1 ? 's' : ''}</span>
+                                                <ChevronLeft className={`w-4 h-4 text-stone-400 transition-transform ${collapsed ? '-rotate-90' : 'rotate-90'}`} />
+                                            </div>
+                                        </button>
+                                        {!collapsed && (
+                                            <div className="divide-y divide-stone-50">
+                                                {oppRecords.map(r => (
+                                                    <div key={r.attendanceId} className="flex items-center justify-between px-6 py-3 text-sm">
+                                                        <span className="font-medium text-stone-700">{r.volunteerName}</span>
+                                                        <div className="flex items-center gap-4 text-stone-400 text-xs">
+                                                            <span>{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-'}</span>
+                                                            <span className="font-bold text-stone-600">{r.totalHours.toFixed(2)} hrs</span>
+                                                            <span className={'px-2 py-0.5 rounded-full font-bold ' + (r.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{r.status}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
