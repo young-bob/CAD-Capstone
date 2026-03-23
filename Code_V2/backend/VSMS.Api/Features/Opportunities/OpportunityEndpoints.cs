@@ -5,6 +5,7 @@ using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
 using VSMS.Api.Extensions;
 using VSMS.Infrastructure.Data.EfCoreQuery;
+using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
 namespace VSMS.Api.Features.Opportunities;
 
@@ -259,6 +260,26 @@ public static class OpportunityEndpoints
 
             if (targetIds.Count > 0)
             {
+                // Get sender name from opportunity read model
+                var opp = await db.OpportunityReadModels.AsNoTracking().FirstOrDefaultAsync(o => o.OpportunityId == id);
+                var senderName = opp?.OrganizationName ?? "Coordinator";
+
+                // Persist notification records so volunteers can see them in their web inbox
+                var now = DateTime.UtcNow;
+                var notifications = targetIds.Select(volunteerId => new NotificationEntity
+                {
+                    Id = Guid.NewGuid(),
+                    VolunteerGrainId = volunteerId,
+                    Title = "Message from " + senderName,
+                    Message = req.Message,
+                    SenderName = senderName,
+                    SentAt = now,
+                    IsRead = false,
+                }).ToList();
+                db.Notifications.AddRange(notifications);
+                await db.SaveChangesAsync();
+
+                // Also send Expo push notification (for mobile)
                 var notificationGrain = grains.GetGrain<INotificationGrain>(Guid.Empty);
                 await notificationGrain.SendBulkNotification(targetIds, "Coordinator Message", req.Message);
             }

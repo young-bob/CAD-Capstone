@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2, ExternalLink, Mail } from 'lucide-react';
+import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2, ExternalLink, Mail, Bell, X, CheckCheck } from 'lucide-react';
 import EventCalendar from '../../components/EventCalendar';
 import ImpactRing from '../../components/ImpactRing';
 import AttendanceHeatmap from '../../components/AttendanceHeatmap';
 import StreakCard, { computeStreak } from '../../components/StreakCard';
 import StatusBadge from '../../components/StatusBadge';
 import { SkeletonDashboard } from '../../components/Skeleton';
-import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift, OrganizationSummary, OrgRecommendation } from '../../types';
+import type { ViewName, OpportunitySummary, OpportunityRecommendation, ApplicationSummary, AttendanceSummary, VolunteerProfile, Skill, CertificateTemplate, OpportunityState, Shift, OrganizationSummary, OrgRecommendation, NotificationItem } from '../../types';
 import { organizationService } from '../../services/organizations';
 import { timeAgo } from '../../utils/timeAgo';
 import { ApplicationStatus, AttendanceStatus } from '../../types';
@@ -16,6 +16,7 @@ import { volunteerService } from '../../services/volunteers';
 import { opportunityService } from '../../services/opportunities';
 import { applicationService } from '../../services/applications';
 import { attendanceService } from '../../services/attendance';
+import { notificationService } from '../../services/notifications';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
 import { MiniCalendar } from '../../components/MiniCalendar';
@@ -184,6 +185,9 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const [orgRecs, setOrgRecs] = useState<OrgRecommendation[]>([]);
     const [followedOrgIdsDash, setFollowedOrgIdsDash] = useState<Set<string>>(new Set());
     const [showAllActivity, setShowAllActivity] = useState(false);
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [showNotifs, setShowNotifs] = useState(false);
+    const [notifLoading, setNotifLoading] = useState(false);
 
     const load = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -207,6 +211,31 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+
+    const loadNotifications = useCallback(async () => {
+        setNotifLoading(true);
+        try {
+            const data = await notificationService.getMyNotifications();
+            setNotifications(data);
+        } catch { /* silently ignore */ }
+        finally { setNotifLoading(false); }
+    }, []);
+
+    useEffect(() => { loadNotifications(); }, [loadNotifications]);
+
+    const handleMarkAllRead = async () => {
+        try {
+            await notificationService.markAllRead();
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        } catch { /* ignore */ }
+    };
+
+    const handleMarkRead = async (id: string) => {
+        try {
+            await notificationService.markRead(id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        } catch { /* ignore */ }
+    };
 
     // ── Chart data — must be before early returns (Rules of Hooks) ────────────
     const monthlyHours = useMemo(() => {
@@ -289,6 +318,62 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 {/* Glow orb — white in light, amber in dark */}
                 <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-20 pointer-events-none"
                     style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.55) 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
+                {/* Notification bell */}
+                <div className="absolute top-4 right-4 z-10">
+                    <button
+                        onClick={() => { setShowNotifs(v => !v); if (!showNotifs) loadNotifications(); }}
+                        className="relative p-2.5 rounded-xl bg-white/20 hover:bg-white/30 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white transition-colors"
+                    >
+                        <Bell className="w-5 h-5" />
+                        {notifications.filter(n => !n.isRead).length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">
+                                {notifications.filter(n => !n.isRead).length > 9 ? '9+' : notifications.filter(n => !n.isRead).length}
+                            </span>
+                        )}
+                    </button>
+                    {/* Notification dropdown */}
+                    {showNotifs && (
+                        <div className="absolute top-12 right-0 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-zinc-700 overflow-hidden z-50">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-zinc-800">
+                                <h3 className="font-bold text-stone-800 dark:text-zinc-100 text-sm">Messages</h3>
+                                <div className="flex items-center gap-2">
+                                    {notifications.some(n => !n.isRead) && (
+                                        <button onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-semibold hover:underline">
+                                            <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                                        </button>
+                                    )}
+                                    <button onClick={() => setShowNotifs(false)} className="text-stone-400 hover:text-stone-600 dark:text-zinc-500 dark:hover:text-zinc-300">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="max-h-96 overflow-y-auto">
+                                {notifLoading ? (
+                                    <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-orange-400 animate-spin" /></div>
+                                ) : notifications.length === 0 ? (
+                                    <div className="text-center py-10 text-stone-400 dark:text-zinc-500 text-sm">No messages yet</div>
+                                ) : (
+                                    notifications.map(n => (
+                                        <div
+                                            key={n.id}
+                                            onClick={() => !n.isRead && handleMarkRead(n.id)}
+                                            className={`px-4 py-3 border-b border-stone-50 dark:border-zinc-800 last:border-0 cursor-pointer hover:bg-stone-50 dark:hover:bg-zinc-800 transition-colors ${!n.isRead ? 'bg-orange-50/60 dark:bg-orange-950/20' : ''}`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.isRead ? 'bg-orange-400' : 'bg-transparent'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-stone-800 dark:text-zinc-100">{n.title}</p>
+                                                    <p className="text-sm text-stone-600 dark:text-zinc-400 mt-0.5 line-clamp-2">{n.message}</p>
+                                                    <p className="text-xs text-stone-400 dark:text-zinc-500 mt-1">{timeAgo(n.sentAt)}{n.senderName ? ` · ${n.senderName}` : ''}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
                 <div className="relative flex flex-col sm:flex-row items-center gap-8">
                     {/* Impact ring */}
                     <div className="shrink-0">

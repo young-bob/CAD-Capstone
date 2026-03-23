@@ -10,6 +10,7 @@ using VSMS.Api.Features.Files;
 using VSMS.Api.Features.Opportunities;
 using VSMS.Api.Features.Organizations;
 using VSMS.Api.Features.Skills;
+using VSMS.Api.Features.Notifications;
 using VSMS.Api.Features.Volunteers;
 using VSMS.Api.Middleware;
 using VSMS.Infrastructure.Data.EfCoreQuery;
@@ -64,6 +65,7 @@ app.MapFileEndpoints();
 app.MapCertificateEndpoints();
 app.MapCoordinatorEndpoints();
 app.MapSkillEndpoints();
+app.MapNotificationEndpoints();
 
 // ==================== Database Init & Admin Seed ====================
 using (var scope = app.Services.CreateScope())
@@ -119,6 +121,21 @@ static async Task ApplySchemaPatchesAsync(AppDbContext db)
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "Tags"                   text[] NOT NULL DEFAULT '{{}}';""",
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementText" character varying(600);""",
         """ALTER TABLE "OrganizationReadModels" ADD COLUMN IF NOT EXISTS "LatestAnnouncementAt"   timestamp with time zone;""",
+
+        // AddNotifications
+        """
+        CREATE TABLE IF NOT EXISTS "Notifications" (
+            "Id"               uuid NOT NULL,
+            "VolunteerGrainId" uuid NOT NULL,
+            "Title"            character varying(200) NOT NULL,
+            "Message"          text NOT NULL,
+            "SenderName"       character varying(200),
+            "SentAt"           timestamp with time zone NOT NULL,
+            "IsRead"           boolean NOT NULL DEFAULT false,
+            CONSTRAINT "PK_Notifications" PRIMARY KEY ("Id")
+        );
+        """,
+        """CREATE INDEX IF NOT EXISTS "IX_Notifications_VolunteerGrainId_SentAt" ON "Notifications" ("VolunteerGrainId", "SentAt" DESC);""",
     };
 
     foreach (var sql in statements)
