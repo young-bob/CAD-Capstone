@@ -41,12 +41,14 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
 import { VolDashboard, VolOpportunities, VolApplications, VolAttendance, VolCertificates, VolProfile, VolSkills, VolOpportunityDetail, VolOrgs } from './pages/volunteer';
+import VolMessages from './pages/volunteer/VolMessages';
 import { CoordDashboard, CoordManageEvents, CoordApplications, CoordCertTemplates, CoordMembers, CoordOpportunityDetail, CoordReports, CoordVolunteers, OrgProfilePage } from './pages/coordinator';
+import CoordMessages from './pages/coordinator/CoordMessages';
 import { AdminDashboard, AdminOrgs, AdminDisputes, AdminUsers, AdminSkills, AdminSystemInfo } from './pages/admin';
 
 // Views considered "deeper" than dashboard — navigate right when entering them
-const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills', 'orgs',
-    'manage_events', 'org_applications', 'manage_templates', 'org_members', 'coord_reports', 'coord_volunteers', 'org_profile',
+const DEEP_VIEWS = new Set<ViewName>(['opportunities', 'applications', 'attendance', 'certificates', 'profile', 'skills', 'orgs', 'messages',
+    'manage_events', 'org_applications', 'manage_templates', 'org_members', 'coord_reports', 'coord_volunteers', 'org_profile', 'coord_messages',
     'admin_orgs', 'admin_disputes', 'admin_users', 'admin_skills', 'admin_system_info']);
 
 function AppInner() {
@@ -149,6 +151,7 @@ function AppInner() {
                 case 'profile': return <VolProfile onNavigate={setCurrentView} />;
                 case 'skills': return <VolSkills />;
                 case 'orgs': return <VolOrgs />;
+                case 'messages': return <VolMessages />;
                 default: return <VolDashboard onNavigate={navigateTo} />;
             }
         }
@@ -163,6 +166,7 @@ function AppInner() {
                 case 'org_members': return <CoordMembers />;
                 case 'coord_reports': return <CoordReports />;
                 case 'coord_volunteers': return <CoordVolunteers />;
+                case 'coord_messages': return <CoordMessages onNavigate={navigateTo} />;
                 case 'org_profile': return <OrgProfilePage />;
                 default: return <CoordDashboard onNavigate={navigateTo} />;
             }

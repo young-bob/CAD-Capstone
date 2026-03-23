@@ -321,7 +321,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 {/* Notification bell */}
                 <div className="absolute top-4 right-4 z-10">
                     <button
-                        onClick={() => { setShowNotifs(v => !v); if (!showNotifs) loadNotifications(); }}
+                        onClick={() => setShowNotifs(v => { if (!v) loadNotifications(); return !v; })}
                         className="relative p-2.5 rounded-xl bg-white/20 hover:bg-white/30 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white transition-colors"
                     >
                         <Bell className="w-5 h-5" />
@@ -335,7 +335,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                     {showNotifs && (
                         <div className="absolute top-12 right-0 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-zinc-700 overflow-hidden z-50">
                             <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-zinc-800">
-                                <h3 className="font-bold text-stone-800 dark:text-zinc-100 text-sm">Messages</h3>
+                                <h3 className="font-bold text-stone-800 dark:text-zinc-100 text-sm">Notifications</h3>
                                 <div className="flex items-center gap-2">
                                     {notifications.some(n => !n.isRead) && (
                                         <button onClick={handleMarkAllRead} className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 font-semibold hover:underline">
@@ -351,7 +351,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                                 {notifLoading ? (
                                     <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 text-orange-400 animate-spin" /></div>
                                 ) : notifications.length === 0 ? (
-                                    <div className="text-center py-10 text-stone-400 dark:text-zinc-500 text-sm">No messages yet</div>
+                                    <div className="text-center py-10 text-stone-400 dark:text-zinc-500 text-sm">No notifications yet</div>
                                 ) : (
                                     notifications.map(n => (
                                         <div

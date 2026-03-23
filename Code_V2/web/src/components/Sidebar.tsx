@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import {
     Menu, Search, Briefcase, MapPin, User, Award, Activity, Users,
     Building, AlertTriangle, FileCheck, LogOut, Star, UserPlus, Server,
-    ChevronLeft, ChevronRight, BarChart2, Heart, Building2
+    ChevronLeft, ChevronRight, BarChart2, Heart, Building2, MessageSquare
 } from 'lucide-react';
 import type { ViewName } from '../types';
 import SidebarTooltip from './SidebarTooltip';
@@ -41,6 +41,7 @@ const VOLUNTEER_ITEMS: { section: string; items: NavItem[] }[] = [
     {
         section: 'Personal & Assets',
         items: [
+            { view: 'messages',     label: 'Messages',       icon: ({ className }) => <MessageSquare className={className} /> },
             { view: 'certificates', label: 'Certificates',   icon: ({ className }) => <Award className={className} /> },
             { view: 'profile',      label: 'Profile',        icon: ({ className }) => <User className={className} /> },
             { view: 'skills',       label: 'My Skills',      icon: ({ className }) => <Star className={className} /> },
@@ -58,6 +59,7 @@ const COORDINATOR_ITEMS: { section: string; items: NavItem[] }[] = [
             { view: 'org_members',       label: 'Members',         icon: ({ className }) => <UserPlus className={className} /> },
             { view: 'manage_templates',  label: 'Cert Templates',  icon: ({ className }) => <FileCheck className={className} /> },
             { view: 'coord_volunteers',   label: 'Volunteers',      icon: ({ className }) => <Heart className={className} /> },
+            { view: 'coord_messages',    label: 'Messages',        icon: ({ className }) => <MessageSquare className={className} /> },
             { view: 'coord_reports',     label: 'Hours Report',    icon: ({ className }) => <BarChart2 className={className} /> },
         ],
     },
