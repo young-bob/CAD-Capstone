@@ -92,6 +92,26 @@ public static class ApplicationEndpoints
             await grain.MarkAsNoShow();
             return Results.NoContent();
         });
+
+        group.MapPost("/{id:guid}/promote", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IApplicationGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
+                return Results.Forbid();
+            await grain.Promote();
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:guid}/waitlist", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IApplicationGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
+                return Results.Forbid();
+            await grain.Waitlist();
+            return Results.NoContent();
+        });
     }
 
 }

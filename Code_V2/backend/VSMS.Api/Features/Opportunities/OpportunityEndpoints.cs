@@ -251,9 +251,11 @@ public static class OpportunityEndpoints
                 return Results.Forbid();
 
             var applications = await queryService.GetByOpportunityAsync(id);
-            var targetIds = req.TargetStatus == "Approved"
-                ? applications.Where(a => a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Promoted).Select(a => a.VolunteerId).Distinct().ToList()
-                : applications.Select(a => a.VolunteerId).Distinct().ToList();
+            var targetIds = req.TargetIds is { Count: > 0 }
+                ? req.TargetIds
+                : req.TargetStatus == "Approved"
+                    ? applications.Where(a => a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Promoted).Select(a => a.VolunteerId).Distinct().ToList()
+                    : applications.Select(a => a.VolunteerId).Distinct().ToList();
 
             if (targetIds.Count > 0)
             {

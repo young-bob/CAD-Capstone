@@ -74,7 +74,7 @@ export const opportunityService = {
     updateShift: async (id: string, shiftId: string, data: { name: string; startTime: string; endTime: string; maxCapacity: number }): Promise<void> => {
         await api.put(`/api/opportunities/${id}/shifts/${shiftId}`, data);
     },
-    notifyVolunteers: async (id: string, data: { message: string; targetStatus: 'Approved' | 'All' }): Promise<{ sent: number }> => {
+    notifyVolunteers: async (id: string, data: { message: string; targetStatus: 'Approved' | 'All'; targetIds?: string[] }): Promise<{ sent: number }> => {
         const res = await api.post<{ sent: number }>(`/api/opportunities/${id}/notify`, data);
         return res.data;
     },

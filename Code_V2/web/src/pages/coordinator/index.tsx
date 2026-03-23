@@ -1022,7 +1022,8 @@ export function CoordApplications() {
     const [error, setError] = useState('');
     const [actionId, setActionId] = useState<string | null>(null);
     const [toast, setToast] = useState('');
-    const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(apps);
+    const nonWaitlistedApps = apps.filter(a => a.status !== 'Waitlisted' && a.status !== 'Promoted');
+    const { visible: visibleApps, hasMore: appsHasMore, sentinelRef: appsSentinel } = useInfiniteList(nonWaitlistedApps);
     const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [volunteerProfiles, setVolunteerProfiles] = useState<Map<string, VolunteerProfile>>(new Map());
@@ -1128,8 +1129,51 @@ export function CoordApplications() {
     });
 
     const pendingAppsList = apps.filter(a => a.status === 'Pending');
+    const waitlistedApps = apps.filter(a => a.status === 'Waitlisted' || a.status === 'Promoted');
     const selectAllPending = () => setSelectedApps(new Set(pendingAppsList.map(a => a.applicationId)));
     const deselectAll = () => setSelectedApps(new Set());
+
+    const handlePromote = async (id: string) => {
+        setActionId(id);
+        try {
+            await applicationService.promote(id);
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: ApplicationStatus.Promoted } : a));
+            showToast('Volunteer promoted from waitlist ✅ — they have 24h to accept');
+            setTimeout(() => { void load(); }, 900);
+        } catch (err: any) { showToast(getErr(err, 'Failed to promote')); }
+        finally { setActionId(null); }
+    };
+
+    const handleWaitlist = async (id: string) => {
+        setActionId(id);
+        try {
+            await applicationService.waitlist(id);
+            setApps(prev => prev.map(a => a.applicationId === id ? { ...a, status: ApplicationStatus.Waitlisted } : a));
+            showToast('Added to waitlist');
+            setTimeout(() => { void load(); }, 900);
+        } catch (err: any) { showToast(getErr(err, 'Failed to add to waitlist')); }
+        finally { setActionId(null); }
+    };
+
+    const [msgApp, setMsgApp] = useState<ApplicationSummary | null>(null);
+    const [msgText, setMsgText] = useState('');
+    const [sending, setSending] = useState(false);
+
+    const doSendMsg = async () => {
+        if (!msgApp || !msgText.trim()) return;
+        setSending(true);
+        try {
+            const res = await opportunityService.notifyVolunteers(msgApp.opportunityId, {
+                message: msgText,
+                targetStatus: 'All',
+                targetIds: [msgApp.volunteerId],
+            });
+            showToast(`Message sent to ${res.sent} volunteer${res.sent !== 1 ? 's' : ''} 📣`);
+            setMsgApp(null);
+            setMsgText('');
+        } catch (err: any) { showToast(getErr(err, 'Failed to send message')); }
+        finally { setSending(false); }
+    };
 
     const handleSetBgc = async (volunteerId: string, status: string) => {
         try {
@@ -1193,6 +1237,28 @@ export function CoordApplications() {
                     <button onClick={selectAllPending} className="text-orange-600 font-bold hover:underline">Select all {pendingAppsList.length} pending</button>
                 </div>
             )}
+            {!loading && waitlistedApps.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-3xl p-6 space-y-3">
+                    <h2 className="text-lg font-bold text-blue-800">Waitlist ({waitlistedApps.length})</h2>
+                    {waitlistedApps.map((app, idx) => (
+                        <div key={app.applicationId} className="bg-white rounded-2xl px-5 py-3 border border-blue-100 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-blue-400 w-6 text-center">#{idx + 1}</span>
+                                <div>
+                                    <p className="font-bold text-stone-800">{app.volunteerName}</p>
+                                    <p className="text-xs text-stone-400">{app.opportunityTitle} · {app.shiftName}</p>
+                                </div>
+                                {app.status === 'Promoted' && <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Pending acceptance</span>}
+                            </div>
+                            {app.status === 'Waitlisted' && (
+                                <button onClick={() => handlePromote(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1 shrink-0">
+                                    {actionId === app.applicationId ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Promote
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
             {loading ? <Spinner /> : apps.length === 0 ? <Empty msg="No applications to review." /> : (
                 <div className="grid gap-4">
                     {filteredApps.map(app => {
@@ -1251,20 +1317,37 @@ export function CoordApplications() {
                                         {actionId === app.applicationId && <p className="text-xs text-orange-600 font-semibold mt-2">Processing review...</p>}
                                     </div>
                                 </div>
-                                {app.status === 'Pending' && (
-                                    <div className="flex gap-3 shrink-0" onClick={e => e.stopPropagation()}>
+                                <div className="flex gap-3 shrink-0 flex-wrap items-center" onClick={e => e.stopPropagation()}>
+                                    <button onClick={(e) => { e.stopPropagation(); setMsgApp(app); setMsgText(''); }} className="p-2 text-stone-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="Message volunteer"><Bell className="w-4 h-4" /></button>
+                                    {app.status === 'Pending' && (<>
                                         <button onClick={() => handleReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
                                             {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Reject
+                                        </button>
+                                        <button onClick={() => handleWaitlist(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-blue-50 text-blue-600 font-bold rounded-xl hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1">
+                                            {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Waitlist
                                         </button>
                                         <button onClick={() => handleApprove(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 disabled:opacity-50 flex items-center gap-1">
                                             {actionId === app.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Approve
                                         </button>
-                                    </div>
-                                )}
+                                    </>)}
+                                </div>
                             </div>
                         );
                     })}
                     {appsHasMore && <div ref={appsSentinel} className="h-6 flex items-center justify-center text-xs text-stone-400">Loading more…</div>}
+                </div>
+            )}
+            {msgApp && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
+                        <div className="flex items-center justify-between"><h3 className="text-lg font-bold text-stone-800">Message Volunteer</h3><button onClick={() => setMsgApp(null)} className="p-1 text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button></div>
+                        <p className="text-sm text-stone-500">To: <span className="font-bold text-stone-700">{msgApp.volunteerName}</span> · {msgApp.opportunityTitle}</p>
+                        <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={4} placeholder="Write your message here…" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-violet-500 outline-none text-sm resize-none" />
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setMsgApp(null)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                            <button onClick={doSendMsg} disabled={sending || !msgText.trim()} className="px-5 py-2.5 bg-violet-500 text-white font-bold rounded-xl hover:bg-violet-600 disabled:opacity-50 flex items-center gap-2">{sending && <Loader2 className="w-4 h-4 animate-spin" />}<Bell className="w-4 h-4" /> Send</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -1749,6 +1832,16 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [notifyTarget, setNotifyTarget] = useState<'Approved' | 'All'>('Approved');
     const [notifying, setNotifying] = useState(false);
 
+    // Live check-in mode
+    const [liveMode, setLiveMode] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+    // Adjust hours
+    const [showAdjust, setShowAdjust] = useState(false);
+    const [adjustRec, setAdjustRec] = useState<AttendanceSummary | null>(null);
+    const [adjustForm, setAdjustForm] = useState({ newCheckIn: '', newCheckOut: '', reason: '' });
+    const [adjusting, setAdjusting] = useState(false);
+
     // Certificate
     const [showCert, setShowCert] = useState(false);
     const [certTemplates, setCertTemplates] = useState<CertificateTemplate[]>([]);
@@ -1773,6 +1866,44 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
     useEffect(() => { load(); }, [load]);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
+
+    const refreshAttendance = useCallback(async () => {
+        try {
+            const att = await attendanceService.getByOpportunity(oppId);
+            setAttendanceRecords(att);
+            setLastUpdated(new Date());
+        } catch {}
+    }, [oppId]);
+
+    useEffect(() => {
+        if (!liveMode) return;
+        const id = setInterval(() => { void refreshAttendance(); }, 15000);
+        return () => clearInterval(id);
+    }, [liveMode, refreshAttendance]);
+
+    const openAdjust = (rec: AttendanceSummary) => {
+        const fmt = (dt: string | null | undefined) => dt ? new Date(dt).toISOString().slice(0, 16) : '';
+        setAdjustRec(rec);
+        setAdjustForm({ newCheckIn: fmt(rec.checkInTime), newCheckOut: fmt(rec.checkOutTime ?? undefined), reason: '' });
+        setShowAdjust(true);
+    };
+
+    const doAdjust = async () => {
+        if (!adjustRec || !adjustForm.newCheckIn || !adjustForm.newCheckOut || !adjustForm.reason) return;
+        setAdjusting(true);
+        try {
+            await attendanceService.adjust(adjustRec.attendanceId, {
+                coordinatorId: auth.linkedGrainId ?? oppId,
+                newCheckIn: new Date(adjustForm.newCheckIn).toISOString(),
+                newCheckOut: new Date(adjustForm.newCheckOut).toISOString(),
+                reason: adjustForm.reason,
+            });
+            setShowAdjust(false);
+            showToast('Hours adjusted ✅');
+            refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed to adjust hours')); }
+        finally { setAdjusting(false); }
+    };
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -2118,13 +2249,22 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                 {/* Attendance Management */}
                 {confirmedApps.length > 0 && (
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100">
-                        <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-xl font-bold text-stone-800">Attendance Management ({confirmedApps.length})</h2>
-                            <div className="flex gap-2 text-xs font-bold">
-                                <span className="px-2 py-1 bg-stone-100 text-stone-500 rounded-lg">{attendanceRecords.filter(r => r.status === 'Pending').length} pending</span>
-                                <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedIn').length} in</span>
-                                <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedOut' || r.status === 'Resolved').length} out</span>
-                                <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg">{attendanceRecords.filter(r => r.status === 'Confirmed').length} confirmed</span>
+                        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl font-bold text-stone-800">Attendance Management ({confirmedApps.length})</h2>
+                                {liveMode && <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-full border border-emerald-200"><span className="animate-pulse">●</span> Live</span>}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="flex gap-2 text-xs font-bold">
+                                    <span className="px-2 py-1 bg-stone-100 text-stone-500 rounded-lg">{attendanceRecords.filter(r => r.status === 'Pending').length} pending</span>
+                                    <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedIn').length} in</span>
+                                    <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg">{attendanceRecords.filter(r => r.status === 'CheckedOut' || r.status === 'Resolved').length} out</span>
+                                    <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg">{attendanceRecords.filter(r => r.status === 'Confirmed').length} confirmed</span>
+                                </div>
+                                <button onClick={() => { setLiveMode(v => !v); if (!liveMode) void refreshAttendance(); }} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${liveMode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'}`}>
+                                    <RefreshCw className={`w-3 h-3 ${liveMode ? 'animate-spin' : ''}`} /> {liveMode ? 'Live On' : 'Go Live'}
+                                </button>
+                                {lastUpdated && <span className="text-xs text-stone-400">Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
                             </div>
                         </div>
                         {confirmedApps.map(app => {
@@ -2165,6 +2305,9 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                         )}
                                         {status === 'Confirmed' && (
                                             <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 font-bold rounded-lg text-sm">✅ Confirmed</span>
+                                        )}
+                                        {rec && (status === 'CheckedOut' || status === 'Confirmed' || status === 'Resolved') && (
+                                            <button onClick={() => openAdjust(rec)} className="px-3 py-1.5 bg-blue-50 text-blue-600 font-bold rounded-lg text-sm hover:bg-blue-100 flex items-center gap-1"><Pencil className="w-3 h-3" /> Adjust</button>
                                         )}
                                         {status !== 'Confirmed' && (
                                             <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
@@ -2232,6 +2375,23 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                     {certTemplates.length === 0 && <p className="text-stone-400 text-sm">No templates. Create one in Cert Templates.</p>}
                 </div>
                 <div className="flex gap-3 justify-end"><button onClick={() => setShowCert(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doIssueCert} disabled={!selTemplate || issuingCert || certTemplates.length === 0} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{issuingCert && <Loader2 className="w-4 h-4 animate-spin" />} Issue</button></div>
+            </OppDetailModal>
+
+            <OppDetailModal show={showAdjust} onClose={() => setShowAdjust(false)} title="Adjust Hours">
+                {(() => {
+                    const adjHours = adjustForm.newCheckIn && adjustForm.newCheckOut
+                        ? Math.max(0, (new Date(adjustForm.newCheckOut).getTime() - new Date(adjustForm.newCheckIn).getTime()) / 3600000)
+                        : null;
+                    return (
+                        <div className="space-y-3">
+                            <div><label className="text-xs font-bold text-stone-500 mb-1 block">New Check-In Time</label><input type="datetime-local" value={adjustForm.newCheckIn} onChange={e => setAdjustForm(p => ({ ...p, newCheckIn: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                            <div><label className="text-xs font-bold text-stone-500 mb-1 block">New Check-Out Time</label><input type="datetime-local" value={adjustForm.newCheckOut} onChange={e => setAdjustForm(p => ({ ...p, newCheckOut: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" /></div>
+                            {adjHours !== null && <p className="text-sm font-bold text-emerald-600">New total: {adjHours.toFixed(2)}h</p>}
+                            <div><label className="text-xs font-bold text-stone-500 mb-1 block">Reason <span className="text-rose-500">*</span></label><textarea value={adjustForm.reason} onChange={e => setAdjustForm(p => ({ ...p, reason: e.target.value }))} placeholder="Explain why hours are being adjusted" rows={2} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" /></div>
+                            <div className="flex gap-3 justify-end pt-1"><button onClick={() => setShowAdjust(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button><button onClick={doAdjust} disabled={adjusting || !adjustForm.newCheckIn || !adjustForm.newCheckOut || !adjustForm.reason} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">{adjusting && <Loader2 className="w-4 h-4 animate-spin" />} Save</button></div>
+                        </div>
+                    );
+                })()}
             </OppDetailModal>
 
             <OppDetailModal show={showNotify} onClose={() => setShowNotify(false)} title="Notify Volunteers">

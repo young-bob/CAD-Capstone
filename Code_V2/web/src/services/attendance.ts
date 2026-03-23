@@ -39,4 +39,7 @@ export const attendanceService = {
         const res = await api.get<DisputeSummary[]>('/api/attendance/disputes/pending');
         return res.data;
     },
+    adjust: async (id: string, data: { coordinatorId: string; newCheckIn: string; newCheckOut: string; reason: string }): Promise<void> => {
+        await api.post(`/api/attendance/${id}/adjust`, data);
+    },
 };

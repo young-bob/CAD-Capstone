@@ -26,4 +26,10 @@ export const applicationService = {
     markNoShow: async (id: string): Promise<void> => {
         await api.post(`/api/applications/${id}/noshow`);
     },
+    promote: async (id: string): Promise<void> => {
+        await api.post(`/api/applications/${id}/promote`);
+    },
+    waitlist: async (id: string): Promise<void> => {
+        await api.post(`/api/applications/${id}/waitlist`);
+    },
 };
