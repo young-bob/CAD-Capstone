@@ -1514,14 +1514,11 @@ interface VolProfileProps { onNavigate?: (view: ViewName) => void; }
 export function VolProfile({ onNavigate }: VolProfileProps) {
     const auth = useAuth();
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
-    const [skills, setSkills] = useState<Skill[]>([]);
-    const [allSkills, setAllSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', bio: '' });
-    const [showAddSkill, setShowAddSkill] = useState(false);
     const [toast, setToast] = useState('');
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -1530,14 +1527,8 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const [p, s, all] = await Promise.all([
-                volunteerService.getProfile(auth.linkedGrainId),
-                skillService.getVolunteerSkills(auth.userId!),
-                skillService.getAll(),
-            ]);
+            const p = await volunteerService.getProfile(auth.linkedGrainId);
             setProfile(p);
-            setSkills(s || []);
-            setAllSkills(all || []);
             setForm({ firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, bio: p.bio });
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
@@ -1583,40 +1574,15 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
         finally { setSigningWaiver(false); }
     };
 
-    const handleRemoveSkill = async (skillId: string) => {
-        if (!auth.userId) return;
-        try {
-            await skillService.removeSkill(auth.userId, skillId);
-            setSkills(prev => prev.filter(s => s.id !== skillId));
-            showToast('Skill removed');
-        } catch (err: any) {
-            setError(getErr(err, 'Failed to remove skill'));
-        }
-    };
-
-    const handleAddSkill = async (skill: Skill) => {
-        if (!auth.userId) return;
-        try {
-            await skillService.addSkill(auth.userId, skill.id);
-            setSkills(prev => [...prev, skill]);
-            showToast(`Added: ${skill.name}`);
-        } catch (err: any) {
-            showToast(getErr(err, 'Failed to add skill'));
-        }
-    };
-
     if (loading) return <Spinner />;
     if (error && !profile) return <ErrorBox msg={error} onRetry={load} />;
-
-    const mySkillIds = new Set(skills.map(s => s.id));
-    const availableToAdd = allSkills.filter(s => !mySkillIds.has(s.id));
 
     const initials = `${form.firstName?.charAt(0) || ''}${form.lastName?.charAt(0) || ''}`.toUpperCase() || '?';
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Profile & Skills</h1></div>
+            <div><h1 className="text-3xl font-extrabold text-stone-800">Profile</h1></div>
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
             {success && <div className="p-3 bg-emerald-50 text-emerald-600 text-sm font-medium rounded-xl border border-emerald-100">{success}</div>}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
@@ -1638,62 +1604,6 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                     {saving ? 'Saving...' : 'Save Profile'}
                 </button>
             </div>
-            {/* Skills section with add */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-stone-800">My Skills</h3>
-                    <button
-                        onClick={() => setShowAddSkill(v => !v)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 hover:bg-orange-100 transition-colors"
-                    >
-                        + Add Skill
-                    </button>
-                </div>
-                {/* 
-<div className="flex flex-wrap gap-3">
-                    {skills.map(s => (
-                        <span key={s.id} className="px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 flex items-center gap-2">
-                            {s.name}
-                            <button onClick={() => handleRemoveSkill(s.id)} className="text-orange-300 hover:text-orange-600 transition-colors text-lg leading-none">×</button>
-                        </span>
-                    ))}
-                    {skills.length === 0 && <span className="text-stone-400 text-sm">No skills added yet.</span>}
-                </div>
-                */}
-
-                <div className="flex flex-wrap gap-3">
-                    {skills.map(s => (
-                        <span key={s.id} className="px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-full text-sm border border-orange-100 flex items-center gap-2">
-                            {s.name}
-                            <button onClick={() => handleRemoveSkill(s.id)} className="text-orange-300 hover:text-orange-600 transition-colors text-lg leading-none">×</button>
-                        </span>
-                    ))}
-                    {skills.length === 0 && <span className="text-stone-400 text-sm">No skills added yet.</span>}
-                </div>
-                {/* Add Skill picker */}
-                {showAddSkill && (
-                    <div className="mt-4 border-t border-stone-100 pt-4">
-                        <p className="text-sm font-medium text-stone-500 mb-3">Select a skill to add:</p>
-                        {availableToAdd.length === 0 ? (
-                            <p className="text-sm text-stone-400">All available skills have been added.</p>
-                        ) : (
-                            <div className="flex flex-wrap gap-2">
-                                {availableToAdd.map(skill => (
-                                    <button
-                                        key={skill.id}
-                                        onClick={() => handleAddSkill(skill)}
-                                        title={skill.description}
-                                        className="px-4 py-2 bg-stone-50 text-stone-600 font-bold rounded-full text-sm border border-stone-200 hover:border-orange-300 hover:text-orange-600 hover:bg-orange-50 transition-all"
-                                    >
-                                        + {skill.name}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
             {/* Upload Credential */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h3 className="text-xl font-bold text-stone-800 mb-2">Credentials</h3>

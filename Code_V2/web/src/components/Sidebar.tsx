@@ -29,37 +29,52 @@ interface NavItem {
 
 const VOLUNTEER_ITEMS: { section: string; items: NavItem[] }[] = [
     {
-        section: 'Core Features',
+        section: 'Main',
         items: [
             { view: 'dashboard',     label: 'Dashboard',         icon: ({ className }) => <Menu className={className} /> },
-            { view: 'opportunities', label: 'Find Opportunities', icon: ({ className }) => <Search className={className} /> },
-            { view: 'orgs',          label: 'Organizations',     icon: ({ className }) => <Building2 className={className} /> },
-            { view: 'applications',  label: 'My Applications',   icon: ({ className }) => <Briefcase className={className} /> },
-            { view: 'attendance',    label: 'Geo Check-in',      icon: ({ className }) => <MapPin className={className} /> },
+            { view: 'messages',      label: 'Messages',          icon: ({ className }) => <MessageSquare className={className} /> },
         ],
     },
     {
-        section: 'Personal & Assets',
+        section: 'Volunteering',
         items: [
-            { view: 'messages',     label: 'Messages',       icon: ({ className }) => <MessageSquare className={className} /> },
-            { view: 'certificates', label: 'Certificates',   icon: ({ className }) => <Award className={className} /> },
-            { view: 'profile',      label: 'Profile',        icon: ({ className }) => <User className={className} /> },
-            { view: 'skills',       label: 'My Skills',      icon: ({ className }) => <Star className={className} /> },
+            { view: 'opportunities', label: 'Find Opportunities', icon: ({ className }) => <Search className={className} /> },
+            { view: 'orgs',          label: 'Organizations',      icon: ({ className }) => <Building2 className={className} /> },
+            { view: 'applications',  label: 'My Applications',    icon: ({ className }) => <Briefcase className={className} /> },
+            { view: 'attendance',    label: 'Geo Check-in',       icon: ({ className }) => <MapPin className={className} /> },
+        ],
+    },
+    {
+        section: 'Profile',
+        items: [
+            { view: 'skills',        label: 'My Skills',          icon: ({ className }) => <Star className={className} /> },
+            { view: 'certificates',  label: 'Certificates',       icon: ({ className }) => <Award className={className} /> },
+            { view: 'profile',       label: 'Profile',            icon: ({ className }) => <User className={className} /> },
         ],
     },
 ];
 
 const COORDINATOR_ITEMS: { section: string; items: NavItem[] }[] = [
     {
-        section: 'Organization',
+        section: 'Overview',
         items: [
             { view: 'dashboard',         label: 'Overview',        icon: ({ className }) => <Activity className={className} /> },
+        ],
+    },
+    {
+        section: 'Management',
+        items: [
             { view: 'manage_events',     label: 'Manage Events',   icon: ({ className }) => <Briefcase className={className} /> },
             { view: 'org_applications',  label: 'Applications',    icon: ({ className }) => <Users className={className} /> },
             { view: 'org_members',       label: 'Members',         icon: ({ className }) => <UserPlus className={className} /> },
-            { view: 'manage_templates',  label: 'Cert Templates',  icon: ({ className }) => <FileCheck className={className} /> },
-            { view: 'coord_volunteers',   label: 'Volunteers',      icon: ({ className }) => <Heart className={className} /> },
+            { view: 'coord_volunteers',  label: 'Volunteers',      icon: ({ className }) => <Heart className={className} /> },
+        ],
+    },
+    {
+        section: 'Tools',
+        items: [
             { view: 'coord_messages',    label: 'Messages',        icon: ({ className }) => <MessageSquare className={className} /> },
+            { view: 'manage_templates',  label: 'Cert Templates',  icon: ({ className }) => <FileCheck className={className} /> },
             { view: 'coord_reports',     label: 'Hours Report',    icon: ({ className }) => <BarChart2 className={className} /> },
         ],
     },
@@ -67,13 +82,23 @@ const COORDINATOR_ITEMS: { section: string; items: NavItem[] }[] = [
 
 const ADMIN_ITEMS: { section: string; items: NavItem[] }[] = [
     {
-        section: 'System Admin',
+        section: 'Overview',
         items: [
             { view: 'dashboard',          label: 'Platform Overview', icon: ({ className }) => <Activity className={className} /> },
+        ],
+    },
+    {
+        section: 'Management',
+        items: [
             { view: 'admin_orgs',         label: 'Organizations',     icon: ({ className }) => <Building className={className} /> },
-            { view: 'admin_disputes',     label: 'Disputes',          icon: ({ className }) => <AlertTriangle className={className} /> },
             { view: 'admin_users',        label: 'User Control',      icon: ({ className }) => <User className={className} /> },
             { view: 'admin_skills',       label: 'Skills',            icon: ({ className }) => <Star className={className} /> },
+        ],
+    },
+    {
+        section: 'Monitoring',
+        items: [
+            { view: 'admin_disputes',     label: 'Disputes',          icon: ({ className }) => <AlertTriangle className={className} /> },
             { view: 'admin_system_info',  label: 'System Info',       icon: ({ className }) => <Server className={className} /> },
         ],
     },
