@@ -12,6 +12,7 @@ using VSMS.Api.Features.Organizations;
 using VSMS.Api.Features.Skills;
 using VSMS.Api.Features.Notifications;
 using VSMS.Api.Features.Volunteers;
+using VSMS.Api.Features.EventTasks;
 using VSMS.Api.Middleware;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 
@@ -66,6 +67,7 @@ app.MapCertificateEndpoints();
 app.MapCoordinatorEndpoints();
 app.MapSkillEndpoints();
 app.MapNotificationEndpoints();
+app.MapEventTaskEndpoints();
 
 // ==================== Database Init & Admin Seed ====================
 using (var scope = app.Services.CreateScope())
@@ -136,6 +138,28 @@ static async Task ApplySchemaPatchesAsync(AppDbContext db)
         );
         """,
         """CREATE INDEX IF NOT EXISTS "IX_Notifications_VolunteerGrainId_SentAt" ON "Notifications" ("VolunteerGrainId", "SentAt" DESC);""",
+
+        // AddEventTasks
+        """
+        CREATE TABLE IF NOT EXISTS "EventTasks" (
+            "Id"                  uuid NOT NULL,
+            "OpportunityId"       uuid NOT NULL,
+            "OrganizationId"      uuid NOT NULL,
+            "Title"               character varying(200) NOT NULL,
+            "Note"                character varying(1000),
+            "AssignedToGrainId"   uuid,
+            "AssignedToEmail"     character varying(256),
+            "AssignedToName"      character varying(200),
+            "IsCompleted"         boolean NOT NULL DEFAULT false,
+            "CreatedByGrainId"    uuid NOT NULL,
+            "CreatedByEmail"      character varying(256),
+            "CreatedAt"           timestamp with time zone NOT NULL,
+            "CompletedAt"         timestamp with time zone,
+            CONSTRAINT "PK_EventTasks" PRIMARY KEY ("Id")
+        );
+        """,
+        """CREATE INDEX IF NOT EXISTS "IX_EventTasks_OpportunityId" ON "EventTasks" ("OpportunityId");""",
+        """CREATE INDEX IF NOT EXISTS "IX_EventTasks_OrganizationId" ON "EventTasks" ("OrganizationId");""",
     };
 
     foreach (var sql in statements)

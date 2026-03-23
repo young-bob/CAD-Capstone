@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw, User, AlertTriangle, Phone } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw, User, AlertTriangle, Phone, Upload, ClipboardList, UserCheck, Check } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import { timeAgo } from '../../utils/timeAgo';
 import OrgHealthCard from '../../components/OrgHealthCard';
@@ -16,6 +16,7 @@ import { applicationService } from '../../services/applications';
 import { certificateService } from '../../services/certificates';
 import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
+import { taskService, type EventTask } from '../../services/tasks';
 import { volunteerService } from '../../services/volunteers';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import EventCalendar from '../../components/EventCalendar';
@@ -798,6 +799,9 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
     const [socialPostOpp, setSocialPostOpp] = useState<OpportunitySummary | null>(null);
     const [orgName, setOrgName] = useState('');
     const [cloningId, setCloningId] = useState<string | null>(null);
+    const [selectedOpps, setSelectedOpps] = useState<Set<string>>(new Set());
+    const [bulkCancelling, setBulkCancelling] = useState(false);
+    const [bulkPublishing, setBulkPublishing] = useState(false);
 
     // Restore draft on mount
     useEffect(() => {
@@ -955,6 +959,33 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         } catch (err: any) {
             setError(getErr(err, 'Failed to clone'));
         } finally { setCloningId(null); }
+    };
+
+    const toggleSelect = (id: string) => setSelectedOpps(prev => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+    });
+    const toggleSelectAll = () => {
+        if (selectedOpps.size === opps.length) setSelectedOpps(new Set());
+        else setSelectedOpps(new Set(opps.map(o => o.opportunityId)));
+    };
+    const handleBulkCancel = async () => {
+        if (!selectedOpps.size) return;
+        setBulkCancelling(true);
+        await Promise.allSettled([...selectedOpps].map(id => opportunityService.cancel(id, 'Bulk cancelled')));
+        setSelectedOpps(new Set());
+        setBulkCancelling(false);
+        await load();
+    };
+    const handleBulkPublish = async () => {
+        if (!selectedOpps.size) return;
+        setBulkPublishing(true);
+        const draftIds = [...selectedOpps].filter(id => opps.find(o => o.opportunityId === id)?.status === 'Draft');
+        await Promise.allSettled(draftIds.map(id => opportunityService.publish(id)));
+        setSelectedOpps(new Set());
+        setBulkPublishing(false);
+        await load();
     };
 
     const handleGetLocation = () => {
@@ -1116,6 +1147,20 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                 />
             )}
             <div className={calendarView ? 'hidden' : ''}>
+            {selectedOpps.size > 0 && (
+                <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+                    <span className="text-sm font-medium text-amber-800 dark:text-amber-200">{selectedOpps.size} selected</span>
+                    <button onClick={handleBulkPublish} disabled={bulkPublishing} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                        {bulkPublishing ? <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> : <Upload size={12} />}
+                        Publish Drafts
+                    </button>
+                    <button onClick={handleBulkCancel} disabled={bulkCancelling} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:opacity-50">
+                        {bulkCancelling ? <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> : <XCircle size={12} />}
+                        Cancel Selected
+                    </button>
+                    <button onClick={() => setSelectedOpps(new Set())} className="ml-auto text-xs text-amber-700 dark:text-amber-300 hover:underline">Clear</button>
+                </div>
+            )}
             {loading ? <Spinner /> : opps.length === 0 ? (
                 <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm text-center">
                     <p className="text-stone-400 font-medium mb-5">No opportunities yet.</p>
@@ -1131,11 +1176,19 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
                 <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 text-sm">
-                            <tr><th className="p-5 font-bold">Event Title</th><th className="p-5 font-bold">Category</th><th className="p-5 font-bold">Status</th><th className="p-5 font-bold">Spots</th><th className="p-5 font-bold">Actions</th></tr>
+                            <tr>
+                                <th className="p-5 font-bold w-10">
+                                    <input type="checkbox" checked={opps.length > 0 && selectedOpps.size === opps.length} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer accent-orange-500" />
+                                </th>
+                                <th className="p-5 font-bold">Event Title</th><th className="p-5 font-bold">Category</th><th className="p-5 font-bold">Status</th><th className="p-5 font-bold">Spots</th><th className="p-5 font-bold">Actions</th>
+                            </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100">
                             {opps.map(o => (
                                 <tr key={o.opportunityId} className={`hover:bg-orange-50/30 cursor-pointer ${publishingId === o.opportunityId ? 'opacity-70' : ''}`} onClick={() => onViewDetail?.(o.opportunityId)}>
+                                    <td className="p-5 w-10" onClick={e => e.stopPropagation()}>
+                                        <input type="checkbox" checked={selectedOpps.has(o.opportunityId)} onChange={() => toggleSelect(o.opportunityId)} className="w-4 h-4 rounded cursor-pointer accent-orange-500" />
+                                    </td>
                                     <td className="p-5 text-stone-800 font-bold text-orange-700 hover:underline">{o.title} →</td>
                                     <td className="p-5 text-stone-500 font-medium">{o.category}</td>
                                     <td className="p-5"><span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[o.status] || 'bg-stone-100 text-stone-600'}`}>{o.status}</span></td>
@@ -2182,6 +2235,17 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [issuingCert, setIssuingCert] = useState(false);
     const [issuedCerts, setIssuedCerts] = useState<Set<string>>(new Set());
 
+    // Tasks tab state
+    const [tasks, setTasks] = useState<EventTask[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(false);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskNote, setNewTaskNote] = useState('');
+    const [newTaskAssignee, setNewTaskAssignee] = useState<string>('');
+    const [creatingTask, setCreatingTask] = useState(false);
+    const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+    const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+    const [taskOrg, setTaskOrg] = useState<OrgState | null>(null);
+
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
@@ -2197,6 +2261,23 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
 
     useEffect(() => { load(); }, [load]);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
+
+    const loadTasks = async () => {
+        setLoadingTasks(true);
+        try {
+            const data = await taskService.getForOpportunity(oppId);
+            setTasks(data);
+        } catch { /* ignore */ }
+        finally { setLoadingTasks(false); }
+    };
+
+    useEffect(() => { void loadTasks(); }, [oppId]);
+
+    // Load org for assignee dropdown
+    useEffect(() => {
+        if (!opp?.organizationId) return;
+        organizationService.getById(opp.organizationId).then(setTaskOrg).catch(() => {});
+    }, [opp?.organizationId]);
 
     // Feature 6 & 7: Load volunteer profiles and other apps after apps load
     useEffect(() => {
@@ -2464,6 +2545,46 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setIssuingCert(false); }
     };
 
+    const handleCreateTask = async () => {
+        if (!newTaskTitle.trim()) return;
+        setCreatingTask(true);
+        try {
+            const assignee = taskOrg?.members?.find(m => m.userId === newTaskAssignee);
+            await taskService.create(oppId, {
+                title: newTaskTitle.trim(),
+                note: newTaskNote.trim() || undefined,
+                assignedToGrainId: newTaskAssignee || undefined,
+                assignedToEmail: assignee?.email,
+                assignedToName: assignee?.email,
+                createdByGrainId: auth.linkedGrainId ?? '',
+                createdByEmail: auth.email ?? undefined,
+            });
+            setNewTaskTitle('');
+            setNewTaskNote('');
+            setNewTaskAssignee('');
+            await loadTasks();
+        } catch { /* ignore */ }
+        finally { setCreatingTask(false); }
+    };
+
+    const handleToggleTask = async (taskId: string) => {
+        setTogglingTaskId(taskId);
+        try {
+            const updated = await taskService.toggleComplete(oppId, taskId);
+            setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+        } catch { /* ignore */ }
+        finally { setTogglingTaskId(null); }
+    };
+
+    const handleDeleteTask = async (taskId: string) => {
+        setDeletingTaskId(taskId);
+        try {
+            await taskService.delete(oppId, taskId);
+            setTasks(prev => prev.filter(t => t.id !== taskId));
+        } catch { /* ignore */ }
+        finally { setDeletingTaskId(null); }
+    };
+
     const doNotify = async () => {
         if (!notifyMsg.trim()) return;
         setNotifying(true);
@@ -2480,7 +2601,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         finally { setNotifying(false); }
     };
 
-    const [detailTab, setDetailTab] = useState<'overview' | 'applications' | 'attendance'>('overview');
+    const [detailTab, setDetailTab] = useState<'overview' | 'applications' | 'attendance' | 'tasks'>('overview');
     const pendingApps = apps.filter(a => a.status === 'Pending');
     const confirmedApps = apps.filter(a => a.status === 'Approved' || a.status === 'Promoted');
     const statusColors: Record<string, string> = { Published: 'bg-emerald-100 text-emerald-700', Draft: 'bg-stone-100 text-stone-500', InProgress: 'bg-blue-100 text-blue-700', Completed: 'bg-emerald-100 text-emerald-700', Cancelled: 'bg-rose-100 text-rose-700' };
@@ -2560,6 +2681,17 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                             {tab.badge > 0 && <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full text-white ${tab.badgeColor}`}>{tab.badge}</span>}
                         </button>
                     ))}
+                    <button
+                        onClick={() => setDetailTab('tasks')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${detailTab === 'tasks' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                    >
+                        Tasks
+                        {tasks.filter(t => !t.isCompleted).length > 0 && (
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full text-white bg-amber-500">
+                                {tasks.filter(t => !t.isCompleted).length}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 {/* Shifts (Overview tab) */}
@@ -2798,6 +2930,128 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         })}
                     </div>
                 )}
+
+                {/* Tasks tab */}
+                {detailTab === 'tasks' && (
+                    <div className="space-y-6">
+                        {/* Create task form */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                            <h3 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                                <ClipboardList size={16} /> New Task
+                            </h3>
+                            <div className="space-y-3">
+                                <input
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                                    placeholder="Task title (e.g. 'Handle check-in table')"
+                                    value={newTaskTitle}
+                                    onChange={e => setNewTaskTitle(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && void handleCreateTask()}
+                                />
+                                <input
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                                    placeholder="Notes (optional)"
+                                    value={newTaskNote}
+                                    onChange={e => setNewTaskNote(e.target.value)}
+                                />
+                                <div className="flex gap-3">
+                                    <select
+                                        className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                                        value={newTaskAssignee}
+                                        onChange={e => setNewTaskAssignee(e.target.value)}
+                                    >
+                                        <option value="">Unassigned</option>
+                                        {(taskOrg?.members ?? []).map(m => (
+                                            <option key={m.userId} value={m.userId}>{m.email} ({m.role})</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => void handleCreateTask()}
+                                        disabled={creatingTask || !newTaskTitle.trim()}
+                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {creatingTask ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Plus size={14} />}
+                                        Add Task
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Task list */}
+                        {loadingTasks ? (
+                            <div className="text-center py-8 text-gray-400">Loading tasks...</div>
+                        ) : tasks.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400">
+                                <ClipboardList size={32} className="mx-auto mb-3 opacity-40" />
+                                <div className="text-sm">No tasks yet. Add one above to delegate responsibilities.</div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {/* Open tasks */}
+                                {tasks.filter(t => !t.isCompleted).map(task => (
+                                    <div key={task.id} className="flex items-start gap-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+                                        <button
+                                            onClick={() => void handleToggleTask(task.id)}
+                                            disabled={togglingTaskId === task.id}
+                                            className="mt-0.5 w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 flex-shrink-0 flex items-center justify-center transition-colors"
+                                        >
+                                            {togglingTaskId === task.id && <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />}
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">{task.title}</div>
+                                            {task.note && <div className="text-xs text-gray-500 mt-0.5">{task.note}</div>}
+                                            <div className="flex items-center gap-3 mt-1.5">
+                                                {task.assignedToEmail ? (
+                                                    <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
+                                                        <UserCheck size={10} /> {task.assignedToEmail}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Unassigned</span>
+                                                )}
+                                                <span className="text-xs text-gray-400">{new Date(task.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => void handleDeleteTask(task.id)}
+                                            disabled={deletingTaskId === task.id}
+                                            className="text-gray-300 hover:text-rose-500 transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {/* Completed tasks */}
+                                {tasks.filter(t => t.isCompleted).length > 0 && (
+                                    <div className="mt-4">
+                                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Completed ({tasks.filter(t => t.isCompleted).length})</div>
+                                        {tasks.filter(t => t.isCompleted).map(task => (
+                                            <div key={task.id} className="flex items-start gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3 mb-2 opacity-60">
+                                                <button
+                                                    onClick={() => void handleToggleTask(task.id)}
+                                                    disabled={togglingTaskId === task.id}
+                                                    className="mt-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-emerald-500 flex-shrink-0 flex items-center justify-center"
+                                                >
+                                                    {togglingTaskId === task.id
+                                                        ? <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                                                        : <Check size={10} className="text-white" />}
+                                                </button>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400 line-through">{task.title}</div>
+                                                    {task.assignedToEmail && (
+                                                        <span className="text-xs text-gray-400">{task.assignedToEmail}</span>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => void handleDeleteTask(task.id)} className="text-gray-300 hover:text-rose-500">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </>)}
 
             {/* Edit Info Modal */}
@@ -2945,6 +3199,22 @@ export function CoordReports() {
     const [fetched, setFetched] = useState(false);
     const [collapsedOpps, setCollapsedOpps] = useState<Set<string>>(new Set());
     const toggleCollapse = (id: string) => setCollapsedOpps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const [reportTab, setReportTab] = useState<'hours' | 'compliance'>('hours');
+    const [complianceVols, setComplianceVols] = useState<OrgVolunteerSummary[]>([]);
+    const [loadingCompliance, setLoadingCompliance] = useState(false);
+
+    const loadCompliance = useCallback(async () => {
+        if (!auth.linkedGrainId) return;
+        setLoadingCompliance(true);
+        try {
+            const vols = await organizationService.getVolunteers(auth.linkedGrainId);
+            setComplianceVols(vols);
+        } finally {
+            setLoadingCompliance(false);
+        }
+    }, [auth.linkedGrainId]);
+
+    useEffect(() => { loadCompliance(); }, [loadCompliance]);
 
     const fetchReport = useCallback(async () => {
         if (!auth.linkedGrainId) return;
@@ -2985,6 +3255,10 @@ export function CoordReports() {
     const uniqueOpps = new Set(records.map(r => r.opportunityId)).size;
     const avgHours = uniqueVolunteers > 0 ? totalHours / uniqueVolunteers : 0;
 
+    const noBgc = complianceVols.filter(v => v.backgroundCheckStatus !== 'Cleared');
+    const noWaiver = complianceVols.filter(v => !v.hasWaiver);
+    const fullyCompliant = complianceVols.filter(v => v.backgroundCheckStatus === 'Cleared' && v.hasWaiver);
+
     const byOpp = records.reduce<Record<string, { title: string; records: AttendanceSummary[] }>>((acc, r) => {
         if (!acc[r.opportunityId]) acc[r.opportunityId] = { title: r.opportunityTitle, records: [] };
         acc[r.opportunityId].records.push(r);
@@ -2995,84 +3269,163 @@ export function CoordReports() {
         <div className="max-w-5xl mx-auto space-y-8">
             <div className="flex justify-between items-start flex-wrap gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-stone-800">Hours Report</h1>
+                    <h1 className="text-3xl font-extrabold text-stone-800">Reports</h1>
                     <p className="text-stone-500 mt-1">Export volunteer hours for accreditation and compliance.</p>
                 </div>
-                {fetched && records.length > 0 && (
+                {reportTab === 'hours' && fetched && records.length > 0 && (
                     <button onClick={handleExportCsv} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600">
                         <Download className="w-4 h-4" /> Export CSV
                     </button>
                 )}
             </div>
 
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-wrap gap-4 items-end">
-                <div className="flex-1 min-w-36">
-                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">From</label>
-                    <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
-                </div>
-                <div className="flex-1 min-w-36">
-                    <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">To</label>
-                    <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
-                </div>
-                <button onClick={fetchReport} disabled={loading} className="px-6 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2 text-sm">
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
-                    {loading ? 'Loading...' : 'Generate Report'}
-                </button>
+            <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+                {(['hours', 'compliance'] as const).map(t => (
+                    <button key={t} onClick={() => setReportTab(t)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${reportTab === t ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                        {t === 'hours' ? 'Hours Report' : 'Compliance'}
+                    </button>
+                ))}
             </div>
 
-            {error && <div className="bg-rose-50 text-rose-600 rounded-2xl px-5 py-4 text-sm font-medium border border-rose-200">{error}</div>}
-
-            {fetched && (
-                <>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {[
-                            { label: 'Total Hours', value: totalHours.toFixed(1), unit: 'hrs', cls: 'bg-blue-50 border-blue-100', valCls: 'text-blue-700' },
-                            { label: 'Volunteers', value: String(uniqueVolunteers), unit: 'people', cls: 'bg-violet-50 border-violet-100', valCls: 'text-violet-700' },
-                            { label: 'Events', value: String(uniqueOpps), unit: 'events', cls: 'bg-orange-50 border-orange-100', valCls: 'text-orange-600' },
-                            { label: 'Avg Hours', value: avgHours.toFixed(1), unit: '/volunteer', cls: 'bg-emerald-50 border-emerald-100', valCls: 'text-emerald-700' },
-                        ].map(c => (
-                            <div key={c.label} className={`rounded-2xl p-5 ${c.cls} border`}>
-                                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-1">{c.label}</p>
-                                <p className={`text-3xl font-extrabold ${c.valCls}`}>{c.value}</p>
-                                <p className="text-xs font-medium text-stone-400 mt-0.5">{c.unit}</p>
-                            </div>
-                        ))}
+            {reportTab === 'compliance' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                            <div className="text-2xl font-bold text-emerald-600">{fullyCompliant.length}</div>
+                            <div className="text-sm text-gray-500 mt-1">Fully Compliant</div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-amber-200 dark:border-amber-700">
+                            <div className="text-2xl font-bold text-amber-600">{noBgc.length}</div>
+                            <div className="text-sm text-gray-500 mt-1">Missing BGC Clearance</div>
+                        </div>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-rose-200 dark:border-rose-700">
+                            <div className="text-2xl font-bold text-rose-600">{noWaiver.length}</div>
+                            <div className="text-sm text-gray-500 mt-1">Waiver Not Signed</div>
+                        </div>
                     </div>
 
-                    {records.length === 0 ? (
-                        <div className="bg-white rounded-3xl p-10 text-center text-stone-400 border border-stone-100">No completed attendance records found for this period.</div>
-                    ) : (
-                        <div className="space-y-4">
-                            {Object.entries(byOpp).map(([oid, { title, records: oppRecords }]) => {
-                                const oppHours = oppRecords.reduce((s, r) => s + r.totalHours, 0);
-                                const collapsed = collapsedOpps.has(oid);
-                                return (
-                                    <div key={oid} className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
-                                        <button onClick={() => toggleCollapse(oid)} className="w-full flex justify-between items-center px-6 py-4 bg-stone-50 hover:bg-stone-100 transition-colors text-left">
-                                            <h3 className="font-bold text-stone-800">{title}</h3>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                                <span className="text-sm font-bold text-orange-600">{oppHours.toFixed(1)} hrs · {oppRecords.length} volunteer{oppRecords.length !== 1 ? 's' : ''}</span>
-                                                <ChevronLeft className={`w-4 h-4 text-stone-400 transition-transform ${collapsed ? '-rotate-90' : 'rotate-90'}`} />
+                    {loadingCompliance ? <div className="text-center py-8 text-gray-500">Loading...</div> : (
+                        <div className="space-y-3">
+                            <h3 className="font-semibold text-gray-700 dark:text-gray-300 text-sm">Volunteers Requiring Attention</h3>
+                            {complianceVols.filter(v => v.backgroundCheckStatus !== 'Cleared' || !v.hasWaiver).length === 0 ? (
+                                <div className="text-center py-8 text-emerald-600 font-medium">All volunteers are fully compliant!</div>
+                            ) : (
+                                complianceVols
+                                    .filter(v => v.backgroundCheckStatus !== 'Cleared' || !v.hasWaiver)
+                                    .map(v => (
+                                        <div key={v.grainId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl px-4 py-3 border border-gray-200 dark:border-gray-700">
+                                            <div>
+                                                <div className="font-medium text-sm text-gray-900 dark:text-white">{v.name}</div>
+                                                <div className="text-xs text-gray-500">{v.email}</div>
                                             </div>
-                                        </button>
-                                        {!collapsed && (
-                                            <div className="divide-y divide-stone-50">
-                                                {oppRecords.map(r => (
-                                                    <div key={r.attendanceId} className="flex items-center justify-between px-6 py-3 text-sm">
-                                                        <span className="font-medium text-stone-700">{r.volunteerName}</span>
-                                                        <div className="flex items-center gap-4 text-stone-400 text-xs">
-                                                            <span>{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-'}</span>
-                                                            <span className="font-bold text-stone-600">{r.totalHours.toFixed(2)} hrs</span>
-                                                            <span className={'px-2 py-0.5 rounded-full font-bold ' + (r.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{r.status}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                            <div className="flex gap-2">
+                                                {v.backgroundCheckStatus !== 'Cleared' && (
+                                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                                        v.backgroundCheckStatus === 'Expired' ? 'bg-rose-100 text-rose-700' :
+                                                        v.backgroundCheckStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-gray-100 text-gray-600'
+                                                    }`}>BGC: {v.backgroundCheckStatus ?? 'Not Submitted'}</span>
+                                                )}
+                                                {!v.hasWaiver && (
+                                                    <span className="text-xs px-2 py-1 rounded-full bg-rose-100 text-rose-700 font-medium">No Waiver</span>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                        </div>
+                                    ))
+                            )}
                         </div>
+                    )}
+
+                    <button
+                        onClick={() => {
+                            const rows = complianceVols.filter(v => v.backgroundCheckStatus !== 'Cleared' || !v.hasWaiver)
+                                .map(v => ({ Name: v.name, Email: v.email, BGC: v.backgroundCheckStatus ?? 'Not Submitted', Waiver: v.hasWaiver ? 'Signed' : 'Not Signed' }));
+                            const headers = Object.keys(rows[0] ?? {});
+                            const csv = [headers.join(','), ...rows.map(r => headers.map(h => (r as Record<string,string>)[h]).join(','))].join('\n');
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'compliance-report.csv'; a.click();
+                        }}
+                        disabled={complianceVols.filter(v => v.backgroundCheckStatus !== 'Cleared' || !v.hasWaiver).length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white text-sm rounded-xl hover:bg-gray-800 disabled:opacity-40"
+                    >
+                        <Download size={14} /> Export Non-Compliant CSV
+                    </button>
+                </div>
+            )}
+
+            {reportTab === 'hours' && (
+                <>
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 flex flex-wrap gap-4 items-end">
+                        <div className="flex-1 min-w-36">
+                            <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">From</label>
+                            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <div className="flex-1 min-w-36">
+                            <label className="text-xs font-bold text-stone-500 uppercase tracking-wide block mb-1">To</label>
+                            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                        </div>
+                        <button onClick={fetchReport} disabled={loading} className="px-6 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:bg-orange-300 flex items-center gap-2 text-sm">
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                            {loading ? 'Loading...' : 'Generate Report'}
+                        </button>
+                    </div>
+
+                    {error && <div className="bg-rose-50 text-rose-600 rounded-2xl px-5 py-4 text-sm font-medium border border-rose-200">{error}</div>}
+
+                    {fetched && (
+                        <>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {[
+                                    { label: 'Total Hours', value: totalHours.toFixed(1), unit: 'hrs', cls: 'bg-blue-50 border-blue-100', valCls: 'text-blue-700' },
+                                    { label: 'Volunteers', value: String(uniqueVolunteers), unit: 'people', cls: 'bg-violet-50 border-violet-100', valCls: 'text-violet-700' },
+                                    { label: 'Events', value: String(uniqueOpps), unit: 'events', cls: 'bg-orange-50 border-orange-100', valCls: 'text-orange-600' },
+                                    { label: 'Avg Hours', value: avgHours.toFixed(1), unit: '/volunteer', cls: 'bg-emerald-50 border-emerald-100', valCls: 'text-emerald-700' },
+                                ].map(c => (
+                                    <div key={c.label} className={`rounded-2xl p-5 ${c.cls} border`}>
+                                        <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-1">{c.label}</p>
+                                        <p className={`text-3xl font-extrabold ${c.valCls}`}>{c.value}</p>
+                                        <p className="text-xs font-medium text-stone-400 mt-0.5">{c.unit}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {records.length === 0 ? (
+                                <div className="bg-white rounded-3xl p-10 text-center text-stone-400 border border-stone-100">No completed attendance records found for this period.</div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {Object.entries(byOpp).map(([oid, { title, records: oppRecords }]) => {
+                                        const oppHours = oppRecords.reduce((s, r) => s + r.totalHours, 0);
+                                        const collapsed = collapsedOpps.has(oid);
+                                        return (
+                                            <div key={oid} className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden">
+                                                <button onClick={() => toggleCollapse(oid)} className="w-full flex justify-between items-center px-6 py-4 bg-stone-50 hover:bg-stone-100 transition-colors text-left">
+                                                    <h3 className="font-bold text-stone-800">{title}</h3>
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <span className="text-sm font-bold text-orange-600">{oppHours.toFixed(1)} hrs · {oppRecords.length} volunteer{oppRecords.length !== 1 ? 's' : ''}</span>
+                                                        <ChevronLeft className={`w-4 h-4 text-stone-400 transition-transform ${collapsed ? '-rotate-90' : 'rotate-90'}`} />
+                                                    </div>
+                                                </button>
+                                                {!collapsed && (
+                                                    <div className="divide-y divide-stone-50">
+                                                        {oppRecords.map(r => (
+                                                            <div key={r.attendanceId} className="flex items-center justify-between px-6 py-3 text-sm">
+                                                                <span className="font-medium text-stone-700">{r.volunteerName}</span>
+                                                                <div className="flex items-center gap-4 text-stone-400 text-xs">
+                                                                    <span>{r.checkInTime ? new Date(r.checkInTime).toLocaleString() : '-'}</span>
+                                                                    <span className="font-bold text-stone-600">{r.totalHours.toFixed(2)} hrs</span>
+                                                                    <span className={'px-2 py-0.5 rounded-full font-bold ' + (r.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500')}>{r.status}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
                     )}
                 </>
             )}
