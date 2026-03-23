@@ -5,6 +5,7 @@ import { adminService } from '../services/admin';
 import { attendanceService } from '../services/attendance';
 import { applicationService } from '../services/applications';
 import { organizationService } from '../services/organizations';
+import { notificationService } from '../services/notifications';
 import { useAuth } from '../hooks/useAuth';
 import type { ViewName } from '../types';
 
@@ -125,6 +126,13 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                     acc[n.view] = (acc[n.view] ?? 0) + 1;
                     return acc;
                 }, {} as Partial<Record<ViewName, number>>);
+                // For volunteers, also badge the Messages sidebar item with unread notification count
+                if (userRole === 'volunteer') {
+                    try {
+                        const count = await notificationService.getUnreadCount();
+                        if (count > 0) byView['messages'] = count;
+                    } catch { /* non-critical */ }
+                }
                 onBadgesUpdate(byView);
             }
         } catch { /* non-critical */ }
