@@ -3,10 +3,6 @@ import { Building, CheckCircle, Clock, XCircle, AlertCircle, ChevronRight } from
 interface OrgHealthCardProps {
   orgName: string | null;
   orgStatus: string | null;
-  publishedEvents: number;
-  totalApplications: number;
-  memberCount: number;
-  onEdit?: () => void;
   onResubmit?: () => void;
   onCreateOrg?: () => void;
 }
@@ -85,7 +81,7 @@ const PENDING_STEPS = [
 ];
 
 export default function OrgHealthCard({
-  orgName, orgStatus, publishedEvents, totalApplications, memberCount, onEdit, onResubmit, onCreateOrg
+  orgName, orgStatus, onResubmit, onCreateOrg
 }: OrgHealthCardProps) {
   if (!orgName || !orgStatus) {
     return (
@@ -164,41 +160,17 @@ export default function OrgHealthCard({
             )}
           </div>
 
-          {/* KPIs */}
-          {orgStatus === 'Approved' && (
-            <div className="flex gap-6 shrink-0">
-              {[
-                { label: 'Events', value: publishedEvents },
-                { label: 'Applications', value: totalApplications },
-                { label: 'Members', value: memberCount },
-              ].map(kpi => (
-                <div key={kpi.label} className="text-center">
-                  <div className="text-2xl font-black text-stone-900 dark:text-zinc-100">{kpi.value}</div>
-                  <div className="text-xs text-stone-400 dark:text-zinc-500 font-medium">{kpi.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-2 shrink-0">
-            {orgStatus === 'Approved' && onEdit && (
-              <button
-                onClick={onEdit}
-                className="px-4 py-2 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300 hover:bg-stone-200 dark:hover:bg-zinc-700 text-sm font-medium transition-colors"
-              >
-                Edit Org
-              </button>
-            )}
-            {orgStatus === 'Rejected' && onResubmit && (
+          {/* Actions — only show for non-approved states */}
+          {orgStatus === 'Rejected' && onResubmit && (
+            <div className="shrink-0">
               <button
                 onClick={onResubmit}
                 className="px-4 py-2 rounded-xl bg-amber-500 text-white hover:bg-amber-400 text-sm font-semibold transition-colors"
               >
                 Resubmit
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

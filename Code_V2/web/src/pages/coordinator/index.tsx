@@ -415,10 +415,6 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
             <OrgHealthCard
                 orgName={org.name}
                 orgStatus={org.status}
-                publishedEvents={opps.filter(o => o.status === 'Published').length}
-                totalApplications={apps.length}
-                memberCount={org.members?.length ?? 0}
-                onEdit={isApproved && isPrimaryCoord ? () => { setEditName(org.name); setEditDesc(org.description || ''); setShowEdit(true); } : undefined}
                 onResubmit={org.status === 'Rejected' ? () => openResubmitForm(true) : undefined}
             />
 
