@@ -119,6 +119,16 @@ public static class AttendanceEndpoints
             await grain.ManualAdjustment(req.CoordinatorId, req.NewCheckIn, req.NewCheckOut, req.Reason);
             return Results.NoContent();
         });
+
+        group.MapPost("/{id:guid}/resolve", async (Guid id, ResolveDisputeRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!await http.CanManageOpportunityAsync(db, state.OpportunityId, grains))
+                return Results.Forbid();
+            await grain.ResolveDispute(req.ResolverId, req.Resolution, req.AdjustedHours);
+            return Results.NoContent();
+        });
     }
 
 }

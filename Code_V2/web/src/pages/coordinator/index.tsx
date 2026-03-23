@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw } from 'lucide-react';
+import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw, User, AlertTriangle, Phone } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import { timeAgo } from '../../utils/timeAgo';
 import OrgHealthCard from '../../components/OrgHealthCard';
@@ -1171,6 +1171,7 @@ export function CoordApplications() {
     const [msgApp, setMsgApp] = useState<ApplicationSummary | null>(null);
     const [msgText, setMsgText] = useState('');
     const [sending, setSending] = useState(false);
+    const [viewProfileId, setViewProfileId] = useState<string | null>(null);
 
     const doSendMsg = async () => {
         if (!msgApp || !msgText.trim()) return;
@@ -1339,6 +1340,7 @@ export function CoordApplications() {
                                     </div>
                                 </div>
                                 <div className="flex gap-3 shrink-0 flex-wrap items-center" onClick={e => e.stopPropagation()}>
+                                    <button onClick={(e) => { e.stopPropagation(); setViewProfileId(app.volunteerId); }} className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View volunteer profile"><User className="w-4 h-4" /></button>
                                     <button onClick={(e) => { e.stopPropagation(); setMsgApp(app); setMsgText(''); }} className="p-2 text-stone-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="Message volunteer"><Bell className="w-4 h-4" /></button>
                                     {app.status === 'Pending' && (<>
                                         <button onClick={() => handleReject(app.applicationId)} disabled={actionId === app.applicationId} className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
@@ -1358,6 +1360,78 @@ export function CoordApplications() {
                     {appsHasMore && <div ref={appsSentinel} className="h-6 flex items-center justify-center text-xs text-stone-400">Loading more…</div>}
                 </div>
             )}
+            {viewProfileId && (() => {
+                const vp = volunteerProfiles.get(viewProfileId);
+                const vName = apps.find(a => a.volunteerId === viewProfileId)?.volunteerName ?? 'Volunteer';
+                return (
+                    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setViewProfileId(null)}>
+                        <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto space-y-4" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-stone-800">Volunteer Profile</h3>
+                                <button onClick={() => setViewProfileId(null)} className="p-1 text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
+                            </div>
+                            {!vp ? (
+                                <div className="text-center py-8 text-stone-400">Profile not available</div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-2xl font-black text-orange-600 shrink-0">{vp.firstName?.charAt(0) || '?'}</div>
+                                        <div>
+                                            <p className="font-bold text-stone-800 text-lg">{vp.firstName} {vp.lastName}</p>
+                                            <p className="text-stone-500 text-sm flex items-center gap-1"><Mail className="w-3 h-3" /> {vp.email}</p>
+                                            {vp.phone && <p className="text-stone-400 text-sm flex items-center gap-1"><Phone className="w-3 h-3" /> {vp.phone}</p>}
+                                        </div>
+                                    </div>
+                                    {vp.bio && <p className="text-stone-600 text-sm bg-stone-50 rounded-xl p-3 italic">"{vp.bio}"</p>}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="bg-blue-50 rounded-xl p-3 text-center">
+                                            <p className="text-2xl font-black text-blue-600">{(vp.totalHours ?? 0).toFixed(0)}</p>
+                                            <p className="text-xs text-blue-500 font-semibold">Hours</p>
+                                        </div>
+                                        <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                                            <p className="text-2xl font-black text-emerald-600">{vp.completedOpportunities ?? 0}</p>
+                                            <p className="text-xs text-emerald-500 font-semibold">Completed</p>
+                                        </div>
+                                        <div className="bg-amber-50 rounded-xl p-3 text-center">
+                                            <p className="text-2xl font-black text-amber-600">{vp.impactScore ?? 0}</p>
+                                            <p className="text-xs text-amber-500 font-semibold">Impact</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {vp.backgroundCheckStatus === 'Cleared'
+                                            ? <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✅ BGC Cleared</span>
+                                            : <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-rose-50 text-rose-600 border border-rose-200">BGC: {vp.backgroundCheckStatus}</span>
+                                        }
+                                        {vp.waiverSignedAt
+                                            ? <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Waiver Signed</span>
+                                            : <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-50 text-amber-600 border border-amber-200">⚠ Waiver Not Signed</span>
+                                        }
+                                        {vp.isProfilePublic && <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-50 text-blue-600 border border-blue-200">Public Profile</span>}
+                                    </div>
+                                    {(vp.credentials?.length ?? 0) > 0 ? (
+                                        <div>
+                                            <p className="text-xs font-bold text-stone-500 mb-2">Credentials ({vp.credentials.length})</p>
+                                            <div className="space-y-1">
+                                                {vp.credentials.map((c, i) => (
+                                                    <div key={i} className="flex items-center gap-2 text-sm text-stone-600 bg-stone-50 rounded-lg px-3 py-2">
+                                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                                        <span className="truncate">{c}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-amber-600 font-medium">No credentials uploaded</p>
+                                    )}
+                                </>
+                            )}
+                            <div className="flex justify-end pt-1">
+                                <button onClick={() => setViewProfileId(null)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
             {msgApp && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4">
@@ -1863,6 +1937,12 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [adjustForm, setAdjustForm] = useState({ newCheckIn: '', newCheckOut: '', reason: '' });
     const [adjusting, setAdjusting] = useState(false);
 
+    // Resolve dispute
+    const [showResolve, setShowResolve] = useState(false);
+    const [resolveRec, setResolveRec] = useState<AttendanceSummary | null>(null);
+    const [resolveForm, setResolveForm] = useState({ resolution: '', adjustedHours: '' });
+    const [resolving, setResolving] = useState(false);
+
     // Certificate
     const [showCert, setShowCert] = useState(false);
     const [certTemplates, setCertTemplates] = useState<CertificateTemplate[]>([]);
@@ -1924,6 +2004,22 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
             refreshSoon();
         } catch (err: any) { showToast(getErr(err, 'Failed to adjust hours')); }
         finally { setAdjusting(false); }
+    };
+
+    const doResolve = async () => {
+        if (!resolveRec || !resolveForm.resolution || !resolveForm.adjustedHours) return;
+        setResolving(true);
+        try {
+            await attendanceService.resolveDispute(resolveRec.attendanceId, {
+                resolverId: auth.linkedGrainId ?? resolveRec.attendanceId,
+                resolution: resolveForm.resolution,
+                adjustedHours: parseFloat(resolveForm.adjustedHours),
+            });
+            setShowResolve(false);
+            showToast('Dispute resolved ✅');
+            refreshSoon();
+        } catch (err: any) { showToast(getErr(err, 'Failed to resolve dispute')); }
+        finally { setResolving(false); }
     };
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -2349,6 +2445,11 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                         {rec && (status === 'CheckedOut' || status === 'Confirmed' || status === 'Resolved') && (
                                             <button onClick={() => openAdjust(rec)} className="px-3 py-1.5 bg-blue-50 text-blue-600 font-bold rounded-lg text-sm hover:bg-blue-100 flex items-center gap-1"><Pencil className="w-3 h-3" /> Adjust</button>
                                         )}
+                                        {status === 'Disputed' && rec && (
+                                            <button onClick={() => { setResolveRec(rec); setResolveForm({ resolution: '', adjustedHours: String((rec.totalHours ?? 0).toFixed(2)) }); setShowResolve(true); }} className="px-3 py-1.5 bg-rose-50 text-rose-600 font-bold rounded-lg text-sm hover:bg-rose-100 flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" /> Resolve Dispute
+                                            </button>
+                                        )}
                                         {status !== 'Confirmed' && (
                                             <button onClick={() => doNoShow(app.applicationId)} disabled={actionId === app.applicationId + '_ns'} className="px-3 py-1.5 bg-stone-100 text-stone-500 font-bold rounded-lg text-sm hover:bg-stone-200 disabled:opacity-50">No-Show</button>
                                         )}
@@ -2432,6 +2533,26 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                         </div>
                     );
                 })()}
+            </OppDetailModal>
+
+            <OppDetailModal show={showResolve} onClose={() => setShowResolve(false)} title="Resolve Dispute">
+                <div className="space-y-3">
+                    {resolveRec && (
+                        <p className="text-sm text-stone-500">Volunteer: <span className="font-bold text-stone-700">{apps.find(a => a.volunteerId === resolveRec.volunteerId)?.volunteerName ?? resolveRec.volunteerId}</span></p>
+                    )}
+                    <div>
+                        <label className="text-xs font-bold text-stone-500 mb-1 block">Resolution Note <span className="text-rose-500">*</span></label>
+                        <textarea value={resolveForm.resolution} onChange={e => setResolveForm(p => ({ ...p, resolution: e.target.value }))} rows={3} placeholder="Explain how the dispute is resolved…" className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm resize-none" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-stone-500 mb-1 block">Adjusted Hours <span className="text-rose-500">*</span></label>
+                        <input type="number" step="0.25" min="0" value={resolveForm.adjustedHours} onChange={e => setResolveForm(p => ({ ...p, adjustedHours: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none text-sm" />
+                    </div>
+                    <div className="flex gap-3 justify-end pt-1">
+                        <button onClick={() => setShowResolve(false)} className="px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
+                        <button onClick={doResolve} disabled={resolving || !resolveForm.resolution || !resolveForm.adjustedHours} className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-2">{resolving && <Loader2 className="w-4 h-4 animate-spin" />} Resolve</button>
+                    </div>
+                </div>
             </OppDetailModal>
 
             <OppDetailModal show={showNotify} onClose={() => setShowNotify(false)} title="Notify Volunteers">

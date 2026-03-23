@@ -42,4 +42,7 @@ export const attendanceService = {
     adjust: async (id: string, data: { coordinatorId: string; newCheckIn: string; newCheckOut: string; reason: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/adjust`, data);
     },
+    resolveDispute: async (id: string, data: { resolverId: string; resolution: string; adjustedHours: number }): Promise<void> => {
+        await api.post(`/api/attendance/${id}/resolve`, data);
+    },
 };
