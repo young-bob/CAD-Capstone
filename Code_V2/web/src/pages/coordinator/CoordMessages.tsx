@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MessageSquare, Clock, Users, ArrowRight, Inbox, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { timeAgo } from '../../utils/timeAgo';
@@ -24,6 +24,19 @@ interface Props { onNavigate: (view: ViewName) => void; }
 export default function CoordMessages({ onNavigate }: Props) {
     const auth = useAuth();
     const [tab, setTab] = useState<'recent' | 'conversations'>('conversations');
+
+    // Mark all current replies as "seen" when this page is opened
+    useEffect(() => {
+        if (!auth.linkedGrainId) return;
+        const history = getMsgHistory(auth.linkedGrainId);
+        const volunteerIds = [...new Set(history.filter(r => r.to !== 'all').map(r => r.to))];
+        let total = 0;
+        for (const vid of volunteerIds) {
+            const replies = getVolReplies(vid);
+            total += replies.length;
+        }
+        localStorage.setItem(`vsms_coord_replies_seen_${auth.linkedGrainId}`, String(total));
+    }, [auth.linkedGrainId]);
 
     const history = useMemo(() => {
         if (!auth.linkedGrainId) return [];

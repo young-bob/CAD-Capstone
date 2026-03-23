@@ -6,15 +6,15 @@ import type { NotificationItem } from '../../types';
 import { timeAgo } from '../../utils/timeAgo';
 
 // Shared key per volunteer — coordinator can read replies by volunteerId
-export interface VolReply { text: string; ts: number }
+export interface VolReply { text: string; ts: number; notifId?: string }
 export const VOL_REPLY_KEY = (volunteerId: string) => `vsms_vol_reply_${volunteerId}`;
 
 function loadMyReplies(volunteerId: string): VolReply[] {
     try { return JSON.parse(localStorage.getItem(VOL_REPLY_KEY(volunteerId)) || '[]'); } catch { return []; }
 }
-function appendReply(volunteerId: string, text: string) {
+function appendReply(volunteerId: string, text: string, notifId: string) {
     const existing = loadMyReplies(volunteerId);
-    existing.push({ text, ts: Date.now() });
+    existing.push({ text, ts: Date.now(), notifId });
     localStorage.setItem(VOL_REPLY_KEY(volunteerId), JSON.stringify(existing));
 }
 
@@ -28,6 +28,8 @@ export default function VolMessages() {
     const [replyText, setReplyText] = useState('');
     const [sending, setSending] = useState(false);
     const [myReplies, setMyReplies] = useState<VolReply[]>([]);
+
+    const repliesFor = (notifId: string) => myReplies.filter(r => r.notifId === notifId);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -46,9 +48,10 @@ export default function VolMessages() {
     useEffect(() => { load(); }, [load]);
 
     // Load this volunteer's replies from shared localStorage
+    // Use linkedGrainId (volunteer grain ID) so coordinator can read them by the same key
     useEffect(() => {
-        if (auth.userId) setMyReplies(loadMyReplies(auth.userId));
-    }, [auth.userId]);
+        if (auth.linkedGrainId) setMyReplies(loadMyReplies(auth.linkedGrainId));
+    }, [auth.linkedGrainId]);
 
     const handleMarkRead = async (id: string) => {
         try {
@@ -66,15 +69,15 @@ export default function VolMessages() {
     };
 
     const handleReply = async (notif: NotificationItem) => {
-        if (!replyText.trim() || !auth.userId) return;
+        if (!replyText.trim() || !auth.linkedGrainId) return;
         setSending(true);
         try {
             if (!notif.isRead) {
                 await notificationService.markRead(notif.id).catch(() => {});
                 setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
             }
-            appendReply(auth.userId, replyText.trim());
-            setMyReplies(loadMyReplies(auth.userId));
+            appendReply(auth.linkedGrainId, replyText.trim(), notif.id);
+            setMyReplies(loadMyReplies(auth.linkedGrainId));
             setReplyText('');
             setReplyingTo(null);
             showToast('Reply sent');
@@ -171,10 +174,10 @@ export default function VolMessages() {
                                     </button>
                                 </div>
 
-                                {/* My sent replies — shown under each message */}
-                                {myReplies.length > 0 && (
+                                {/* My sent replies — shown only under the message they belong to */}
+                                {repliesFor(n.id).length > 0 && (
                                     <div className="px-5 pb-3 space-y-2 ml-[52px]">
-                                        {myReplies.map((r, i) => (
+                                        {repliesFor(n.id).map((r, i) => (
                                             <div key={i} className="flex items-start gap-2 justify-end">
                                                 <div className="max-w-xs bg-orange-500 rounded-2xl rounded-tr-sm px-3 py-2 text-white">
                                                     <p className="text-xs">{r.text}</p>

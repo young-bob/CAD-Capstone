@@ -133,6 +133,24 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                         if (count > 0) byView['messages'] = count;
                     } catch { /* non-critical */ }
                 }
+                // For coordinators, badge coord_messages with new volunteer replies
+                if (userRole === 'coordinator' && auth.linkedGrainId) {
+                    try {
+                        const msgKey = `vsms_msg_history_${auth.linkedGrainId}`;
+                        const seenKey = `vsms_coord_replies_seen_${auth.linkedGrainId}`;
+                        const history: { to: string; toName: string; oppTitle: string; text: string; ts: number }[] =
+                            JSON.parse(localStorage.getItem(msgKey) || '[]');
+                        const volunteerIds = [...new Set(history.filter(r => r.to !== 'all').map(r => r.to))];
+                        let totalReplies = 0;
+                        for (const vid of volunteerIds) {
+                            const replies = JSON.parse(localStorage.getItem(`vsms_vol_reply_${vid}`) || '[]');
+                            totalReplies += replies.length;
+                        }
+                        const seen = parseInt(localStorage.getItem(seenKey) || '0', 10);
+                        const newReplies = Math.max(0, totalReplies - seen);
+                        if (newReplies > 0) byView['coord_messages'] = newReplies;
+                    } catch { /* non-critical */ }
+                }
                 onBadgesUpdate(byView);
             }
         } catch { /* non-critical */ }
