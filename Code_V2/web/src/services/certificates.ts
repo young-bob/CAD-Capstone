@@ -44,6 +44,7 @@ export const certificateService = {
     },
     createTemplate: async (data: {
         name: string; description?: string; organizationId?: string; organizationName?: string;
+        templateType?: 'achievement_certificate' | 'hours_log';
         primaryColor?: string; accentColor?: string; titleText?: string; bodyTemplate?: string;
         signatoryName?: string; signatoryTitle?: string;
     }): Promise<{ id: string }> => {
@@ -52,6 +53,8 @@ export const certificateService = {
     },
     updateTemplate: async (templateId: string, data: {
         name?: string; description?: string; primaryColor?: string; accentColor?: string;
+        templateType?: 'achievement_certificate' | 'hours_log';
+        titleText?: string; organizationName?: string; signatoryName?: string; signatoryTitle?: string;
     }): Promise<void> => {
         await api.put(`/api/certificates/templates/${templateId}`, data);
     },

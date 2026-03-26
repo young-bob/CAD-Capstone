@@ -24,7 +24,7 @@ public static class CertificateEndpoints
                 .ThenBy(t => t.Name)
                 .Select(t => new TemplateListItem(
                     t.Id, t.Name, t.Description, t.OrganizationId, t.OrganizationName,
-                    t.PrimaryColor, t.AccentColor, t.OrganizationId == null))
+                    t.TemplateType, t.PrimaryColor, t.AccentColor, t.OrganizationId == null))
                 .ToListAsync();
 
             return Results.Ok(templates);
@@ -49,6 +49,7 @@ public static class CertificateEndpoints
                 Description = req.Description ?? string.Empty,
                 OrganizationId = req.OrganizationId,
                 OrganizationName = req.OrganizationName,
+                TemplateType = NormalizeTemplateType(req.TemplateType, req.TitleText),
                 LogoFileKey = req.LogoFileKey,
                 BackgroundFileKey = req.BackgroundFileKey,
                 PrimaryColor = req.PrimaryColor ?? "#1A237E",
@@ -73,6 +74,8 @@ public static class CertificateEndpoints
 
             entity.Name = req.Name ?? entity.Name;
             entity.Description = req.Description ?? entity.Description;
+            entity.OrganizationName = req.OrganizationName ?? entity.OrganizationName;
+            entity.TemplateType = NormalizeTemplateType(req.TemplateType, req.TitleText, entity.TemplateType);
             entity.LogoFileKey = req.LogoFileKey ?? entity.LogoFileKey;
             entity.BackgroundFileKey = req.BackgroundFileKey ?? entity.BackgroundFileKey;
             entity.PrimaryColor = req.PrimaryColor ?? entity.PrimaryColor;
@@ -132,6 +135,7 @@ public static class CertificateEndpoints
             var templateInfo = new CertificateTemplateInfo
             {
                 Name = templateEntity.Name,
+                TemplateType = templateEntity.TemplateType,
                 PrimaryColor = templateEntity.PrimaryColor,
                 AccentColor = templateEntity.AccentColor,
                 TitleText = templateEntity.TitleText,
@@ -147,6 +151,21 @@ public static class CertificateEndpoints
                 TotalHours = profile.TotalHours,
                 CompletedOpportunities = profile.CompletedOpportunities,
                 OrganizationName = templateEntity.OrganizationName,
+                Activities = await db.AttendanceReadModels
+                    .AsNoTracking()
+                    .Where(a => a.VolunteerId == req.VolunteerId &&
+                        (a.Status == Abstractions.Enums.AttendanceStatus.Confirmed ||
+                         a.Status == Abstractions.Enums.AttendanceStatus.CheckedOut) &&
+                        a.TotalHours > 0)
+                    .OrderByDescending(a => a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime)
+                    .Select(a => new CertificateActivity
+                    {
+                        Title = a.OpportunityTitle,
+                        OrganizationName = templateEntity.OrganizationName ?? string.Empty,
+                        CompletedAt = a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime,
+                        Hours = a.TotalHours
+                    })
+                    .ToListAsync(),
             };
 
             // 4. Generate PDF
@@ -175,6 +194,7 @@ public static class CertificateEndpoints
                 {
                     Name = "Elegant Navy",
                     Description = "Classic navy blue with gold accents",
+                    TemplateType = CertificateTemplateTypes.AchievementCertificate,
                     PrimaryColor = "#1A237E",
                     AccentColor = "#C5A23E",
                     TitleText = "Certificate of Volunteer Service",
@@ -183,6 +203,7 @@ public static class CertificateEndpoints
                 {
                     Name = "Modern Teal",
                     Description = "Contemporary teal with silver accents",
+                    TemplateType = CertificateTemplateTypes.AchievementCertificate,
                     PrimaryColor = "#00695C",
                     AccentColor = "#90A4AE",
                     TitleText = "Volunteer Achievement Certificate",
@@ -191,9 +212,19 @@ public static class CertificateEndpoints
                 {
                     Name = "Warm Burgundy",
                     Description = "Warm burgundy with copper accents",
+                    TemplateType = CertificateTemplateTypes.AchievementCertificate,
                     PrimaryColor = "#880E4F",
                     AccentColor = "#D4A574",
                     TitleText = "Certificate of Appreciation",
+                },
+                new CertificateTemplateEntity
+                {
+                    Name = "Verified Hours Log",
+                    Description = "Structured school-friendly volunteer hours log",
+                    TemplateType = CertificateTemplateTypes.HoursLog,
+                    PrimaryColor = "#1F4E79",
+                    AccentColor = "#5B8FB9",
+                    TitleText = "Community Involvement Hours Log",
                 },
             };
 
@@ -202,6 +233,18 @@ public static class CertificateEndpoints
             return Results.Ok($"Seeded {presets.Length} system preset templates");
         });
     }
+
+    private static string NormalizeTemplateType(string? templateType, string? legacyTitleText, string? fallback = null)
+    {
+        var normalized = (templateType ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized == CertificateTemplateTypes.AchievementCertificate || normalized == CertificateTemplateTypes.HoursLog)
+            return normalized;
+
+        if (string.Equals(legacyTitleText, "tracking", StringComparison.OrdinalIgnoreCase))
+            return CertificateTemplateTypes.HoursLog;
+
+        return fallback ?? CertificateTemplateTypes.AchievementCertificate;
+    }
 }
 
 // ==================== Request / Response DTOs ====================
@@ -209,11 +252,12 @@ public static class CertificateEndpoints
 public record TemplateListItem(
     Guid Id, string Name, string Description,
     Guid? OrganizationId, string? OrganizationName,
-    string PrimaryColor, string AccentColor, bool IsSystemPreset);
+    string TemplateType, string PrimaryColor, string AccentColor, bool IsSystemPreset);
 
 public record CreateTemplateRequest(
     string Name, string? Description,
     Guid? OrganizationId, string? OrganizationName,
+    string? TemplateType,
     string? LogoFileKey, string? BackgroundFileKey,
     string? PrimaryColor, string? AccentColor,
     string? TitleText, string? BodyTemplate,
@@ -221,6 +265,7 @@ public record CreateTemplateRequest(
 
 public record UpdateTemplateRequest(
     string? Name, string? Description,
+    string? OrganizationName, string? TemplateType,
     string? LogoFileKey, string? BackgroundFileKey,
     string? PrimaryColor, string? AccentColor,
     string? TitleText, string? BodyTemplate,

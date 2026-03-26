@@ -6,6 +6,7 @@ export interface CertificateTemplate {
     description: string;
     organizationId: string | null;
     organizationName: string | null;
+    templateType?: 'achievement_certificate' | 'hours_log';
     primaryColor: string;
     accentColor: string;
     isSystemPreset: boolean;
@@ -17,6 +18,7 @@ export interface CertificateTemplateDetail {
     description: string;
     organizationId: string | null;
     organizationName: string | null;
+    templateType: 'achievement_certificate' | 'hours_log';
     logoFileKey: string | null;
     backgroundFileKey: string | null;
     primaryColor: string;
@@ -54,6 +56,7 @@ export const certificateService = {
         description?: string;
         organizationId?: string;
         organizationName?: string;
+        templateType?: 'achievement_certificate' | 'hours_log';
         logoFileKey?: string;
         backgroundFileKey?: string;
         primaryColor?: string;
@@ -75,6 +78,7 @@ export const certificateService = {
         backgroundFileKey: string;
         primaryColor: string;
         accentColor: string;
+        templateType: 'achievement_certificate' | 'hours_log';
         titleText: string;
         bodyTemplate: string;
         signatoryName: string;

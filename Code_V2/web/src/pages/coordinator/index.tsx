@@ -1907,8 +1907,72 @@ export function CoordMembers() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // COORDINATOR CERT TEMPLATES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+import { getTemplateStyle } from '../../utils/certGenerator';
+
+function CertThumbnail({ template, style }: { template: CertificateTemplate; style: 'award' | 'tracking' }) {
+    const p = template.primaryColor || '#F59E0B';
+    const a = template.accentColor || '#EA580C';
+    if (style === 'tracking') {
+        return (
+            <div className="rounded-lg overflow-hidden border" style={{ height: 80, background: 'white', borderColor: p + '60' }}>
+                <div style={{ height: 8, background: `linear-gradient(90deg,${p},${a})` }} />
+                <div style={{ padding: '6px 8px' }}>
+                    <div style={{ height: 6, background: p + '40', borderRadius: 3, marginBottom: 5, width: '70%' }} />
+                    {[0,1,2].map(i => (
+                        <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
+                            <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, flex: 2 }} />
+                            <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, flex: 1 }} />
+                            <div style={{ height: 4, background: p + '50', borderRadius: 2, width: 20 }} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return (
+        <div className="rounded-lg overflow-hidden" style={{ height: 80, background: 'white', border: `2px solid ${p}60`, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: `linear-gradient(90deg,${p},${a})` }} />
+            <div style={{ padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ height: 5, background: p + '60', borderRadius: 3, margin: '4px auto 6px', width: '40%' }} />
+                <div style={{ height: 10, background: p + '30', borderRadius: 3, margin: '0 auto 6px', width: '70%' }} />
+                <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, margin: '0 auto 3px', width: '55%' }} />
+                <div style={{ display: 'inline-block', height: 8, width: 50, borderRadius: 50, background: `linear-gradient(90deg,${p},${a})`, marginTop: 2 }} />
+            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg,${p},${a})` }} />
+        </div>
+    );
+}
+
+function TypeToggle({
+    value,
+    onChange
+}: {
+    value: 'achievement_certificate' | 'hours_log';
+    onChange: (v: 'achievement_certificate' | 'hours_log') => void;
+}) {
+    return (
+        <div className="flex gap-2">
+            {([
+                { value: 'achievement_certificate', label: 'Certificate' },
+                { value: 'hours_log', label: 'Hours Log' },
+            ] as const).map(option => (
+                <button key={option.value} type="button" onClick={() => onChange(option.value)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${value === option.value ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}>
+                    {option.label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function getTemplateTypeLabel(style: 'award' | 'tracking') {
+    return style === 'award' ? 'Certificate' : 'Hours Log';
+}
+
 export function CoordCertTemplates() {
     const auth = useAuth();
     const orgStatus = useOrgStatus();
@@ -1917,10 +1981,32 @@ export function CoordCertTemplates() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showCreate, setShowCreate] = useState(false);
-    const [createForm, setCreateForm] = useState({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C' });
+    const [createForm, setCreateForm] = useState<{
+        name: string;
+        description: string;
+        primaryColor: string;
+        accentColor: string;
+        templateType: 'achievement_certificate' | 'hours_log';
+        titleText: string;
+        organizationName: string;
+    }>({
+        name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C',
+        templateType: 'achievement_certificate', titleText: '', organizationName: '',
+    });
     const [creating, setCreating] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
-    const [editForm, setEditForm] = useState({ name: '', description: '', primaryColor: '', accentColor: '' });
+    const [editForm, setEditForm] = useState<{
+        name: string;
+        description: string;
+        primaryColor: string;
+        accentColor: string;
+        templateType: 'achievement_certificate' | 'hours_log';
+        titleText: string;
+        organizationName: string;
+    }>({
+        name: '', description: '', primaryColor: '', accentColor: '',
+        templateType: 'achievement_certificate', titleText: '', organizationName: '',
+    });
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [toast, setToast] = useState('');
@@ -1945,11 +2031,17 @@ export function CoordCertTemplates() {
         setCreating(true);
         try {
             await certificateService.createTemplate({
-                ...createForm,
+                name: createForm.name,
+                description: createForm.description,
+                templateType: createForm.templateType,
+                primaryColor: createForm.primaryColor,
+                accentColor: createForm.accentColor,
+                titleText: createForm.titleText,
+                organizationName: createForm.organizationName || undefined,
                 organizationId: auth.linkedGrainId || undefined,
             });
             setShowCreate(false);
-            setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C' });
+            setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C', templateType: 'achievement_certificate', titleText: '', organizationName: '' });
             showToast('Template created!');
             refreshSoon();
         } catch (err: any) {
@@ -1960,7 +2052,13 @@ export function CoordCertTemplates() {
     const openEdit = (t: CertificateTemplate) => {
         setShowCreate(false);
         setEditingTemplate(t);
-        setEditForm({ name: t.name, description: t.description, primaryColor: t.primaryColor, accentColor: t.accentColor });
+        setEditForm({
+            name: t.name, description: t.description,
+            primaryColor: t.primaryColor, accentColor: t.accentColor,
+            templateType: t.templateType || 'achievement_certificate',
+            titleText: t.titleText || '',
+            organizationName: t.organizationName || '',
+        });
         setDeleteConfirm(null);
     };
 
@@ -1968,7 +2066,12 @@ export function CoordCertTemplates() {
         if (!editingTemplate) return;
         setSaving(true);
         try {
-            await certificateService.updateTemplate(editingTemplate.id, editForm);
+            await certificateService.updateTemplate(editingTemplate.id, {
+                name: editForm.name, description: editForm.description,
+                primaryColor: editForm.primaryColor, accentColor: editForm.accentColor,
+                templateType: editForm.templateType,
+                titleText: editForm.titleText, organizationName: editForm.organizationName || undefined,
+            });
             setEditingTemplate(null);
             showToast('Template updated!');
             refreshSoon();
@@ -1989,16 +2092,25 @@ export function CoordCertTemplates() {
         }
     };
 
+    const StyleToggle = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+        <div className="flex gap-2">
+            {(['award', 'tracking'] as const).map(s => (
+                <button key={s} type="button" onClick={() => onChange(s)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${value === s ? 'bg-orange-500 text-white border-orange-500' : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-orange-300'}`}>
+                    {s === 'award' ? '🏆 Award Certificate' : '📋 Activity Log'}
+                </button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-
             <OrgPendingBanner />
-
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-extrabold text-stone-800">Certificate Templates</h1>
-                    <p className="text-stone-500 mt-2 text-lg">Click any template to edit. Manage your certificate designs.</p>
+                    <p className="text-stone-500 mt-2 text-lg">Manage certificate designs available for volunteers to download.</p>
                 </div>
                 {isOrgApproved && (
                     <button onClick={() => { setShowCreate(!showCreate); setEditingTemplate(null); }} className="bg-orange-500 text-white px-5 py-2.5 rounded-full font-bold hover:bg-orange-600 shadow-sm flex items-center gap-2"><Plus className="w-5 h-5" /> New Template</button>
@@ -2010,6 +2122,12 @@ export function CoordCertTemplates() {
                     <h3 className="text-lg font-bold text-stone-800">New Template</h3>
                     <input placeholder="Template Name *" value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <input placeholder="Organization Name (shown on document)" value={createForm.organizationName} onChange={e => setCreateForm(p => ({ ...p, organizationName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <div>
+                        <label className="block text-sm font-semibold text-stone-600 mb-2">Document Type</label>
+                        <TypeToggle value={createForm.templateType} onChange={v => setCreateForm(p => ({ ...p, templateType: v }))} />
+                    </div>
+                    <input placeholder="Document Title (optional)" value={createForm.titleText} onChange={e => setCreateForm(p => ({ ...p, titleText: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <div className="flex gap-4">
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={createForm.primaryColor} onChange={e => setCreateForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Accent Color</label><input type="color" value={createForm.accentColor} onChange={e => setCreateForm(p => ({ ...p, accentColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
@@ -2023,7 +2141,6 @@ export function CoordCertTemplates() {
                 </div>
             )}
 
-            {/* Edit panel */}
             {editingTemplate && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200 space-y-4">
                     <div className="flex justify-between items-center">
@@ -2032,6 +2149,12 @@ export function CoordCertTemplates() {
                     </div>
                     <input placeholder="Template Name *" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Description" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <input placeholder="Organization Name (shown on document)" value={editForm.organizationName} onChange={e => setEditForm(p => ({ ...p, organizationName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <div>
+                        <label className="block text-sm font-semibold text-stone-600 mb-2">Document Type</label>
+                        <TypeToggle value={editForm.templateType} onChange={v => setEditForm(p => ({ ...p, templateType: v }))} />
+                    </div>
+                    <input placeholder="Document Title (optional)" value={editForm.titleText} onChange={e => setEditForm(p => ({ ...p, titleText: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <div className="flex gap-4">
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={editForm.primaryColor} onChange={e => setEditForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Accent Color</label><input type="color" value={editForm.accentColor} onChange={e => setEditForm(p => ({ ...p, accentColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
@@ -2059,23 +2182,30 @@ export function CoordCertTemplates() {
             )}
 
             {error && <div className="p-3 bg-rose-50 text-rose-600 text-sm font-medium rounded-xl border border-rose-100">{error}</div>}
-            {loading ? <Spinner /> : templates.length === 0 ? <Empty msg="No templates yet." /> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {templates.map(t => (
-                        <div key={t.id}
-                            onClick={() => openEdit(t)}
-                            className={`bg-white rounded-3xl p-6 shadow-sm border cursor-pointer hover:shadow-md hover:border-orange-200 transition-all ${editingTemplate?.id === t.id ? 'border-orange-300 ring-2 ring-orange-200' : 'border-stone-100'}`}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.primaryColor }}></div>
-                                    <h3 className="font-bold text-stone-800">{t.name}</h3>
-                                    {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded">System</span>}
+            {loading ? <Spinner /> : templates.length === 0 ? <Empty msg="No templates yet. Create one for volunteers to download." /> : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {templates.map(t => {
+                        const style = getTemplateStyle(t);
+                        return (
+                            <div key={t.id} onClick={() => openEdit(t)}
+                                className={`bg-white rounded-3xl p-5 shadow-sm border cursor-pointer hover:shadow-md transition-all ${editingTemplate?.id === t.id ? 'border-orange-300 ring-2 ring-orange-200' : 'border-stone-100'}`}>
+                                <CertThumbnail template={t} style={style} />
+                                <div className="mt-4 flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${style === 'award' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {getTemplateTypeLabel(style)}
+                                            </span>
+                                            {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded-full">System</span>}
+                                        </div>
+                                        <h3 className="font-bold text-stone-800 truncate">{t.name}</h3>
+                                        {t.organizationName && <p className="text-xs text-stone-400 mt-0.5 truncate">{t.organizationName}</p>}
+                                    </div>
+                                    <Pencil className="w-4 h-4 text-stone-300 shrink-0 mt-1" />
                                 </div>
-                                <Pencil className="w-4 h-4 text-stone-300" />
                             </div>
-                            <p className="text-sm text-stone-500">{t.description}</p>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

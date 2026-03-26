@@ -19,6 +19,7 @@ import { attendanceService } from '../../services/attendance';
 import { notificationService } from '../../services/notifications';
 import { skillService } from '../../services/skills';
 import { certificateService } from '../../services/certificates';
+import { getTemplateStyle, buildAwardCertHtml, buildTrackingFormHtml, type CertActivity } from '../../utils/certGenerator';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import ActionToast from '../../components/ActionToast';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -1413,95 +1414,154 @@ export function VolCertificates() {
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
     const [showConfetti, setShowConfetti] = useState(false);
-
-    // Generate modal
-    const [showGenerate, setShowGenerate] = useState(false);
-    const [selTemplate, setSelTemplate] = useState<string | null>(null);
-    const [generating, setGenerating] = useState(false);
+    const [profile, setProfile] = useState<VolunteerProfile | null>(null);
+    const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
+    const [generating, setGenerating] = useState<string | null>(null);
 
     const SEEN_KEY = `vsms_seen_certs_${auth.email ?? ''}`;
 
     const load = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const data = await certificateService.getTemplates();
-            setTemplates(data);
-            // Check for new certificates since last visit
+            const [tpls, prof, att] = await Promise.all([
+                certificateService.getTemplates(),
+                auth.linkedGrainId ? volunteerService.getProfile(auth.linkedGrainId) : null,
+                auth.linkedGrainId ? attendanceService.getByVolunteer(auth.linkedGrainId) : [],
+            ]);
+            setTemplates(tpls);
+            if (prof) setProfile(prof);
+            setAttendance(Array.isArray(att) ? att : []);
             const seen = new Set<string>(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]'));
-            const newOnes = data.filter(t => !seen.has(t.id));
+            const newOnes = tpls.filter(t => !seen.has(t.id));
             if (newOnes.length > 0 && seen.size > 0) setShowConfetti(true);
-            data.forEach(t => seen.add(t.id));
+            tpls.forEach(t => seen.add(t.id));
             localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
-        }
-        catch (err: any) { setError(getErr(err, 'Failed to load certificates')); }
+        } catch (err: any) { setError(getErr(err, 'Failed to load certificates')); }
         finally { setLoading(false); }
-    }, [SEEN_KEY]);
+    }, [SEEN_KEY, auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-    const openGenerate = (templateId: string) => { setSelTemplate(templateId); setShowGenerate(true); };
-
-    const handleGenerate = async () => {
-        if (!auth.linkedGrainId || !selTemplate) return;
-        setGenerating(true);
+    const handleDownload = (template: CertificateTemplate) => {
+        setGenerating(template.id);
         try {
-            const result = await certificateService.generate(auth.linkedGrainId, selTemplate);
-            setShowGenerate(false);
-            showToast(`Certificate ready: ${result.fileName}`);
-            await certificateService.openGeneratedFile(result.fileKey, result.fileName);
-        } catch (err: any) { showToast(err.response?.data?.toString() || 'Failed to generate certificate'); }
-        finally { setGenerating(false); }
+            const volunteerName = profile
+                ? `${profile.firstName} ${profile.lastName}`.trim()
+                : (auth.email ?? 'Volunteer');
+            const districtName = template.organizationName || 'Community Organization';
+            const confirmedRecords = attendance.filter(a =>
+                a.status === AttendanceStatus.Confirmed || a.status === AttendanceStatus.CheckedOut
+            );
+            const activities: CertActivity[] = confirmedRecords.map(a => ({
+                title: a.opportunityTitle,
+                orgName: districtName,
+                date: a.checkOutTime ?? a.checkInTime ?? a.shiftStartTime,
+                hours: a.totalHours,
+            }));
+            const totalHours = profile?.totalHours ?? activities.reduce((s, a) => s + a.hours, 0);
+            const style = getTemplateStyle(template);
+            const html = style === 'tracking'
+                ? buildTrackingFormHtml(volunteerName, districtName, activities, template)
+                : buildAwardCertHtml(volunteerName, districtName, totalHours, activities, template);
+            const win = window.open('', '_blank');
+            if (win) { win.document.write(html); win.document.close(); }
+            else showToast('Please allow popups to download certificates.');
+        } finally {
+            setGenerating(null);
+        }
+    };
+
+    // Mini thumbnail (same style as coordinator side)
+    const CertMiniThumb = ({ t }: { t: CertificateTemplate }) => {
+        const p = t.primaryColor || '#F59E0B';
+        const a = t.accentColor || '#EA580C';
+        const style = getTemplateStyle(t);
+        if (style === 'tracking') {
+            return (
+                <div className="rounded-xl overflow-hidden border mb-4" style={{ height: 90, background: 'white', borderColor: p + '60' }}>
+                    <div style={{ height: 9, background: `linear-gradient(90deg,${p},${a})` }} />
+                    <div className="p-2">
+                        <div style={{ height: 6, background: p + '40', borderRadius: 3, marginBottom: 5, width: '65%' }} />
+                        {[0,1,2,3].map(i => (
+                            <div key={i} style={{ display: 'flex', gap: 3, marginBottom: 3 }}>
+                                <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, flex: 2 }} />
+                                <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, flex: 1 }} />
+                                <div style={{ height: 4, background: p + '50', borderRadius: 2, width: 18 }} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        return (
+            <div className="rounded-xl overflow-hidden mb-4" style={{ height: 90, background: 'white', border: `2px solid ${p}60`, position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 7, background: `linear-gradient(90deg,${p},${a})` }} />
+                <div style={{ padding: '12px', textAlign: 'center' }}>
+                    <div style={{ height: 5, background: p + '60', borderRadius: 3, margin: '4px auto 6px', width: '40%' }} />
+                    <div style={{ height: 11, background: p + '30', borderRadius: 3, margin: '0 auto 6px', width: '70%' }} />
+                    <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, margin: '0 auto 3px', width: '55%' }} />
+                    <div style={{ display: 'inline-block', height: 8, width: 50, borderRadius: 50, background: `linear-gradient(90deg,${p},${a})`, marginTop: 3 }} />
+                </div>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg,${p},${a})` }} />
+            </div>
+        );
     };
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
             {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50">{toast}</div>}
-            <div><h1 className="text-3xl font-extrabold text-stone-800">Certificates</h1><p className="text-stone-500 mt-2 text-lg">Generate your volunteer participation certificates.</p></div>
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : templates.length === 0
-                ? <Empty msg="No certificate templates available yet." />
-                : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {templates.map(c => (
-                            <div key={c.id} className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100 hover:shadow-lg transition-shadow flex flex-col">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-3 rounded-2xl" style={{ backgroundColor: c.primaryColor + '20' }}>
-                                        <BadgeCheck className="w-8 h-8" style={{ color: c.primaryColor }} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-stone-800">{c.name}</h3>
-                                        <p className="text-sm text-stone-400">{c.organizationName || 'System Preset'}</p>
-                                    </div>
-                                </div>
-                                <p className="text-sm text-stone-500 mb-5 flex-1">{c.description}</p>
-                                <button onClick={() => openGenerate(c.id)}
-                                    className="w-full py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 text-sm flex items-center justify-center gap-2 shadow-sm shadow-orange-500/20">
-                                    <Download className="w-4 h-4" /> Generate Certificate
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
 
-            {/* Confirm Generate Modal */}
-            {showGenerate && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full space-y-4 text-center">
-                        <div className="text-5xl">🏅</div>
-                        <h3 className="text-xl font-bold text-stone-800">Generate Certificate</h3>
-                        <p className="text-stone-500 text-sm">A PDF certificate will be generated for your volunteer work and opened for download.</p>
-                        <div className="flex gap-3 justify-center">
-                            <button onClick={() => setShowGenerate(false)} className="px-5 py-2.5 bg-stone-100 text-stone-600 font-bold rounded-xl hover:bg-stone-200">Cancel</button>
-                            <button onClick={handleGenerate} disabled={generating}
-                                className="px-5 py-2.5 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2">
-                                {generating && <Loader2 className="w-4 h-4 animate-spin" />} Generate
-                            </button>
-                        </div>
+            <div>
+                <h1 className="text-3xl font-extrabold text-stone-800">My Certificates</h1>
+                <p className="text-stone-500 mt-2 text-lg">Download your volunteer participation certificates. Your real hours and activities are auto-filled.</p>
+            </div>
+
+            {/* Hours summary */}
+            {profile && (
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl p-5 flex items-center gap-4 border border-orange-100">
+                    <div className="p-3 bg-orange-500 rounded-2xl"><Award className="w-6 h-6 text-white" /></div>
+                    <div>
+                        <p className="text-sm font-semibold text-orange-700">Your Total Confirmed Hours</p>
+                        <p className="text-2xl font-extrabold text-stone-800">{profile.totalHours.toFixed(1)} hrs <span className="text-sm font-normal text-stone-500">across {profile.completedOpportunities} opportunities</span></p>
                     </div>
                 </div>
             )}
+
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : templates.length === 0
+                ? <Empty msg="No certificate templates available yet. Ask your coordinator to create one." />
+                : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {templates.map(t => {
+                            const style = getTemplateStyle(t);
+                            return (
+                                <div key={t.id} className="bg-white rounded-3xl p-5 shadow-sm border border-stone-100 hover:shadow-lg transition-shadow flex flex-col">
+                                    <CertMiniThumb t={t} />
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${style === 'award' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {style === 'award' ? 'Certificate' : 'Hours Log'}
+                                        </span>
+                                        {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded-full">System</span>}
+                                    </div>
+                                    <h3 className="font-bold text-stone-800 mt-1">{t.name}</h3>
+                                    {t.organizationName && <p className="text-xs text-stone-400 mt-0.5">{t.organizationName}</p>}
+                                    <p className="text-sm text-stone-500 mt-2 mb-4 flex-1">{t.description}</p>
+                                    <button
+                                        onClick={() => handleDownload(t)}
+                                        disabled={generating === t.id}
+                                        className="w-full py-2.5 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+                                        style={{ background: `linear-gradient(90deg,${t.primaryColor || '#F59E0B'},${t.accentColor || '#EA580C'})` }}
+                                    >
+                                        {generating === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {generating === t.id ? 'Preparing…' : 'Download Certificate'}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
         </div>
     );
 }

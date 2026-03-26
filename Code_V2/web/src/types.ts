@@ -281,9 +281,14 @@ export interface CertificateTemplate {
     description: string;
     organizationId: string | null;
     organizationName: string | null;
+    templateType: 'achievement_certificate' | 'hours_log';
     primaryColor: string;
     accentColor: string;
     isSystemPreset: boolean;
+    /** 'award' | 'tracking' — stored in titleText on backend */
+    titleText?: string;
+    signatoryName?: string;
+    signatoryTitle?: string;
 }
 
 export interface GenerateCertificateResult {

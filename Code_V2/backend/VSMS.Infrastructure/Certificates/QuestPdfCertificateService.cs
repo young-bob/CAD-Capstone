@@ -14,6 +14,9 @@ public class QuestPdfCertificateService : ICertificateService
 
     public Task<byte[]> GeneratePdfAsync(CertificateData data, CertificateTemplateInfo template)
     {
+        if (template.TemplateType == CertificateTemplateTypes.HoursLog)
+            return Task.FromResult(GenerateHoursLogPdf(data, template));
+
         var titleText = template.TitleText ?? "Certificate of Volunteer Service";
         var bodyText = BuildBodyText(data, template);
 
@@ -105,6 +108,117 @@ public class QuestPdfCertificateService : ICertificateService
         var bytes = doc.GeneratePdf();
         return Task.FromResult(bytes);
     }
+
+    private static byte[] GenerateHoursLogPdf(CertificateData data, CertificateTemplateInfo template)
+    {
+        var titleText = template.TitleText ?? "Community Involvement Hours Log";
+        var today = DateTime.UtcNow.ToString("MMMM dd, yyyy");
+
+        var doc = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(24);
+                page.DefaultTextStyle(x => x.FontSize(11));
+
+                page.Content().Column(col =>
+                {
+                    col.Spacing(12);
+
+                    col.Item().Background(template.PrimaryColor).Padding(16).Column(header =>
+                    {
+                        header.Item().Text(titleText).FontSize(20).Bold().FontColor(Colors.White);
+                        header.Item().PaddingTop(4).Text("Verified volunteer activity summary").FontSize(10).FontColor(Colors.White);
+                    });
+
+                    col.Item().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(12).Row(info =>
+                    {
+                        info.RelativeItem().Column(left =>
+                        {
+                            left.Item().Text($"Volunteer: {data.VolunteerName}").Bold();
+                            left.Item().Text($"Organization: {data.OrganizationName ?? "Community Organization"}");
+                        });
+
+                        info.RelativeItem().Column(right =>
+                        {
+                            right.Item().AlignRight().Text($"Issued: {today}");
+                            right.Item().AlignRight().Text($"Total Hours: {data.TotalHours:F1}");
+                        });
+                    });
+
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(3);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(1);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(CellHeader).Text("Activity");
+                            header.Cell().Element(CellHeader).Text("Organization");
+                            header.Cell().Element(CellHeader).Text("Completed");
+                            header.Cell().Element(CellHeader).AlignRight().Text("Hours");
+                        });
+
+                        if (data.Activities.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(4).Element(CellBody).Text("No verified activities recorded yet.");
+                        }
+                        else
+                        {
+                            foreach (var activity in data.Activities)
+                            {
+                                table.Cell().Element(CellBody).Text(activity.Title);
+                                table.Cell().Element(CellBody).Text(string.IsNullOrWhiteSpace(activity.OrganizationName) ? data.OrganizationName ?? "-" : activity.OrganizationName);
+                                table.Cell().Element(CellBody).Text(activity.CompletedAt?.ToString("yyyy-MM-dd") ?? "-");
+                                table.Cell().Element(CellBody).AlignRight().Text($"{activity.Hours:F1}");
+                            }
+                        }
+
+                        table.Cell().ColumnSpan(3).Element(CellTotal).AlignRight().Text("Total Hours");
+                        table.Cell().Element(CellTotal).AlignRight().Text($"{data.TotalHours:F1}");
+                    });
+
+                    col.Item().PaddingTop(8)
+                        .Text("This log was generated from verified participation records in VSMS. School-specific approval or signature fields can be completed manually if required.")
+                        .FontSize(9).FontColor(Colors.Grey.Darken1);
+
+                    col.Item().PaddingTop(24).Row(row =>
+                    {
+                        row.RelativeItem().Column(sig =>
+                        {
+                            sig.Item().Height(24);
+                            sig.Item().LineHorizontal(1);
+                            sig.Item().PaddingTop(4).Text("Volunteer Signature").FontSize(9).FontColor(Colors.Grey.Medium);
+                        });
+                        row.ConstantItem(30);
+                        row.RelativeItem().Column(sig =>
+                        {
+                            sig.Item().Height(24);
+                            sig.Item().LineHorizontal(1);
+                            sig.Item().PaddingTop(4).Text(template.SignatoryName ?? "Authorized Representative").FontSize(9).FontColor(Colors.Grey.Medium);
+                        });
+                    });
+                });
+            });
+        });
+
+        return doc.GeneratePdf();
+    }
+
+    private static IContainer CellHeader(IContainer container) =>
+        container.Background(Colors.Grey.Darken2).PaddingVertical(6).PaddingHorizontal(8).DefaultTextStyle(x => x.FontColor(Colors.White).Bold().FontSize(10));
+
+    private static IContainer CellBody(IContainer container) =>
+        container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(6).PaddingHorizontal(8);
+
+    private static IContainer CellTotal(IContainer container) =>
+        container.Background(Colors.Grey.Lighten3).PaddingVertical(7).PaddingHorizontal(8).DefaultTextStyle(x => x.Bold());
 
     private static string BuildBodyText(CertificateData data, CertificateTemplateInfo template)
     {

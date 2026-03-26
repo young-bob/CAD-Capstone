@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using VSMS.Abstractions.Services;
 
 namespace VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
@@ -28,6 +29,12 @@ public class CertificateTemplateEntity
     /// <summary>Organization name (cached for display convenience)</summary>
     [MaxLength(200)]
     public string? OrganizationName { get; set; }
+
+    /// <summary>
+    /// Supported document families: achievement_certificate, hours_log.
+    /// </summary>
+    [Required, MaxLength(50)]
+    public string TemplateType { get; set; } = CertificateTemplateTypes.AchievementCertificate;
 
     /// <summary>Optional logo image file key stored in MinIO</summary>
     [MaxLength(500)]
