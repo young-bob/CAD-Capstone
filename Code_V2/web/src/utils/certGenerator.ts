@@ -18,6 +18,7 @@ export function buildAwardCertHtml(
     totalHours: number,
     activities: CertActivity[],
     template: CertificateTemplate,
+    volunteerSignatureName?: string,
 ): string {
     const p = template.primaryColor || '#F59E0B';
     const a = template.accentColor || '#EA580C';
@@ -59,6 +60,7 @@ export function buildAwardCertHtml(
   .sig-line{width:180px;height:1px;background:#374151;margin:0 auto 6px}
   .sig-lbl{font-family:Arial,sans-serif;font-size:11px;color:#6b7280;letter-spacing:1px;text-transform:uppercase}
   .sig-name{font-family:Arial,sans-serif;font-size:13px;color:#1c1917;font-weight:bold;margin-bottom:4px}
+  .sig-script{font-family:'Brush Script MT','Lucida Handwriting','Segoe Script',cursive;font-size:26px;color:#1c1917;line-height:1;margin-bottom:4px}
   .seal{width:70px;height:70px;border-radius:50%;border:3px solid ${p};display:flex;align-items:center;justify-content:center;flex-direction:column;color:${p};font-family:Arial,sans-serif;font-size:8px;font-weight:bold;letter-spacing:1px;text-align:center;text-transform:uppercase;line-height:1.3}
   .bot{height:6px;background:linear-gradient(90deg,${p},${a})}
 </style>
@@ -79,6 +81,7 @@ export function buildAwardCertHtml(
     <div class="sig-row">
       <div class="sig">
         <div class="sig-line"></div>
+        ${volunteerSignatureName ? `<div class="sig-script">${volunteerSignatureName}</div>` : ''}
         <div class="sig-name">${signatoryName}</div>
         <div class="sig-lbl">${signatoryTitle}</div>
       </div>
@@ -104,6 +107,7 @@ export function buildTrackingFormHtml(
     districtName: string,
     activities: CertActivity[],
     template: CertificateTemplate,
+    volunteerSignatureName?: string,
 ): string {
     const p = template.primaryColor || '#F59E0B';
     const a = template.accentColor || '#EA580C';
@@ -151,6 +155,7 @@ export function buildTrackingFormHtml(
   .sig-section{padding:24px 32px;display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:8px}
   .sig-block{text-align:center}
   .sig-line{border-bottom:1px solid #374151;margin-bottom:6px;height:28px}
+  .sig-script{font-family:'Brush Script MT','Lucida Handwriting','Segoe Script',cursive;font-size:24px;color:#1c1917;line-height:1;margin-bottom:4px}
   .sig-name{font-size:13px;color:#1c1917;font-weight:bold;margin-bottom:4px}
   .sig-lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px}
   .footer{background:${p}10;padding:12px 32px;font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid ${p}20}
@@ -203,6 +208,7 @@ export function buildTrackingFormHtml(
   <div class="sig-section">
     <div class="sig-block">
       <div class="sig-line"></div>
+      ${volunteerSignatureName ? `<div class="sig-script">${volunteerSignatureName}</div>` : ''}
       <div class="sig-lbl">Volunteer Signature &amp; Date</div>
     </div>
     <div class="sig-block">

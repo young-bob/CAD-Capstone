@@ -1417,6 +1417,8 @@ export function VolCertificates() {
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
     const [generating, setGenerating] = useState<string | null>(null);
+    const [pendingTemplate, setPendingTemplate] = useState<CertificateTemplate | null>(null);
+    const [volunteerSignatureName, setVolunteerSignatureName] = useState('');
 
     const SEEN_KEY = `vsms_seen_certs_${auth.email ?? ''}`;
 
@@ -1444,7 +1446,7 @@ export function VolCertificates() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-    const handleDownload = (template: CertificateTemplate) => {
+    const handleDownload = (template: CertificateTemplate, signatureName?: string) => {
         setGenerating(template.id);
         try {
             const volunteerName = profile
@@ -1463,14 +1465,28 @@ export function VolCertificates() {
             const totalHours = profile?.totalHours ?? activities.reduce((s, a) => s + a.hours, 0);
             const style = getTemplateStyle(template);
             const html = style === 'tracking'
-                ? buildTrackingFormHtml(volunteerName, districtName, activities, template)
-                : buildAwardCertHtml(volunteerName, districtName, totalHours, activities, template);
+                ? buildTrackingFormHtml(volunteerName, districtName, activities, template, signatureName)
+                : buildAwardCertHtml(volunteerName, districtName, totalHours, activities, template, signatureName);
             const win = window.open('', '_blank');
             if (win) { win.document.write(html); win.document.close(); }
             else showToast('Please allow popups to download certificates.');
         } finally {
             setGenerating(null);
         }
+    };
+
+    const openDownloadConfirm = (template: CertificateTemplate) => {
+        const defaultName = profile
+            ? `${profile.firstName} ${profile.lastName}`.trim()
+            : '';
+        setVolunteerSignatureName(defaultName);
+        setPendingTemplate(template);
+    };
+
+    const confirmDownload = () => {
+        if (!pendingTemplate) return;
+        handleDownload(pendingTemplate, volunteerSignatureName.trim() || undefined);
+        setPendingTemplate(null);
     };
 
     // Mini thumbnail (same style as coordinator side)
@@ -1549,7 +1565,7 @@ export function VolCertificates() {
                                     {t.organizationName && <p className="text-xs text-stone-400 mt-0.5">{t.organizationName}</p>}
                                     <p className="text-sm text-stone-500 mt-2 mb-4 flex-1">{t.description}</p>
                                     <button
-                                        onClick={() => handleDownload(t)}
+                                        onClick={() => openDownloadConfirm(t)}
                                         disabled={generating === t.id}
                                         className="w-full py-2.5 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
                                         style={{ background: `linear-gradient(90deg,${t.primaryColor || '#F59E0B'},${t.accentColor || '#EA580C'})` }}
@@ -1562,6 +1578,47 @@ export function VolCertificates() {
                         })}
                     </div>
                 )}
+
+            {pendingTemplate && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-stone-800">Confirm Download</h3>
+                            <p className="text-sm text-stone-500 mt-1">
+                                Add your signature name before generating this {getTemplateStyle(pendingTemplate) === 'award' ? 'certificate' : 'hours log'}.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-stone-600">Volunteer Signature</label>
+                            <input
+                                value={volunteerSignatureName}
+                                onChange={e => setVolunteerSignatureName(e.target.value)}
+                                placeholder="Type your name"
+                                className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none"
+                            />
+                            <p className="text-xs text-stone-400">
+                                Your typed name will appear in a handwriting-style signature font on the document.
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setPendingTemplate(null)}
+                                className="px-4 py-2 rounded-xl bg-stone-100 text-stone-600 font-bold hover:bg-stone-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDownload}
+                                className="px-4 py-2 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600"
+                            >
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
