@@ -17,9 +17,16 @@ public static class CertificateEndpoints
         // Get all available templates (system presets + org-specific)
         group.MapGet("/templates", async (Guid? organizationId, AppDbContext db) =>
         {
-            var templates = await db.CertificateTemplates
+            var query = db.CertificateTemplates
                 .AsNoTracking()
-                .Where(t => t.IsActive && (t.OrganizationId == null || t.OrganizationId == organizationId))
+                .Where(t => t.IsActive);
+
+            if (organizationId.HasValue)
+            {
+                query = query.Where(t => t.OrganizationId == null || t.OrganizationId == organizationId);
+            }
+
+            var templates = await query
                 .OrderBy(t => t.OrganizationId == null ? 0 : 1) // System presets first
                 .ThenBy(t => t.Name)
                 .Select(t => new TemplateListItem(
