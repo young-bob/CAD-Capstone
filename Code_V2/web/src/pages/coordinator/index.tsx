@@ -1988,9 +1988,11 @@ export function CoordCertTemplates() {
         accentColor: string;
         templateType: 'achievement_certificate' | 'hours_log';
         titleText: string;
+        signatoryName: string;
+        signatoryTitle: string;
     }>({
         name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C',
-        templateType: 'achievement_certificate', titleText: '',
+        templateType: 'achievement_certificate', titleText: '', signatoryName: '', signatoryTitle: '',
     });
     const [creating, setCreating] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
@@ -2001,9 +2003,11 @@ export function CoordCertTemplates() {
         accentColor: string;
         templateType: 'achievement_certificate' | 'hours_log';
         titleText: string;
+        signatoryName: string;
+        signatoryTitle: string;
     }>({
         name: '', description: '', primaryColor: '', accentColor: '',
-        templateType: 'achievement_certificate', titleText: '',
+        templateType: 'achievement_certificate', titleText: '', signatoryName: '', signatoryTitle: '',
     });
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -2035,10 +2039,15 @@ export function CoordCertTemplates() {
                 primaryColor: createForm.primaryColor,
                 accentColor: createForm.accentColor,
                 titleText: createForm.titleText,
+                signatoryName: createForm.signatoryName || undefined,
+                signatoryTitle: createForm.signatoryTitle || undefined,
                 organizationId: auth.linkedGrainId || undefined,
             });
             setShowCreate(false);
-            setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C', templateType: 'achievement_certificate', titleText: '' });
+            setCreateForm({
+                name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C',
+                templateType: 'achievement_certificate', titleText: '', signatoryName: '', signatoryTitle: ''
+            });
             showToast('Template created!');
             refreshSoon();
         } catch (err: any) {
@@ -2054,6 +2063,8 @@ export function CoordCertTemplates() {
             primaryColor: t.primaryColor, accentColor: t.accentColor,
             templateType: t.templateType || 'achievement_certificate',
             titleText: t.titleText || '',
+            signatoryName: t.signatoryName || '',
+            signatoryTitle: t.signatoryTitle || '',
         });
         setDeleteConfirm(null);
     };
@@ -2067,6 +2078,8 @@ export function CoordCertTemplates() {
                 primaryColor: editForm.primaryColor, accentColor: editForm.accentColor,
                 templateType: editForm.templateType,
                 titleText: editForm.titleText,
+                signatoryName: editForm.signatoryName || undefined,
+                signatoryTitle: editForm.signatoryTitle || undefined,
             });
             setEditingTemplate(null);
             showToast('Template updated!');
@@ -2123,6 +2136,10 @@ export function CoordCertTemplates() {
                         <TypeToggle value={createForm.templateType} onChange={v => setCreateForm(p => ({ ...p, templateType: v }))} />
                     </div>
                     <input placeholder="Document Title (optional)" value={createForm.titleText} onChange={e => setCreateForm(p => ({ ...p, titleText: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input placeholder="Signatory Name (optional)" value={createForm.signatoryName} onChange={e => setCreateForm(p => ({ ...p, signatoryName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                        <input placeholder="Signatory Title (optional)" value={createForm.signatoryTitle} onChange={e => setCreateForm(p => ({ ...p, signatoryTitle: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    </div>
                     <div className="flex gap-4">
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={createForm.primaryColor} onChange={e => setCreateForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Accent Color</label><input type="color" value={createForm.accentColor} onChange={e => setCreateForm(p => ({ ...p, accentColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
@@ -2149,6 +2166,10 @@ export function CoordCertTemplates() {
                         <TypeToggle value={editForm.templateType} onChange={v => setEditForm(p => ({ ...p, templateType: v }))} />
                     </div>
                     <input placeholder="Document Title (optional)" value={editForm.titleText} onChange={e => setEditForm(p => ({ ...p, titleText: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input placeholder="Signatory Name (optional)" value={editForm.signatoryName} onChange={e => setEditForm(p => ({ ...p, signatoryName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                        <input placeholder="Signatory Title (optional)" value={editForm.signatoryTitle} onChange={e => setEditForm(p => ({ ...p, signatoryTitle: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                    </div>
                     <div className="flex gap-4">
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Primary Color</label><input type="color" value={editForm.primaryColor} onChange={e => setEditForm(p => ({ ...p, primaryColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>
                         <div><label className="block text-sm font-medium text-stone-600 mb-1">Accent Color</label><input type="color" value={editForm.accentColor} onChange={e => setEditForm(p => ({ ...p, accentColor: e.target.value }))} className="w-12 h-10 rounded-lg cursor-pointer" /></div>

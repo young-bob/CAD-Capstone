@@ -22,6 +22,8 @@ export function buildAwardCertHtml(
     const p = template.primaryColor || '#F59E0B';
     const a = template.accentColor || '#EA580C';
     const today = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    const signatoryName = template.signatoryName?.trim() || districtName;
+    const signatoryTitle = template.signatoryTitle?.trim() || 'Authorized Organization Representative';
     const actDesc = activities.length > 0
         ? activities.map(x => x.title).slice(0, 3).join(', ')
         : 'Community Volunteer Service';
@@ -77,7 +79,8 @@ export function buildAwardCertHtml(
     <div class="sig-row">
       <div class="sig">
         <div class="sig-line"></div>
-        <div class="sig-lbl">Authorized Signature</div>
+        <div class="sig-name">${signatoryName}</div>
+        <div class="sig-lbl">${signatoryTitle}</div>
       </div>
       <div class="seal"><div>✦</div><div>VSMS</div><div>Official</div></div>
       <div class="sig">
@@ -106,6 +109,8 @@ export function buildTrackingFormHtml(
     const a = template.accentColor || '#EA580C';
     const totalHours = activities.reduce((s, x) => s + x.hours, 0);
     const today = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+    const signatoryName = template.signatoryName?.trim() || districtName;
+    const signatoryTitle = template.signatoryTitle?.trim() || 'Authorized Organization Representative';
 
     const rows = activities.length > 0
         ? activities.map(x => `
@@ -146,6 +151,7 @@ export function buildTrackingFormHtml(
   .sig-section{padding:24px 32px;display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:8px}
   .sig-block{text-align:center}
   .sig-line{border-bottom:1px solid #374151;margin-bottom:6px;height:28px}
+  .sig-name{font-size:13px;color:#1c1917;font-weight:bold;margin-bottom:4px}
   .sig-lbl{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:1px}
   .footer{background:${p}10;padding:12px 32px;font-size:10px;color:#9ca3af;text-align:center;border-top:1px solid ${p}20}
   .badge{display:inline-block;background:linear-gradient(135deg,${p},${a});color:white;font-size:13px;font-weight:bold;padding:6px 18px;border-radius:50px}
@@ -201,7 +207,8 @@ export function buildTrackingFormHtml(
     </div>
     <div class="sig-block">
       <div class="sig-line"></div>
-      <div class="sig-lbl">Authorized Organization Representative</div>
+      <div class="sig-name">${signatoryName}</div>
+      <div class="sig-lbl">${signatoryTitle}</div>
     </div>
   </div>
 

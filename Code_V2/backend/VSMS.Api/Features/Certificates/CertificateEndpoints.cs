@@ -53,7 +53,9 @@ public static class CertificateEndpoints
                 t.TemplateType,
                 t.PrimaryColor,
                 t.AccentColor,
-                t.OrganizationId == null));
+                t.OrganizationId == null,
+                t.SignatoryName,
+                t.SignatoryTitle));
 
             return Results.Ok(result);
         });
@@ -315,7 +317,8 @@ public static class CertificateEndpoints
 public record TemplateListItem(
     Guid Id, string Name, string Description,
     Guid? OrganizationId, string? OrganizationName,
-    string TemplateType, string PrimaryColor, string AccentColor, bool IsSystemPreset);
+    string TemplateType, string PrimaryColor, string AccentColor, bool IsSystemPreset,
+    string? SignatoryName, string? SignatoryTitle);
 
 public record CreateTemplateRequest(
     string Name, string? Description,

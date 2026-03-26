@@ -113,6 +113,12 @@ public class QuestPdfCertificateService : ICertificateService
     {
         var titleText = template.TitleText ?? "Community Involvement Hours Log";
         var today = DateTime.UtcNow.ToString("MMMM dd, yyyy");
+        var signatoryName = string.IsNullOrWhiteSpace(template.SignatoryName)
+            ? data.OrganizationName ?? "Authorized Organization Representative"
+            : template.SignatoryName;
+        var signatoryTitle = string.IsNullOrWhiteSpace(template.SignatoryTitle)
+            ? "Authorized Organization Representative"
+            : template.SignatoryTitle;
 
         var doc = Document.Create(container =>
         {
@@ -201,7 +207,8 @@ public class QuestPdfCertificateService : ICertificateService
                         {
                             sig.Item().Height(24);
                             sig.Item().LineHorizontal(1);
-                            sig.Item().PaddingTop(4).Text(template.SignatoryName ?? "Authorized Representative").FontSize(9).FontColor(Colors.Grey.Medium);
+                            sig.Item().PaddingTop(4).Text(signatoryName).FontSize(9).FontColor(Colors.Grey.Darken1);
+                            sig.Item().Text(signatoryTitle).FontSize(8).FontColor(Colors.Grey.Medium);
                         });
                     });
                 });
