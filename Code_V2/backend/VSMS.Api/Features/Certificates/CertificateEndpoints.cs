@@ -29,12 +29,33 @@ public static class CertificateEndpoints
             var templates = await query
                 .OrderBy(t => t.OrganizationId == null ? 0 : 1) // System presets first
                 .ThenBy(t => t.Name)
-                .Select(t => new TemplateListItem(
-                    t.Id, t.Name, t.Description, t.OrganizationId, t.OrganizationName,
-                    t.TemplateType, t.PrimaryColor, t.AccentColor, t.OrganizationId == null))
                 .ToListAsync();
 
-            return Results.Ok(templates);
+            var orgIds = templates
+                .Where(t => t.OrganizationId.HasValue && string.IsNullOrWhiteSpace(t.OrganizationName))
+                .Select(t => t.OrganizationId!.Value)
+                .Distinct()
+                .ToList();
+
+            var orgNameMap = orgIds.Count == 0
+                ? new Dictionary<Guid, string>()
+                : await db.OrganizationReadModels
+                    .AsNoTracking()
+                    .Where(o => orgIds.Contains(o.OrgId))
+                    .ToDictionaryAsync(o => o.OrgId, o => o.Name);
+
+            var result = templates.Select(t => new TemplateListItem(
+                t.Id,
+                t.Name,
+                t.Description,
+                t.OrganizationId,
+                ResolveOrganizationName(t.OrganizationName, t.OrganizationId, orgNameMap),
+                t.TemplateType,
+                t.PrimaryColor,
+                t.AccentColor,
+                t.OrganizationId == null));
+
+            return Results.Ok(result);
         });
 
         // Get a single template by ID
@@ -44,18 +65,25 @@ public static class CertificateEndpoints
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == templateId);
             if (t is null) return Results.NotFound();
+
+            var orgName = await ResolveOrganizationNameAsync(db, t.OrganizationName, t.OrganizationId);
+            if (!string.Equals(orgName, t.OrganizationName, StringComparison.Ordinal))
+                t.OrganizationName = orgName;
+
             return Results.Ok(t);
         });
 
         // Create a new template (org-specific custom template)
         group.MapPost("/templates", async (CreateTemplateRequest req, AppDbContext db) =>
         {
+            var organizationName = await ResolveOrganizationNameAsync(db, req.OrganizationName, req.OrganizationId);
+
             var entity = new CertificateTemplateEntity
             {
                 Name = req.Name,
                 Description = req.Description ?? string.Empty,
                 OrganizationId = req.OrganizationId,
-                OrganizationName = req.OrganizationName,
+                OrganizationName = organizationName,
                 TemplateType = NormalizeTemplateType(req.TemplateType, req.TitleText),
                 LogoFileKey = req.LogoFileKey,
                 BackgroundFileKey = req.BackgroundFileKey,
@@ -81,7 +109,7 @@ public static class CertificateEndpoints
 
             entity.Name = req.Name ?? entity.Name;
             entity.Description = req.Description ?? entity.Description;
-            entity.OrganizationName = req.OrganizationName ?? entity.OrganizationName;
+            entity.OrganizationName = await ResolveOrganizationNameAsync(db, req.OrganizationName ?? entity.OrganizationName, entity.OrganizationId);
             entity.TemplateType = NormalizeTemplateType(req.TemplateType, req.TitleText, entity.TemplateType);
             entity.LogoFileKey = req.LogoFileKey ?? entity.LogoFileKey;
             entity.BackgroundFileKey = req.BackgroundFileKey ?? entity.BackgroundFileKey;
@@ -131,6 +159,8 @@ public static class CertificateEndpoints
             if (templateEntity is null)
                 return Results.BadRequest("Template not found");
 
+            var resolvedOrganizationName = await ResolveOrganizationNameAsync(db, templateEntity.OrganizationName, templateEntity.OrganizationId);
+
             // 3. Optionally load logo bytes from MinIO
             byte[]? logoBytes = null;
             if (!string.IsNullOrEmpty(templateEntity.LogoFileKey))
@@ -157,7 +187,7 @@ public static class CertificateEndpoints
                 VolunteerName = $"{profile.FirstName} {profile.LastName}",
                 TotalHours = profile.TotalHours,
                 CompletedOpportunities = profile.CompletedOpportunities,
-                OrganizationName = templateEntity.OrganizationName,
+                OrganizationName = resolvedOrganizationName,
                 Activities = await db.AttendanceReadModels
                     .AsNoTracking()
                     .Where(a => a.VolunteerId == req.VolunteerId &&
@@ -168,7 +198,7 @@ public static class CertificateEndpoints
                     .Select(a => new CertificateActivity
                     {
                         Title = a.OpportunityTitle,
-                        OrganizationName = templateEntity.OrganizationName ?? string.Empty,
+                        OrganizationName = resolvedOrganizationName ?? string.Empty,
                         CompletedAt = a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime,
                         Hours = a.TotalHours
                     })
@@ -251,6 +281,32 @@ public static class CertificateEndpoints
             return CertificateTemplateTypes.HoursLog;
 
         return fallback ?? CertificateTemplateTypes.AchievementCertificate;
+    }
+
+    private static async Task<string?> ResolveOrganizationNameAsync(AppDbContext db, string? preferredName, Guid? organizationId)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredName))
+            return preferredName.Trim();
+
+        if (!organizationId.HasValue)
+            return preferredName;
+
+        return await db.OrganizationReadModels
+            .AsNoTracking()
+            .Where(o => o.OrgId == organizationId.Value)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync();
+    }
+
+    private static string? ResolveOrganizationName(string? preferredName, Guid? organizationId, IReadOnlyDictionary<Guid, string> orgNameMap)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredName))
+            return preferredName;
+
+        if (organizationId.HasValue && orgNameMap.TryGetValue(organizationId.Value, out var name))
+            return name;
+
+        return preferredName;
     }
 }
 

@@ -1988,10 +1988,9 @@ export function CoordCertTemplates() {
         accentColor: string;
         templateType: 'achievement_certificate' | 'hours_log';
         titleText: string;
-        organizationName: string;
     }>({
         name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C',
-        templateType: 'achievement_certificate', titleText: '', organizationName: '',
+        templateType: 'achievement_certificate', titleText: '',
     });
     const [creating, setCreating] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null);
@@ -2002,10 +2001,9 @@ export function CoordCertTemplates() {
         accentColor: string;
         templateType: 'achievement_certificate' | 'hours_log';
         titleText: string;
-        organizationName: string;
     }>({
         name: '', description: '', primaryColor: '', accentColor: '',
-        templateType: 'achievement_certificate', titleText: '', organizationName: '',
+        templateType: 'achievement_certificate', titleText: '',
     });
     const [saving, setSaving] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -2037,11 +2035,10 @@ export function CoordCertTemplates() {
                 primaryColor: createForm.primaryColor,
                 accentColor: createForm.accentColor,
                 titleText: createForm.titleText,
-                organizationName: createForm.organizationName || undefined,
                 organizationId: auth.linkedGrainId || undefined,
             });
             setShowCreate(false);
-            setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C', templateType: 'achievement_certificate', titleText: '', organizationName: '' });
+            setCreateForm({ name: '', description: '', primaryColor: '#F59E0B', accentColor: '#EA580C', templateType: 'achievement_certificate', titleText: '' });
             showToast('Template created!');
             refreshSoon();
         } catch (err: any) {
@@ -2057,7 +2054,6 @@ export function CoordCertTemplates() {
             primaryColor: t.primaryColor, accentColor: t.accentColor,
             templateType: t.templateType || 'achievement_certificate',
             titleText: t.titleText || '',
-            organizationName: t.organizationName || '',
         });
         setDeleteConfirm(null);
     };
@@ -2070,7 +2066,7 @@ export function CoordCertTemplates() {
                 name: editForm.name, description: editForm.description,
                 primaryColor: editForm.primaryColor, accentColor: editForm.accentColor,
                 templateType: editForm.templateType,
-                titleText: editForm.titleText, organizationName: editForm.organizationName || undefined,
+                titleText: editForm.titleText,
             });
             setEditingTemplate(null);
             showToast('Template updated!');
@@ -2122,7 +2118,6 @@ export function CoordCertTemplates() {
                     <h3 className="text-lg font-bold text-stone-800">New Template</h3>
                     <input placeholder="Template Name *" value={createForm.name} onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Description" value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <input placeholder="Organization Name (shown on document)" value={createForm.organizationName} onChange={e => setCreateForm(p => ({ ...p, organizationName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <div>
                         <label className="block text-sm font-semibold text-stone-600 mb-2">Document Type</label>
                         <TypeToggle value={createForm.templateType} onChange={v => setCreateForm(p => ({ ...p, templateType: v }))} />
@@ -2149,7 +2144,6 @@ export function CoordCertTemplates() {
                     </div>
                     <input placeholder="Template Name *" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <input placeholder="Description" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
-                    <input placeholder="Organization Name (shown on document)" value={editForm.organizationName} onChange={e => setEditForm(p => ({ ...p, organizationName: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
                     <div>
                         <label className="block text-sm font-semibold text-stone-600 mb-2">Document Type</label>
                         <TypeToggle value={editForm.templateType} onChange={v => setEditForm(p => ({ ...p, templateType: v }))} />
