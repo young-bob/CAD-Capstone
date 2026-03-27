@@ -18,6 +18,7 @@ import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
 import { taskService, type EventTask } from '../../services/tasks';
 import { volunteerService } from '../../services/volunteers';
+import { aiService } from '../../services/ai';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import EventCalendar from '../../components/EventCalendar';
 import ActivityFeed, { type ActivityItem } from '../../components/ActivityFeed';
@@ -665,8 +666,6 @@ function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
         setContextText(`${opp.title} is a ${opp.category || 'volunteer'} opportunity organized by ${orgName}.`);
     }, []);
 
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
-
     const fallback = () => {
         const tag = opp.category ? `#${opp.category.replace(/\s+/g,'')}` : '#volunteer';
         setTwitter(`Join us at ${orgName}! We need volunteers for "${opp.title}". Sign up today! ${tag} #volunteering`);
@@ -674,31 +673,23 @@ function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
     };
 
     const generate = async () => {
-        if (!apiKey) { fallback(); return; }
         setLoading(true);
         try {
             const prompt = `Org: ${orgName}\nEvent: ${opp.title}\nCategory: ${opp.category || 'General'}\nDescription: ${contextText || opp.title}`;
-            const res = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true',
-                },
-                body: JSON.stringify({
-                    model: 'claude-haiku-4-5-20251001',
-                    max_tokens: 600,
-                    stream: false,
-                    system: `You are a social media copywriter for nonprofits. Given a volunteer opportunity, generate:
-1. Twitter/X version: ≤280 chars with 2–3 hashtags
-2. Instagram/LinkedIn version: 3–4 engaging sentences + call to action + 4–5 hashtags
-Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITTER:" and "INSTAGRAM:" labels on separate lines.`,
-                    messages: [{ role: 'user', content: prompt }],
-                }),
+            const res = await aiService.chat({
+                currentView: 'Coordinator Portal / Social Post Generator',
+                maxTokens: 700,
+                messages: [{
+                    role: 'user',
+                    content: `You are a social media copywriter for nonprofits. Given a volunteer opportunity, generate:
+1. Twitter/X version: <=280 chars with 2-3 hashtags
+2. Instagram/LinkedIn version: 3-4 engaging sentences + call to action + 4-5 hashtags
+Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITTER:" and "INSTAGRAM:" labels on separate lines.
+
+${prompt}`
+                }]
             });
-            const data = await res.json();
-            const text: string = data?.content?.[0]?.text ?? '';
+            const text = res.reply ?? '';
             const twMatch = text.match(/TWITTER:\s*([\s\S]*?)(?=INSTAGRAM:|$)/i);
             const igMatch = text.match(/INSTAGRAM:\s*([\s\S]*)/i);
             setTwitter(twMatch ? twMatch[1].trim() : text.slice(0, 280));

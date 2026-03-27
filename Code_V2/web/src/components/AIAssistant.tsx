@@ -5,14 +5,15 @@
  * - Floating purple button (bottom-right, fixed position)
  * - Dark-themed slide-up chat panel
  * - Role-aware responses (Volunteer / Coordinator / Admin)
- * - Simulated streaming (character-by-character reveal) for demo
- * - Real Anthropic API when VITE_ANTHROPIC_API_KEY is set in .env
+ * - Backend AI chat via /api/ai/chat
+ * - Simulated streaming reveal for better UX
  * - Quick suggestion pills per role
  * - Typing indicator while generating response
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
+import { aiService, type AiChatMessage } from '../services/ai';
 
 interface Message {
     id: string;
@@ -24,46 +25,6 @@ interface Message {
 interface Props {
     userRole: 'volunteer' | 'coordinator' | 'admin';
     currentView?: string;
-}
-
-// ─── Role-aware system prompt ─────────────────────────────────────────────────
-function buildSystemPrompt(role: string, currentView?: string): string {
-    const roleCtx: Record<string, string> = {
-        volunteer: `You are a friendly AI assistant for VSMS (Volunteer Service Management System).
-The user is a VOLUNTEER. Help them with:
-- Finding and applying for volunteer opportunities (status: Pending → Approved/Waitlisted/Rejected)
-- Understanding "Promoted" status: waitlisted volunteers promoted to approved when spots open
-- Geo-based check-in: arrive at the event location, tap "Check In Now", confirm with GPS
-- Impact score: increases with completed events and logged hours
-- Certificate collection: issued automatically after attendance is confirmed by coordinator
-- Managing skills profile: add skills to improve opportunity matching score
-- Opportunity matching: AI scoring based on skill overlap + distance
-Keep answers concise and friendly. Use bullet points when listing steps.`,
-
-        coordinator: `You are a helpful AI assistant for VSMS (Volunteer Service Management System).
-The user is a COORDINATOR managing a volunteer organization. Help them with:
-- Creating opportunities: navigate to "Manage Events", click "+", fill in title/location/shifts
-- Approval policies: AutoApprove (all accepted), ManualApprove (review each), InviteOnly (coordinator invites)
-- Reviewing applications: go to "Applications", approve or reject pending volunteers
-- Issuing certificates: generate from "Cert Templates" after event completion
-- Monitoring attendance: view check-in/check-out records per opportunity
-- Managing members: invite coordinators/members via "Members" page
-- Organization status: PendingApproval → Approved → Suspended if needed
-Keep answers concise and action-oriented.`,
-
-        admin: `You are a helpful AI assistant for VSMS (Volunteer Service Management System).
-The user is a SYSTEM ADMINISTRATOR. Help them with:
-- Approving organizations: go to "Organizations", review pending applications, approve or reject
-- Managing users: "User Control" → ban, unban, reset password, or delete accounts
-- Resolving disputes: "Disputes" → view attendance disputes, resolve with reason
-- Global skills taxonomy: "Skills" → add, edit, or delete skills used across the platform
-- System health: "System Info" → Orleans grain activations, silo health, CPU/memory metrics
-- Grain distribution: shows how actor workloads are spread across server nodes
-Keep answers technical and precise.`,
-    };
-
-    const viewHint = currentView ? `\nThe user is currently on the "${currentView}" page.` : '';
-    return (roleCtx[role] || roleCtx.volunteer) + viewHint;
 }
 
 // ─── Mock response bank (keyword-matched) ────────────────────────────────────
@@ -166,66 +127,6 @@ function simulateStream(
     return () => clearInterval(timer);
 }
 
-/** Real Anthropic API streaming */
-async function anthropicStream(
-    messages: { role: string; content: string }[],
-    systemPrompt: string,
-    apiKey: string,
-    onChunk: (chunk: string) => void,
-    onDone: () => void,
-    onError: (err: string) => void,
-): Promise<void> {
-    try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 1024,
-                stream: true,
-                system: systemPrompt,
-                messages,
-            }),
-        });
-
-        if (!response.ok) {
-            onError(`API error ${response.status}. Falling back to offline mode.`);
-            return;
-        }
-
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') continue;
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-                        onChunk(parsed.delta.text);
-                    }
-                } catch { /* skip malformed */ }
-            }
-        }
-        onDone();
-    } catch {
-        onError('Network error. Falling back to offline mode.');
-    }
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AIAssistant({ userRole, currentView }: Props) {
     const [isOpen, setIsOpen] = useState(false);
@@ -279,31 +180,26 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             cancelRef.current = null;
         };
 
-        const apiKey = (import.meta as any).env?.VITE_ANTHROPIC_API_KEY as string | undefined;
+        try {
+            const history: AiChatMessage[] = messages
+                .filter(m => m.role === 'user' || m.role === 'assistant')
+                .slice(-12)
+                .map(m => ({ role: m.role, content: m.content }));
 
-        if (apiKey) {
-            // Real API mode
-            const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-            await anthropicStream(
-                [...history, { role: 'user', content: userText.trim() }],
-                buildSystemPrompt(userRole, currentView),
-                apiKey,
-                onChunk,
-                onDone,
-                (errMsg) => {
-                    // Fall back to mock on API error
-                    const mockText = getMockResponse(userText, userRole) +
-                        `\n\n_⚠️ ${errMsg}_`;
-                    const cancel = simulateStream(mockText, onChunk, onDone);
-                    cancelRef.current = cancel;
-                },
-            );
-        } else {
-            // Mock mode
+            const res = await aiService.chat({
+                messages: [...history, { role: 'user', content: userText.trim() }],
+                currentView,
+            });
+
+            const text = res.reply?.trim() || 'I could not generate a response.';
+            const cancel = simulateStream(text, onChunk, onDone);
+            cancelRef.current = cancel;
+        } catch (error: any) {
             const mockText = getMockResponse(userText, userRole);
-            // Small initial delay to feel more realistic
+            const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
+            const fallback = `${mockText}\n\n_Warning: ${backendError}_`;
             await new Promise(r => setTimeout(r, 400));
-            const cancel = simulateStream(mockText, onChunk, onDone);
+            const cancel = simulateStream(fallback, onChunk, onDone);
             cancelRef.current = cancel;
         }
     }, [isStreaming, messages, userRole, currentView]);

@@ -128,6 +128,33 @@ npm run build
 
 ---
 
+## 🤖 AI Assistant (Backend Inference)
+
+Web AI calls now go through backend APIs (no direct browser call to model vendors):
+
+- `POST /api/ai/chat` (JWT required)
+- `GET /api/ai/tools` (JWT required)
+- `POST /api/ai/tools/run` (JWT required)
+
+Configure the backend AI provider in `backend/VSMS.Api/appsettings*.json` or environment variables:
+
+```env
+AI__Provider=BedrockDirect
+AI__Region=ca-central-1
+AI__Endpoint=https://YOUR_AWS_AI_ENDPOINT/v1/chat/completions
+AI__Model=us.amazon.nova-2-lite-v1:0
+AI__ApiKeyHeader=Authorization
+AI__ApiKey=YOUR_API_KEY
+AI__TimeoutSeconds=60
+AI__DefaultTemperature=0.2
+AI__DefaultMaxTokens=900
+```
+
+- `BedrockDirect` (recommended on EC2 with IAM role): `AI__Endpoint` and `AI__ApiKey` are optional.
+- `AwsApi` (proxy/gateway mode): requires `AI__Endpoint` (and usually `AI__ApiKey`).
+
+---
+
 ## 🧪 Seed Debug Data (System/Flow Testing)
 
 To quickly generate realistic data for end-to-end feature and process debugging (users, organizations, opportunities, shifts, applications, approvals, attendance, and disputes), run:

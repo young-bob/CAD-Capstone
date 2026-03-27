@@ -43,6 +43,16 @@ services:
       Minio__SecretKey: ${MINIO_SECRET_KEY}
       Minio__BucketName: vsms
       Minio__UseSsl: "false"
+      # ---- AI Inference (BedrockDirect via IAM role, or AwsApi proxy mode) ----
+      AI__Provider: ${AI_PROVIDER}
+      AI__Region: ${AI_REGION}
+      AI__Endpoint: ${AI_ENDPOINT}
+      AI__Model: ${AI_MODEL}
+      AI__ApiKeyHeader: ${AI_API_KEY_HEADER}
+      AI__ApiKey: ${AI_API_KEY}
+      AI__TimeoutSeconds: ${AI_TIMEOUT_SECONDS}
+      AI__DefaultTemperature: ${AI_DEFAULT_TEMPERATURE}
+      AI__DefaultMaxTokens: ${AI_DEFAULT_MAX_TOKENS}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/swagger/v1/swagger.json"]
       interval: 10s
