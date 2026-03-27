@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using VSMS.Infrastructure.Data.EfCoreQuery;
 
 #nullable disable
 
 namespace VSMS.Infrastructure.Data.EfCoreQuery.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260327103000_AddIssuedCertificates")]
     public partial class AddIssuedCertificates : Migration
     {
         /// <inheritdoc />
