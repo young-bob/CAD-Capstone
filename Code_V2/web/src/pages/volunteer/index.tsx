@@ -1446,9 +1446,13 @@ export function VolCertificates() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-    const handleDownload = (template: CertificateTemplate, signatureName?: string) => {
+    const handleDownload = async (template: CertificateTemplate, signatureName?: string) => {
         setGenerating(template.id);
         try {
+            if (!auth.linkedGrainId) {
+                showToast('Volunteer profile is not linked yet.');
+                return;
+            }
             const volunteerName = profile
                 ? `${profile.firstName} ${profile.lastName}`.trim()
                 : (auth.email ?? 'Volunteer');
@@ -1464,12 +1468,19 @@ export function VolCertificates() {
             }));
             const totalHours = profile?.totalHours ?? activities.reduce((s, a) => s + a.hours, 0);
             const style = getTemplateStyle(template);
+            const issued = await certificateService.issue(
+                auth.linkedGrainId,
+                template.id,
+                signatureName,
+            );
             const html = style === 'tracking'
-                ? buildTrackingFormHtml(volunteerName, districtName, activities, template, signatureName)
-                : buildAwardCertHtml(volunteerName, districtName, totalHours, activities, template, signatureName);
+                ? buildTrackingFormHtml(volunteerName, districtName, activities, template, signatureName, issued)
+                : buildAwardCertHtml(volunteerName, districtName, totalHours, activities, template, signatureName, issued);
             const win = window.open('', '_blank');
             if (win) { win.document.write(html); win.document.close(); }
             else showToast('Please allow popups to download certificates.');
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to generate verified certificate.'));
         } finally {
             setGenerating(null);
         }
@@ -1483,9 +1494,9 @@ export function VolCertificates() {
         setPendingTemplate(template);
     };
 
-    const confirmDownload = () => {
+    const confirmDownload = async () => {
         if (!pendingTemplate) return;
-        handleDownload(pendingTemplate, volunteerSignatureName.trim() || undefined);
+        await handleDownload(pendingTemplate, volunteerSignatureName.trim() || undefined);
         setPendingTemplate(null);
     };
 

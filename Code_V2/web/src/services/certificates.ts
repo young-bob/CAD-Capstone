@@ -1,5 +1,10 @@
 import api from './api';
-import type { CertificateTemplate, GenerateCertificateResult } from '../types';
+import type {
+    CertificateTemplate,
+    GenerateCertificateResult,
+    IssueCertificateResult,
+    CertificateVerificationRecord,
+} from '../types';
 
 function normalizeFileKey(raw: string): string {
     const key = (raw || '').trim();
@@ -63,6 +68,18 @@ export const certificateService = {
     },
     generate: async (volunteerId: string, templateId: string): Promise<GenerateCertificateResult> => {
         const res = await api.post<GenerateCertificateResult>('/api/certificates/generate', { volunteerId, templateId });
+        return res.data;
+    },
+    issue: async (volunteerId: string, templateId: string, volunteerSignatureName?: string): Promise<IssueCertificateResult> => {
+        const res = await api.post<IssueCertificateResult>('/api/certificates/issue', {
+            volunteerId,
+            templateId,
+            volunteerSignatureName,
+        });
+        return res.data;
+    },
+    verify: async (certificateId: string): Promise<CertificateVerificationRecord> => {
+        const res = await api.get<CertificateVerificationRecord>(`/api/certificates/verify/${encodeURIComponent(certificateId)}`);
         return res.data;
     },
     openGeneratedFile: async (fileKey: string, fileName?: string): Promise<void> => {

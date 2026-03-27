@@ -21,6 +21,9 @@ public class CertificateData
     public int CompletedOpportunities { get; set; }
     public string? OrganizationName { get; set; }
     public List<CertificateActivity> Activities { get; set; } = [];
+    public string? VolunteerSignatureName { get; set; }
+    public string? CertificateId { get; set; }
+    public string? VerificationUrl { get; set; }
 }
 
 public class CertificateTemplateInfo

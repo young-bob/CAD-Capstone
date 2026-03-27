@@ -30,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AttendanceReadModel> AttendanceReadModels => Set<AttendanceReadModel>();
     public DbSet<DisputeReadModel> DisputeReadModels => Set<DisputeReadModel>();
     public DbSet<CertificateTemplateEntity> CertificateTemplates => Set<CertificateTemplateEntity>();
+    public DbSet<IssuedCertificateEntity> IssuedCertificates => Set<IssuedCertificateEntity>();
     public DbSet<EventTemplateEntity> EventTemplates => Set<EventTemplateEntity>();
     public DbSet<VolunteerFollowEntity> VolunteerFollows => Set<VolunteerFollowEntity>();
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
@@ -119,6 +120,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasDatabaseName("IX_DisputeReadModels_RaisedAt");
 
         modelBuilder.Entity<CertificateTemplateEntity>().HasIndex(t => t.OrganizationId);
+        modelBuilder.Entity<IssuedCertificateEntity>().HasIndex(c => c.CertificateId).IsUnique();
+        modelBuilder.Entity<IssuedCertificateEntity>().HasIndex(c => c.VolunteerId);
+        modelBuilder.Entity<IssuedCertificateEntity>().HasIndex(c => c.IssuedAt);
         modelBuilder.Entity<EventTemplateEntity>().HasIndex(t => t.OrganizationId);
 
         modelBuilder.Entity<VolunteerFollowEntity>()

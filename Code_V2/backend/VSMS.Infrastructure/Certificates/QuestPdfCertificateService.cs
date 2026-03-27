@@ -19,6 +19,7 @@ public class QuestPdfCertificateService : ICertificateService
 
         var titleText = template.TitleText ?? "Certificate of Volunteer Service";
         var bodyText = BuildBodyText(data, template);
+        var volunteerSignature = string.IsNullOrWhiteSpace(data.VolunteerSignatureName) ? null : data.VolunteerSignatureName;
 
         var doc = Document.Create(container =>
         {
@@ -92,14 +93,31 @@ public class QuestPdfCertificateService : ICertificateService
                              row.RelativeItem().AlignCenter().Column(sigCol =>
                              {
                                  sigCol.Item().AlignCenter().LineHorizontal(1).LineColor(Colors.Grey.Medium);
+                                 if (!string.IsNullOrWhiteSpace(volunteerSignature))
+                                 {
+                                     sigCol.Item().AlignCenter().Text(volunteerSignature)
+                                        .FontSize(18).Italic().FontColor(template.AccentColor);
+                                 }
                                  sigCol.Item().AlignCenter().PaddingTop(4)
                                     .Text(template.SignatoryName ?? "Program Director")
                                     .FontSize(11).FontColor(Colors.Grey.Darken1);
                                  sigCol.Item().AlignCenter()
-                                    .Text(template.SignatoryTitle ?? "Authorized Signatory")
-                                    .FontSize(9).FontColor(Colors.Grey.Medium);
+                                     .Text(template.SignatoryTitle ?? "Authorized Signatory")
+                                     .FontSize(9).FontColor(Colors.Grey.Medium);
                              });
                          });
+
+                         if (!string.IsNullOrWhiteSpace(data.CertificateId))
+                         {
+                             col.Item().AlignCenter().Text($"Certificate ID: {data.CertificateId}")
+                                .FontSize(9).FontColor(Colors.Grey.Medium);
+                         }
+
+                         if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
+                         {
+                             col.Item().AlignCenter().Text($"Verify: {data.VerificationUrl}")
+                                .FontSize(9).FontColor(Colors.Grey.Medium);
+                         }
                      });
                 });
             });
@@ -119,6 +137,7 @@ public class QuestPdfCertificateService : ICertificateService
         var signatoryTitle = string.IsNullOrWhiteSpace(template.SignatoryTitle)
             ? "Authorized Organization Representative"
             : template.SignatoryTitle;
+        var volunteerSignature = string.IsNullOrWhiteSpace(data.VolunteerSignatureName) ? null : data.VolunteerSignatureName;
 
         var doc = Document.Create(container =>
         {
@@ -200,6 +219,10 @@ public class QuestPdfCertificateService : ICertificateService
                         {
                             sig.Item().Height(24);
                             sig.Item().LineHorizontal(1);
+                            if (!string.IsNullOrWhiteSpace(volunteerSignature))
+                            {
+                                sig.Item().PaddingTop(4).Text(volunteerSignature).FontSize(16).Italic().FontColor(template.AccentColor);
+                            }
                             sig.Item().PaddingTop(4).Text("Volunteer Signature").FontSize(9).FontColor(Colors.Grey.Medium);
                         });
                         row.ConstantItem(30);
@@ -211,6 +234,18 @@ public class QuestPdfCertificateService : ICertificateService
                             sig.Item().Text(signatoryTitle).FontSize(8).FontColor(Colors.Grey.Medium);
                         });
                     });
+
+                    if (!string.IsNullOrWhiteSpace(data.CertificateId))
+                    {
+                        col.Item().AlignCenter().Text($"Certificate ID: {data.CertificateId}")
+                            .FontSize(9).FontColor(Colors.Grey.Medium);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
+                    {
+                        col.Item().AlignCenter().Text($"Verify: {data.VerificationUrl}")
+                            .FontSize(9).FontColor(Colors.Grey.Medium);
+                    }
                 });
             });
         });

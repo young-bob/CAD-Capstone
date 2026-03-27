@@ -8,9 +8,12 @@ namespace VSMS.Api.Features.Certificates;
 
 public static class CertificateEndpoints
 {
+    private const string DefaultSignatoryTitle = "Authorized Organization Representative";
+
     public static void MapCertificateEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/certificates").WithTags("Certificates").RequireAuthorization();
+        var publicGroup = app.MapGroup("/api/certificates").WithTags("Certificates");
 
         // ==================== Template Management ====================
 
@@ -145,7 +148,8 @@ public static class CertificateEndpoints
             AppDbContext db,
             IGrainFactory grains,
             ICertificateService certService,
-            IFileStorageService fileStorage) =>
+            IFileStorageService fileStorage,
+            HttpContext http) =>
         {
             // 1. Get volunteer data
             var volunteer = grains.GetGrain<IVolunteerGrain>(req.VolunteerId);
@@ -184,12 +188,21 @@ public static class CertificateEndpoints
                 LogoBytes = logoBytes,
             };
 
+            var volunteerName = $"{profile.FirstName} {profile.LastName}";
+            var certificateId = CreatePublicCertificateId();
+            var verifyUrl = BuildVerifyUrl(http, certificateId);
+            var signatoryName = ResolveSignatoryName(templateEntity.SignatoryName, resolvedOrganizationName);
+            var signatoryTitle = ResolveSignatoryTitle(templateEntity.SignatoryTitle);
+
             var certData = new CertificateData
             {
-                VolunteerName = $"{profile.FirstName} {profile.LastName}",
+                VolunteerName = volunteerName,
                 TotalHours = profile.TotalHours,
                 CompletedOpportunities = profile.CompletedOpportunities,
                 OrganizationName = resolvedOrganizationName,
+                VolunteerSignatureName = req.VolunteerSignatureName,
+                CertificateId = certificateId,
+                VerificationUrl = verifyUrl,
                 Activities = await db.AttendanceReadModels
                     .AsNoTracking()
                     .Where(a => a.VolunteerId == req.VolunteerId &&
@@ -215,11 +228,106 @@ public static class CertificateEndpoints
             var fileName = $"cert_{profile.FirstName}_{profile.LastName}_{DateTime.UtcNow:yyyyMMdd}.pdf";
             var fileKey = await fileStorage.UploadAsync(stream, fileName, "certificates");
 
+            var issuedCertificate = new IssuedCertificateEntity
+            {
+                CertificateId = certificateId,
+                VolunteerId = req.VolunteerId,
+                OrganizationId = templateEntity.OrganizationId,
+                TemplateId = templateEntity.Id,
+                VolunteerName = volunteerName,
+                OrganizationName = resolvedOrganizationName ?? string.Empty,
+                TemplateName = templateEntity.Name,
+                TemplateType = templateEntity.TemplateType,
+                TotalHours = profile.TotalHours,
+                CompletedOpportunities = profile.CompletedOpportunities,
+                VolunteerSignatureName = req.VolunteerSignatureName,
+                SignatoryName = signatoryName,
+                SignatoryTitle = signatoryTitle,
+                FileKey = fileKey,
+                FileName = fileName,
+                IssuedAt = DateTime.UtcNow,
+            };
+
+            db.IssuedCertificates.Add(issuedCertificate);
+            await db.SaveChangesAsync();
+
             // 6. Get presigned URL
             var downloadUrl = await fileStorage.GetUrlAsync(fileKey);
 
-            return Results.Ok(new { fileKey, downloadUrl, fileName });
+            return Results.Ok(new GenerateCertificateResponse(fileKey, downloadUrl, fileName, certificateId, verifyUrl));
         });
+
+        group.MapPost("/issue", async (
+            IssueCertificateRequest req,
+            AppDbContext db,
+            IGrainFactory grains,
+            HttpContext http) =>
+        {
+            var volunteer = grains.GetGrain<IVolunteerGrain>(req.VolunteerId);
+            var profile = await volunteer.GetProfile();
+
+            if (!profile.IsInitialized)
+                return Results.BadRequest("Volunteer profile not initialized");
+
+            var templateEntity = await db.CertificateTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == req.TemplateId && t.IsActive);
+            if (templateEntity is null)
+                return Results.BadRequest("Template not found");
+
+            var resolvedOrganizationName = await ResolveOrganizationNameAsync(db, templateEntity.OrganizationName, templateEntity.OrganizationId);
+            var volunteerName = $"{profile.FirstName} {profile.LastName}";
+            var certificateId = CreatePublicCertificateId();
+            var verifyUrl = BuildVerifyUrl(http, certificateId);
+
+            var issuedCertificate = new IssuedCertificateEntity
+            {
+                CertificateId = certificateId,
+                VolunteerId = req.VolunteerId,
+                OrganizationId = templateEntity.OrganizationId,
+                TemplateId = templateEntity.Id,
+                VolunteerName = volunteerName,
+                OrganizationName = resolvedOrganizationName ?? string.Empty,
+                TemplateName = templateEntity.Name,
+                TemplateType = templateEntity.TemplateType,
+                TotalHours = profile.TotalHours,
+                CompletedOpportunities = profile.CompletedOpportunities,
+                VolunteerSignatureName = req.VolunteerSignatureName,
+                SignatoryName = ResolveSignatoryName(templateEntity.SignatoryName, resolvedOrganizationName),
+                SignatoryTitle = ResolveSignatoryTitle(templateEntity.SignatoryTitle),
+                IssuedAt = DateTime.UtcNow,
+            };
+
+            db.IssuedCertificates.Add(issuedCertificate);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new IssueCertificateResponse(certificateId, verifyUrl));
+        });
+
+        publicGroup.MapGet("/verify/{certificateId}", async (string certificateId, AppDbContext db) =>
+        {
+            var issued = await db.IssuedCertificates
+                .AsNoTracking()
+                .Where(x => x.CertificateId == certificateId)
+                .Select(x => new CertificateVerificationResponse(
+                    x.CertificateId,
+                    !x.IsRevoked,
+                    x.IsRevoked,
+                    x.RevokedAt,
+                    x.VolunteerName,
+                    x.OrganizationName,
+                    x.TemplateName,
+                    x.TemplateType,
+                    x.TotalHours,
+                    x.CompletedOpportunities,
+                    x.IssuedAt,
+                    x.SignatoryName,
+                    x.SignatoryTitle,
+                    x.FileName))
+                .FirstOrDefaultAsync();
+
+            return issued is null ? Results.NotFound() : Results.Ok(issued);
+        }).AllowAnonymous();
 
         // Seed system preset templates (call once during initial setup)
         group.MapPost("/seed-presets", async (AppDbContext db) =>
@@ -310,6 +418,30 @@ public static class CertificateEndpoints
 
         return preferredName;
     }
+
+    private static string CreatePublicCertificateId()
+    {
+        return $"VSMS-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8]}".ToUpperInvariant();
+    }
+
+    private static string BuildVerifyUrl(HttpContext http, string certificateId)
+    {
+        return $"{http.Request.Scheme}://{http.Request.Host}/api/certificates/verify/{Uri.EscapeDataString(certificateId)}";
+    }
+
+    private static string ResolveSignatoryName(string? preferredName, string? organizationName)
+    {
+        return string.IsNullOrWhiteSpace(preferredName)
+            ? organizationName?.Trim() ?? string.Empty
+            : preferredName.Trim();
+    }
+
+    private static string ResolveSignatoryTitle(string? preferredTitle)
+    {
+        return string.IsNullOrWhiteSpace(preferredTitle)
+            ? DefaultSignatoryTitle
+            : preferredTitle.Trim();
+    }
 }
 
 // ==================== Request / Response DTOs ====================
@@ -339,4 +471,37 @@ public record UpdateTemplateRequest(
 
 public record GenerateCertificateRequest(
     Guid VolunteerId,
-    Guid TemplateId);
+    Guid TemplateId,
+    string? VolunteerSignatureName);
+
+public record GenerateCertificateResponse(
+    string FileKey,
+    string DownloadUrl,
+    string FileName,
+    string CertificateId,
+    string VerifyUrl);
+
+public record IssueCertificateRequest(
+    Guid VolunteerId,
+    Guid TemplateId,
+    string? VolunteerSignatureName);
+
+public record IssueCertificateResponse(
+    string CertificateId,
+    string VerifyUrl);
+
+public record CertificateVerificationResponse(
+    string CertificateId,
+    bool IsValid,
+    bool IsRevoked,
+    DateTime? RevokedAt,
+    string VolunteerName,
+    string OrganizationName,
+    string TemplateName,
+    string TemplateType,
+    double TotalHours,
+    int CompletedOpportunities,
+    DateTime IssuedAt,
+    string? SignatoryName,
+    string? SignatoryTitle,
+    string? FileName);

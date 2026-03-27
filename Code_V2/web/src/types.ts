@@ -295,6 +295,30 @@ export interface GenerateCertificateResult {
     fileKey: string;
     downloadUrl: string;
     fileName: string;
+    certificateId: string;
+    verifyUrl: string;
+}
+
+export interface IssueCertificateResult {
+    certificateId: string;
+    verifyUrl: string;
+}
+
+export interface CertificateVerificationRecord {
+    certificateId: string;
+    isValid: boolean;
+    isRevoked: boolean;
+    revokedAt: string | null;
+    volunteerName: string;
+    organizationName: string;
+    templateName: string;
+    templateType: 'achievement_certificate' | 'hours_log';
+    totalHours: number;
+    completedOpportunities: number;
+    issuedAt: string;
+    signatoryName: string | null;
+    signatoryTitle: string | null;
+    fileName: string | null;
 }
 
 // ─── Admin ────────────────────────────────────────────────────
