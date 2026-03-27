@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Orleans.Runtime;
+using VSMS.Abstractions.Enums;
 using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
 using VSMS.Infrastructure.Data.EfCoreQuery;
+using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
 namespace VSMS.Api.Features.Admin;
 
@@ -619,6 +621,444 @@ public static class AdminEndpoints
             await orgGrain.RemoveCoordinator(req.CoordinatorUserId);
             return Results.NoContent();
         });
+
+        group.MapPost("/seed-demo", async (AppDbContext db, IGrainFactory grains) =>
+        {
+            const string demoPassword = "Demo123!";
+
+            var existingDemoUsers = await db.Users
+                .AsNoTracking()
+                .Where(u => u.Email.EndsWith("@vsms.demo"))
+                .OrderBy(u => u.Role)
+                .ThenBy(u => u.Email)
+                .Select(u => new DemoAccountDto(u.Role, u.Email, demoPassword))
+                .ToListAsync();
+
+            if (existingDemoUsers.Count > 0)
+            {
+                return Results.Ok(new
+                {
+                    message = "Demo data already exists.",
+                    password = demoPassword,
+                    accounts = existingDemoUsers
+                });
+            }
+
+            var now = DateTime.UtcNow;
+
+            var skillMap = await EnsureDemoSkillsAsync(db);
+
+            var harborOrgId = Guid.NewGuid();
+            var cityOrgId = Guid.NewGuid();
+
+            await CreateOrganizationAsync(
+                db,
+                grains,
+                harborOrgId,
+                "Harbor Helpers",
+                "Waterfront cleanups, food drives, and outreach for local families.",
+                "hello@harborhelpers.demo",
+                "https://www.vsms.foo/orgs/harbor-helpers",
+                ["Environment", "Food Security", "Community"],
+                "Spring shoreline cleanup registrations are now open.");
+
+            await CreateOrganizationAsync(
+                db,
+                grains,
+                cityOrgId,
+                "City Youth Connect",
+                "Mentorship, tutoring, and event support for youth programs across the city.",
+                "welcome@cityyouthconnect.demo",
+                "https://www.vsms.foo/orgs/city-youth-connect",
+                ["Youth", "Education", "Mentorship"],
+                "Volunteer orientation night happens every Thursday at 6 PM.");
+
+            var coordinatorA = await CreateCoordinatorAsync(
+                db, grains,
+                "coord.harbor@vsms.demo", demoPassword,
+                "Sarah", "Nguyen",
+                "647-555-0110", harborOrgId);
+
+            var coordinatorB = await CreateCoordinatorAsync(
+                db, grains,
+                "coord.city@vsms.demo", demoPassword,
+                "Daniel", "Brooks",
+                "647-555-0111", cityOrgId);
+
+            var volunteerA = await CreateVolunteerAsync(
+                db, grains,
+                "alex.chen@vsms.demo", demoPassword,
+                "Alex", "Chen",
+                "647-555-0201",
+                "Computer science student who enjoys event support and community outreach.",
+                backgroundCheckStatus: "Verified",
+                skills: [skillMap["Event Setup"], skillMap["First Aid"]],
+                follows: [harborOrgId],
+                totalHours: 14.5,
+                completedOpportunities: 3);
+
+            var volunteerB = await CreateVolunteerAsync(
+                db, grains,
+                "maya.patel@vsms.demo", demoPassword,
+                "Maya", "Patel",
+                "647-555-0202",
+                "Business student focused on tutoring, youth programs, and volunteer leadership.",
+                backgroundCheckStatus: "Verified",
+                skills: [skillMap["Mentoring"], skillMap["Tutoring"]],
+                follows: [cityOrgId, harborOrgId],
+                totalHours: 21.0,
+                completedOpportunities: 4);
+
+            var volunteerC = await CreateVolunteerAsync(
+                db, grains,
+                "liam.brown@vsms.demo", demoPassword,
+                "Liam", "Brown",
+                "647-555-0203",
+                "New volunteer exploring community events and weekend service opportunities.",
+                backgroundCheckStatus: "Pending",
+                skills: [skillMap["Food Handling"]],
+                follows: [harborOrgId],
+                totalHours: 6.0,
+                completedOpportunities: 1);
+
+            var opportunityA = new OpportunityReadModel
+            {
+                OpportunityId = Guid.NewGuid(),
+                OrganizationId = harborOrgId,
+                OrganizationName = "Harbor Helpers",
+                Title = "Saturday Waterfront Cleanup",
+                Category = "Environment",
+                Status = OpportunityStatus.Published,
+                PublishDate = now.AddDays(-10),
+                TotalSpots = 25,
+                AvailableSpots = 7,
+                Latitude = 43.6532,
+                Longitude = -79.3832,
+                RequiredSkillIds = [skillMap["Event Setup"]]
+            };
+
+            var opportunityB = new OpportunityReadModel
+            {
+                OpportunityId = Guid.NewGuid(),
+                OrganizationId = harborOrgId,
+                OrganizationName = "Harbor Helpers",
+                Title = "Community Food Sorting Night",
+                Category = "Food Security",
+                Status = OpportunityStatus.InProgress,
+                PublishDate = now.AddDays(-6),
+                TotalSpots = 18,
+                AvailableSpots = 4,
+                Latitude = 43.6510,
+                Longitude = -79.3470,
+                RequiredSkillIds = [skillMap["Food Handling"]]
+            };
+
+            var opportunityC = new OpportunityReadModel
+            {
+                OpportunityId = Guid.NewGuid(),
+                OrganizationId = cityOrgId,
+                OrganizationName = "City Youth Connect",
+                Title = "After-School Coding Mentor",
+                Category = "Education",
+                Status = OpportunityStatus.Published,
+                PublishDate = now.AddDays(-12),
+                TotalSpots = 12,
+                AvailableSpots = 3,
+                Latitude = 43.6629,
+                Longitude = -79.3957,
+                RequiredSkillIds = [skillMap["Mentoring"], skillMap["Tutoring"]]
+            };
+
+            var opportunityD = new OpportunityReadModel
+            {
+                OpportunityId = Guid.NewGuid(),
+                OrganizationId = cityOrgId,
+                OrganizationName = "City Youth Connect",
+                Title = "Youth Career Fair Support",
+                Category = "Events",
+                Status = OpportunityStatus.Completed,
+                PublishDate = now.AddDays(-20),
+                TotalSpots = 20,
+                AvailableSpots = 0,
+                Latitude = 43.7001,
+                Longitude = -79.4163,
+                RequiredSkillIds = [skillMap["Event Setup"]]
+            };
+
+            db.OpportunityReadModels.AddRange(opportunityA, opportunityB, opportunityC, opportunityD);
+
+            db.ApplicationReadModels.AddRange(
+                BuildApplication(opportunityA, volunteerA, "Morning Shift", now.AddDays(-9).Date.AddHours(9), 4),
+                BuildApplication(opportunityB, volunteerC, "Warehouse Support", now.AddDays(-4).Date.AddHours(17), 3),
+                BuildApplication(opportunityC, volunteerB, "Mentor Session", now.AddDays(-7).Date.AddHours(15), 2),
+                BuildApplication(opportunityD, volunteerA, "Registration Desk", now.AddDays(-16).Date.AddHours(10), 5));
+
+            db.AttendanceReadModels.AddRange(
+                BuildAttendance(opportunityA, volunteerA, now.AddDays(-8).Date.AddHours(9), 4.5, AttendanceStatus.Confirmed),
+                BuildAttendance(opportunityD, volunteerA, now.AddDays(-15).Date.AddHours(10), 5.0, AttendanceStatus.CheckedOut),
+                BuildAttendance(opportunityC, volunteerB, now.AddDays(-6).Date.AddHours(15), 6.0, AttendanceStatus.Confirmed),
+                BuildAttendance(opportunityB, volunteerB, now.AddDays(-3).Date.AddHours(18), 5.0, AttendanceStatus.CheckedOut),
+                BuildAttendance(opportunityB, volunteerC, now.AddDays(-2).Date.AddHours(17), 6.0, AttendanceStatus.Confirmed));
+
+            db.CertificateTemplates.AddRange(
+                new CertificateTemplateEntity
+                {
+                    Name = "Harbor Helpers Certificate",
+                    Description = "Demo certificate for Harbor Helpers",
+                    OrganizationId = harborOrgId,
+                    OrganizationName = "Harbor Helpers",
+                    TemplateType = CertificateTemplateTypes.AchievementCertificate,
+                    PrimaryColor = "#0F4C5C",
+                    AccentColor = "#E36414",
+                    TitleText = "Certificate of Volunteer Service",
+                    SignatoryName = "Sarah Nguyen",
+                    SignatoryTitle = "Volunteer Coordinator",
+                },
+                new CertificateTemplateEntity
+                {
+                    Name = "City Youth Hours Log",
+                    Description = "Demo hours log for City Youth Connect",
+                    OrganizationId = cityOrgId,
+                    OrganizationName = "City Youth Connect",
+                    TemplateType = CertificateTemplateTypes.HoursLog,
+                    PrimaryColor = "#1D3557",
+                    AccentColor = "#E9C46A",
+                    TitleText = "Community Involvement Hours Log",
+                    SignatoryName = "Daniel Brooks",
+                    SignatoryTitle = "Program Lead",
+                });
+
+            db.IssuedCertificates.Add(new IssuedCertificateEntity
+            {
+                CertificateId = $"VSMS-DEMO-{Guid.NewGuid().ToString("N")[..8]}".ToUpperInvariant(),
+                VolunteerId = volunteerB.GrainId,
+                OrganizationId = cityOrgId,
+                TemplateId = Guid.Empty,
+                VolunteerName = $"{volunteerB.FirstName} {volunteerB.LastName}",
+                OrganizationName = "City Youth Connect",
+                TemplateName = "City Youth Hours Log",
+                TemplateType = CertificateTemplateTypes.HoursLog,
+                TotalHours = volunteerB.TotalHours,
+                CompletedOpportunities = volunteerB.CompletedOpportunities,
+                VolunteerSignatureName = $"{volunteerB.FirstName} {volunteerB.LastName}",
+                SignatoryName = "Daniel Brooks",
+                SignatoryTitle = "Program Lead",
+                IssuedAt = now.AddDays(-1),
+                FileName = "demo-hours-log.pdf",
+            });
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                message = "Demo data seeded successfully.",
+                password = demoPassword,
+                accounts = new[]
+                {
+                    new DemoAccountDto("SystemAdmin", "admin@vsms.com", "Admin@123"),
+                    new DemoAccountDto("Coordinator", "coord.harbor@vsms.demo", demoPassword),
+                    new DemoAccountDto("Coordinator", "coord.city@vsms.demo", demoPassword),
+                    new DemoAccountDto("Volunteer", "alex.chen@vsms.demo", demoPassword),
+                    new DemoAccountDto("Volunteer", "maya.patel@vsms.demo", demoPassword),
+                    new DemoAccountDto("Volunteer", "liam.brown@vsms.demo", demoPassword),
+                },
+                organizations = new[] { "Harbor Helpers", "City Youth Connect" },
+                opportunities = 4,
+                attendances = 5
+            });
+        });
     }
 
+    private static async Task<Dictionary<string, Guid>> EnsureDemoSkillsAsync(AppDbContext db)
+    {
+        var skillDefs = new[]
+        {
+            new SkillEntity { Name = "Event Setup", Category = "Operations", Description = "Set up booths, signs, and event spaces." },
+            new SkillEntity { Name = "First Aid", Category = "Safety", Description = "Certified basic first aid support." },
+            new SkillEntity { Name = "Food Handling", Category = "Community", Description = "Safe handling and sorting of donated food." },
+            new SkillEntity { Name = "Mentoring", Category = "Youth", Description = "Support and mentor youth participants." },
+            new SkillEntity { Name = "Tutoring", Category = "Education", Description = "One-on-one tutoring and learning support." },
+        };
+
+        foreach (var skill in skillDefs)
+        {
+            if (!await db.Skills.AnyAsync(x => x.Name == skill.Name))
+                db.Skills.Add(skill);
+        }
+
+        await db.SaveChangesAsync();
+
+        return await db.Skills
+            .Where(x => skillDefs.Select(s => s.Name).Contains(x.Name))
+            .ToDictionaryAsync(x => x.Name, x => x.Id);
+    }
+
+    private static async Task CreateOrganizationAsync(
+        AppDbContext db,
+        IGrainFactory grains,
+        Guid orgId,
+        string name,
+        string description,
+        string contactEmail,
+        string websiteUrl,
+        List<string> tags,
+        string announcement)
+    {
+        var orgGrain = grains.GetGrain<IOrganizationGrain>(orgId);
+        await orgGrain.Initialize(name, description, Guid.Empty, contactEmail);
+        await orgGrain.SetStatus(OrgStatus.Approved);
+        await orgGrain.UpdateProfile(websiteUrl, contactEmail, tags);
+        await orgGrain.PostAnnouncement(announcement);
+
+        db.OrganizationReadModels.Add(new OrganizationReadModel
+        {
+            OrgId = orgId,
+            Name = name,
+            Description = description,
+            Status = OrgStatus.Approved,
+            CreatedAt = DateTime.UtcNow.AddDays(-30),
+            WebsiteUrl = websiteUrl,
+            ContactEmail = contactEmail,
+            Tags = tags,
+            LatestAnnouncementText = announcement,
+            LatestAnnouncementAt = DateTime.UtcNow.AddDays(-2),
+        });
+    }
+
+    private static async Task<DemoCoordinatorSeed> CreateCoordinatorAsync(
+        AppDbContext db,
+        IGrainFactory grains,
+        string email,
+        string password,
+        string firstName,
+        string lastName,
+        string phone,
+        Guid organizationId)
+    {
+        var user = new UserEntity
+        {
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = "Coordinator",
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var grainId = Guid.NewGuid();
+        db.Coordinators.Add(new CoordinatorEntity
+        {
+            UserId = user.Id,
+            GrainId = grainId,
+            OrganizationId = organizationId,
+        });
+        await db.SaveChangesAsync();
+
+        var grain = grains.GetGrain<ICoordinatorGrain>(grainId);
+        await grain.Initialize(firstName, lastName, email, phone, organizationId);
+        await grain.SetOrganization(organizationId);
+
+        return new DemoCoordinatorSeed(user.Id, grainId, firstName, lastName, email);
+    }
+
+    private static async Task<DemoVolunteerSeed> CreateVolunteerAsync(
+        AppDbContext db,
+        IGrainFactory grains,
+        string email,
+        string password,
+        string firstName,
+        string lastName,
+        string phone,
+        string bio,
+        string backgroundCheckStatus,
+        List<Guid> skills,
+        List<Guid> follows,
+        double totalHours,
+        int completedOpportunities)
+    {
+        var user = new UserEntity
+        {
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = "Volunteer",
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var grainId = Guid.NewGuid();
+        db.Volunteers.Add(new VolunteerEntity
+        {
+            UserId = user.Id,
+            GrainId = grainId,
+        });
+        await db.SaveChangesAsync();
+
+        var grain = grains.GetGrain<IVolunteerGrain>(grainId);
+        await grain.UpdateProfile(firstName, lastName, email, phone, bio);
+        await grain.SetBackgroundCheckStatus(backgroundCheckStatus);
+        await grain.SignWaiver();
+        await grain.UpdatePrivacySettings(true, true, true);
+
+        foreach (var skill in skills)
+            await grain.AddSkill(skill);
+
+        foreach (var orgId in follows)
+            await grain.FollowOrg(orgId);
+
+        for (var i = 0; i < completedOpportunities; i++)
+            await grain.IncrementCompletedOpportunities();
+
+        if (totalHours > 0)
+            await grain.AddCompletedHours(totalHours);
+
+        return new DemoVolunteerSeed(user.Id, grainId, firstName, lastName, email, totalHours, completedOpportunities);
+    }
+
+    private static ApplicationReadModel BuildApplication(
+        OpportunityReadModel opportunity,
+        DemoVolunteerSeed volunteer,
+        string shiftName,
+        DateTime shiftStart,
+        int durationHours)
+    {
+        return new ApplicationReadModel
+        {
+            ApplicationId = Guid.NewGuid(),
+            OpportunityId = opportunity.OpportunityId,
+            ShiftId = Guid.NewGuid(),
+            OpportunityTitle = opportunity.Title,
+            ShiftName = shiftName,
+            ShiftStartTime = shiftStart,
+            ShiftEndTime = shiftStart.AddHours(durationHours),
+            VolunteerId = volunteer.GrainId,
+            VolunteerName = $"{volunteer.FirstName} {volunteer.LastName}",
+            Status = ApplicationStatus.Approved,
+            AppliedAt = shiftStart.AddDays(-5),
+        };
+    }
+
+    private static AttendanceReadModel BuildAttendance(
+        OpportunityReadModel opportunity,
+        DemoVolunteerSeed volunteer,
+        DateTime start,
+        double totalHours,
+        AttendanceStatus status)
+    {
+        return new AttendanceReadModel
+        {
+            AttendanceId = Guid.NewGuid(),
+            OpportunityId = opportunity.OpportunityId,
+            VolunteerId = volunteer.GrainId,
+            VolunteerName = $"{volunteer.FirstName} {volunteer.LastName}",
+            OpportunityTitle = opportunity.Title,
+            Status = status,
+            ShiftStartTime = start,
+            CheckInTime = start,
+            CheckOutTime = start.AddHours(totalHours),
+            TotalHours = totalHours,
+        };
+    }
+
+    private sealed record DemoVolunteerSeed(Guid UserId, Guid GrainId, string FirstName, string LastName, string Email, double TotalHours, int CompletedOpportunities);
+    private sealed record DemoCoordinatorSeed(Guid UserId, Guid GrainId, string FirstName, string LastName, string Email);
+    private sealed record DemoAccountDto(string Role, string Email, string Password);
 }
