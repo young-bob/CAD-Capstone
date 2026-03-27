@@ -48,7 +48,13 @@ public class AwsApiInferenceService(
 
         try
         {
-            using var client = new AmazonBedrockRuntimeClient(RegionEndpoint.GetBySystemName(_region));
+            var clientConfig = new AmazonBedrockRuntimeConfig
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(_region),
+                // Bedrock supports multiple auth schemes in SDK v4; force SigV4 on EC2/IAM.
+                AuthSchemePreference = ["sigv4"]
+            };
+            using var client = new AmazonBedrockRuntimeClient(clientConfig);
 
             var bedrockRequest = new ConverseRequest
             {
