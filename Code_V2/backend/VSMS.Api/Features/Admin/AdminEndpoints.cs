@@ -909,20 +909,6 @@ public static class AdminEndpoints
         await orgGrain.SetStatus(OrgStatus.Approved);
         await orgGrain.UpdateProfile(websiteUrl, contactEmail, tags);
         await orgGrain.PostAnnouncement(announcement);
-
-        db.OrganizationReadModels.Add(new OrganizationReadModel
-        {
-            OrgId = orgId,
-            Name = name,
-            Description = description,
-            Status = OrgStatus.Approved,
-            CreatedAt = DateTime.UtcNow.AddDays(-30),
-            WebsiteUrl = websiteUrl,
-            ContactEmail = contactEmail,
-            Tags = tags,
-            LatestAnnouncementText = announcement,
-            LatestAnnouncementAt = DateTime.UtcNow.AddDays(-2),
-        });
     }
 
     private static async Task<DemoCoordinatorSeed> CreateCoordinatorAsync(
