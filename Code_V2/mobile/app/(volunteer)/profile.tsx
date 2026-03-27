@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert, Switch, Linking } from 'react-native';
 import { Avatar, Button, Card, Text, Surface, Divider, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
+import { router } from 'expo-router';
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { volunteerService, VolunteerProfile } from '../../services/volunteers';
@@ -213,6 +214,12 @@ export default function ProfileScreen() {
                         onPress={() => setShowCredential(true)} />
                     <Divider style={styles.divider} />
                     <ActionItem icon="certificate" label="Generate Certificate" onPress={handleOpenCertModal} />
+                    <Divider style={styles.divider} />
+                    <ActionItem icon="star-circle" label="My Skills" onPress={() => router.push('/(volunteer)/skills')} />
+                    <Divider style={styles.divider} />
+                    <ActionItem icon="history" label="Attendance History" onPress={() => router.push('/(volunteer)/attendance')} />
+                    <Divider style={styles.divider} />
+                    <ActionItem icon="domain" label="Browse Organizations" onPress={() => router.push('/(volunteer)/organizations')} />
                     <Divider style={styles.divider} />
                     <ActionItem icon="bell-outline" label="Notifications" onPress={openPrivacy} />
                     <Divider style={styles.divider} />

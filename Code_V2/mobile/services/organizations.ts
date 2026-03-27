@@ -14,6 +14,18 @@ export interface OrgState {
     createdAt: string;
 }
 
+export interface OrganizationSummary {
+    orgId: string;
+    name: string;
+    description: string;
+    status: string;
+    memberCount: number;
+    opportunityCount: number;
+    tags: string[];
+    websiteUrl?: string;
+    contactEmail?: string;
+}
+
 export const organizationService = {
     create: async (data: { name: string; description: string; creatorUserId: string; creatorEmail: string }): Promise<{ orgId: string }> => {
         const res = await api.post('/api/organizations', data);
@@ -54,5 +66,20 @@ export const organizationService = {
 
     updateInfo: async (orgId: string, data: { name: string; description: string }): Promise<void> => {
         await api.put(`/api/organizations/${orgId}`, data);
+    },
+
+    listApproved: async (): Promise<OrganizationSummary[]> => {
+        const res = await api.get<OrganizationSummary[]>('/api/organizations/approved');
+        return res.data;
+    },
+
+    getRecommended: async (volunteerId: string): Promise<OrganizationSummary[]> => {
+        const res = await api.get<OrganizationSummary[]>(`/api/organizations/recommend?volunteerId=${volunteerId}`);
+        return res.data;
+    },
+
+    getAnnouncements: async (orgId: string): Promise<{ id: string; text: string; createdAt: string }[]> => {
+        const res = await api.get(`/api/organizations/${orgId}/announcements`);
+        return res.data;
     },
 };
