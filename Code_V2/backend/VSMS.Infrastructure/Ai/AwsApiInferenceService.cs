@@ -16,12 +16,12 @@ public class AwsApiInferenceService(
 {
     private static readonly HttpClient Http = new();
 
-    private readonly string _provider = (config["AI:Provider"] ?? "BedrockDirect").Trim();
-    private readonly string _region = (config["AI:Region"] ?? "ca-central-1").Trim();
-    private readonly string _endpoint = (config["AI:Endpoint"] ?? string.Empty).Trim();
-    private readonly string _model = (config["AI:Model"] ?? "us.amazon.nova-2-lite-v1:0").Trim();
-    private readonly string _apiKey = (config["AI:ApiKey"] ?? string.Empty).Trim();
-    private readonly string _apiKeyHeader = (config["AI:ApiKeyHeader"] ?? "Authorization").Trim();
+    private readonly string _provider = ReadString(config, "AI:Provider", "BedrockDirect");
+    private readonly string _region = ReadString(config, "AI:Region", "ca-central-1");
+    private readonly string _endpoint = ReadString(config, "AI:Endpoint", string.Empty);
+    private readonly string _model = ReadString(config, "AI:Model", "us.amazon.nova-2-lite-v1:0");
+    private readonly string _apiKey = ReadString(config, "AI:ApiKey", string.Empty);
+    private readonly string _apiKeyHeader = ReadString(config, "AI:ApiKeyHeader", "Authorization");
     private readonly int _timeoutSeconds = ParseInt(config["AI:TimeoutSeconds"], 60, 10, 300);
     private readonly double _defaultTemperature = ParseDouble(config["AI:DefaultTemperature"], 0.2, 0.0, 1.0);
     private readonly int _defaultMaxTokens = ParseInt(config["AI:DefaultMaxTokens"], 900, 128, 4096);
@@ -79,6 +79,16 @@ public class AwsApiInferenceService(
             logger.LogWarning(ex, "Bedrock direct request failed. Code={Code}, Status={StatusCode}",
                 ex.ErrorCode, (int)ex.StatusCode);
             throw new InvalidOperationException($"Bedrock request failed: {ex.ErrorCode}");
+        }
+        catch (AmazonClientException ex)
+        {
+            logger.LogWarning(ex, "Bedrock client initialization/invocation failed.");
+            throw new InvalidOperationException($"Bedrock client error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected Bedrock direct inference error.");
+            throw new InvalidOperationException($"Bedrock unexpected error: {ex.Message}");
         }
     }
 
@@ -289,5 +299,11 @@ public class AwsApiInferenceService(
         if (string.IsNullOrEmpty(value) || value.Length <= max)
             return value;
         return value[..max];
+    }
+
+    private static string ReadString(IConfiguration config, string key, string defaultValue)
+    {
+        var value = config[key];
+        return string.IsNullOrWhiteSpace(value) ? defaultValue : value.Trim();
     }
 }
