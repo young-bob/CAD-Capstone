@@ -14,6 +14,13 @@ export default function VolunteerLayout() {
             }}
         >
             <Tabs.Screen
+                name="dashboard"
+                options={{
+                    title: 'Dashboard',
+                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
                 name="home"
                 options={{
                     title: 'Explore',
@@ -41,18 +48,33 @@ export default function VolunteerLayout() {
                     tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account" size={size} color={color} />,
                 }}
             />
+            {/* Hidden screens — accessible via router.push but not shown in tab bar */}
             <Tabs.Screen
                 name="attendance"
                 options={{
                     title: 'History',
-                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="history" size={size} color={color} />,
+                    tabBarButton: () => null,
                 }}
             />
             <Tabs.Screen
                 name="skills"
                 options={{
                     title: 'Skills',
-                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="star-circle" size={size} color={color} />,
+                    tabBarButton: () => null,
+                }}
+            />
+            <Tabs.Screen
+                name="organizations"
+                options={{
+                    title: 'Organizations',
+                    tabBarButton: () => null,
+                }}
+            />
+            <Tabs.Screen
+                name="opportunity-detail"
+                options={{
+                    title: 'Opportunity',
+                    tabBarButton: () => null,
                 }}
             />
         </Tabs>
