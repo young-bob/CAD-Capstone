@@ -7,19 +7,22 @@ namespace VSMS.Infrastructure.Certificates;
 
 public class QuestPdfCertificateService : ICertificateService
 {
+    private static readonly HttpClient QrHttpClient = new();
+
     static QuestPdfCertificateService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public Task<byte[]> GeneratePdfAsync(CertificateData data, CertificateTemplateInfo template)
+    public async Task<byte[]> GeneratePdfAsync(CertificateData data, CertificateTemplateInfo template)
     {
         if (template.TemplateType == CertificateTemplateTypes.HoursLog)
-            return Task.FromResult(GenerateHoursLogPdf(data, template));
+            return await GenerateHoursLogPdfAsync(data, template);
 
         var titleText = template.TitleText ?? "Certificate of Volunteer Service";
         var bodyText = BuildBodyText(data, template);
         var volunteerSignature = string.IsNullOrWhiteSpace(data.VolunteerSignatureName) ? null : data.VolunteerSignatureName;
+        var qrCodeBytes = await TryGetQrCodeBytesAsync(data.VerificationUrl);
 
         var doc = Document.Create(container =>
         {
@@ -107,27 +110,16 @@ public class QuestPdfCertificateService : ICertificateService
                              });
                          });
 
-                         if (!string.IsNullOrWhiteSpace(data.CertificateId))
-                         {
-                             col.Item().AlignCenter().Text($"Certificate ID: {data.CertificateId}")
-                                .FontSize(9).FontColor(Colors.Grey.Medium);
-                         }
-
-                         if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
-                         {
-                             col.Item().AlignCenter().Text($"Verify: {data.VerificationUrl}")
-                                .FontSize(9).FontColor(Colors.Grey.Medium);
-                         }
+                         AddVerificationBlock(col, data, qrCodeBytes);
                      });
                 });
             });
         });
 
-        var bytes = doc.GeneratePdf();
-        return Task.FromResult(bytes);
+        return doc.GeneratePdf();
     }
 
-    private static byte[] GenerateHoursLogPdf(CertificateData data, CertificateTemplateInfo template)
+    private static async Task<byte[]> GenerateHoursLogPdfAsync(CertificateData data, CertificateTemplateInfo template)
     {
         var titleText = template.TitleText ?? "Community Involvement Hours Log";
         var today = DateTime.UtcNow.ToString("MMMM dd, yyyy");
@@ -138,6 +130,7 @@ public class QuestPdfCertificateService : ICertificateService
             ? "Authorized Organization Representative"
             : template.SignatoryTitle;
         var volunteerSignature = string.IsNullOrWhiteSpace(data.VolunteerSignatureName) ? null : data.VolunteerSignatureName;
+        var qrCodeBytes = await TryGetQrCodeBytesAsync(data.VerificationUrl);
 
         var doc = Document.Create(container =>
         {
@@ -235,17 +228,7 @@ public class QuestPdfCertificateService : ICertificateService
                         });
                     });
 
-                    if (!string.IsNullOrWhiteSpace(data.CertificateId))
-                    {
-                        col.Item().AlignCenter().Text($"Certificate ID: {data.CertificateId}")
-                            .FontSize(9).FontColor(Colors.Grey.Medium);
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
-                    {
-                        col.Item().AlignCenter().Text($"Verify: {data.VerificationUrl}")
-                            .FontSize(9).FontColor(Colors.Grey.Medium);
-                    }
+                    AddVerificationBlock(col, data, qrCodeBytes);
                 });
             });
         });
@@ -261,6 +244,54 @@ public class QuestPdfCertificateService : ICertificateService
 
     private static IContainer CellTotal(IContainer container) =>
         container.Background(Colors.Grey.Lighten3).PaddingVertical(7).PaddingHorizontal(8).DefaultTextStyle(x => x.Bold());
+
+    private static void AddVerificationBlock(ColumnDescriptor col, CertificateData data, byte[]? qrCodeBytes)
+    {
+        if (string.IsNullOrWhiteSpace(data.CertificateId) && string.IsNullOrWhiteSpace(data.VerificationUrl))
+            return;
+
+        col.Item().PaddingTop(10).AlignCenter().Row(row =>
+        {
+            if (qrCodeBytes is { Length: > 0 })
+            {
+                row.ConstantItem(80).Height(80).Image(qrCodeBytes);
+                row.ConstantItem(16);
+            }
+
+            row.RelativeItem().Column(info =>
+            {
+                info.Item().Text("Scan to verify").FontSize(10).SemiBold().FontColor(Colors.Grey.Darken2);
+
+                if (!string.IsNullOrWhiteSpace(data.CertificateId))
+                {
+                    info.Item().Text($"Certificate ID: {data.CertificateId}")
+                        .FontSize(9).FontColor(Colors.Grey.Medium);
+                }
+
+                if (!string.IsNullOrWhiteSpace(data.VerificationUrl))
+                {
+                    info.Item().Text($"Verify: {data.VerificationUrl}")
+                        .FontSize(9).FontColor(Colors.Grey.Medium);
+                }
+            });
+        });
+    }
+
+    private static async Task<byte[]?> TryGetQrCodeBytesAsync(string? verificationUrl)
+    {
+        if (string.IsNullOrWhiteSpace(verificationUrl))
+            return null;
+
+        try
+        {
+            var qrUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data={Uri.EscapeDataString(verificationUrl)}";
+            return await QrHttpClient.GetByteArrayAsync(qrUrl);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static string BuildBodyText(CertificateData data, CertificateTemplateInfo template)
     {

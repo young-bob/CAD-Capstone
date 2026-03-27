@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using VSMS.Abstractions.Grains;
 using VSMS.Abstractions.Services;
@@ -149,7 +150,8 @@ public static class CertificateEndpoints
             IGrainFactory grains,
             ICertificateService certService,
             IFileStorageService fileStorage,
-            HttpContext http) =>
+            HttpContext http,
+            IConfiguration config) =>
         {
             // 1. Get volunteer data
             var volunteer = grains.GetGrain<IVolunteerGrain>(req.VolunteerId);
@@ -190,7 +192,7 @@ public static class CertificateEndpoints
 
             var volunteerName = $"{profile.FirstName} {profile.LastName}";
             var certificateId = CreatePublicCertificateId();
-            var verifyUrl = BuildVerifyUrl(http, certificateId);
+            var verifyUrl = BuildVerifyUrl(config, http, certificateId);
             var signatoryName = ResolveSignatoryName(templateEntity.SignatoryName, resolvedOrganizationName);
             var signatoryTitle = ResolveSignatoryTitle(templateEntity.SignatoryTitle);
 
@@ -261,7 +263,8 @@ public static class CertificateEndpoints
             IssueCertificateRequest req,
             AppDbContext db,
             IGrainFactory grains,
-            HttpContext http) =>
+            HttpContext http,
+            IConfiguration config) =>
         {
             var volunteer = grains.GetGrain<IVolunteerGrain>(req.VolunteerId);
             var profile = await volunteer.GetProfile();
@@ -278,7 +281,7 @@ public static class CertificateEndpoints
             var resolvedOrganizationName = await ResolveOrganizationNameAsync(db, templateEntity.OrganizationName, templateEntity.OrganizationId);
             var volunteerName = $"{profile.FirstName} {profile.LastName}";
             var certificateId = CreatePublicCertificateId();
-            var verifyUrl = BuildVerifyUrl(http, certificateId);
+            var verifyUrl = BuildVerifyUrl(config, http, certificateId);
 
             var issuedCertificate = new IssuedCertificateEntity
             {
@@ -304,7 +307,7 @@ public static class CertificateEndpoints
             return Results.Ok(new IssueCertificateResponse(certificateId, verifyUrl));
         });
 
-        publicGroup.MapGet("/verify/{certificateId}", async (string certificateId, AppDbContext db) =>
+        publicGroup.MapGet("/verify/{certificateId}", async (string certificateId, AppDbContext db, HttpContext http) =>
         {
             var issued = await db.IssuedCertificates
                 .AsNoTracking()
@@ -325,6 +328,16 @@ public static class CertificateEndpoints
                     x.SignatoryTitle,
                     x.FileName))
                 .FirstOrDefaultAsync();
+
+            if (PrefersHtml(http))
+            {
+                if (issued is null)
+                {
+                    return Results.Content(BuildVerificationNotFoundHtml(certificateId), "text/html");
+                }
+
+                return Results.Content(BuildVerificationHtml(issued), "text/html");
+            }
 
             return issued is null ? Results.NotFound() : Results.Ok(issued);
         }).AllowAnonymous();
@@ -424,9 +437,14 @@ public static class CertificateEndpoints
         return $"VSMS-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8]}".ToUpperInvariant();
     }
 
-    private static string BuildVerifyUrl(HttpContext http, string certificateId)
+    private static string BuildVerifyUrl(IConfiguration config, HttpContext http, string certificateId)
     {
-        return $"{http.Request.Scheme}://{http.Request.Host}/api/certificates/verify/{Uri.EscapeDataString(certificateId)}";
+        var configuredBaseUrl = config["App:PublicBaseUrl"];
+        var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
+            ? $"{http.Request.Scheme}://{http.Request.Host}"
+            : configuredBaseUrl.Trim().TrimEnd('/');
+
+        return $"{baseUrl}/api/certificates/verify/{Uri.EscapeDataString(certificateId)}";
     }
 
     private static string ResolveSignatoryName(string? preferredName, string? organizationName)
@@ -442,6 +460,157 @@ public static class CertificateEndpoints
             ? DefaultSignatoryTitle
             : preferredTitle.Trim();
     }
+
+    private static bool PrefersHtml(HttpContext http)
+    {
+        var accept = http.Request.Headers.Accept.ToString();
+        return string.IsNullOrWhiteSpace(accept)
+            || accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)
+            || accept.Contains("*/*", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildVerificationHtml(CertificateVerificationResponse issued)
+    {
+        var statusLabel = issued.IsValid ? "Valid Certificate" : "Certificate Revoked";
+        var statusColor = issued.IsValid ? "#166534" : "#991B1B";
+        var statusBg = issued.IsValid ? "#DCFCE7" : "#FEE2E2";
+        var statusBorder = issued.IsValid ? "#86EFAC" : "#FCA5A5";
+        var orgName = Html(issued.OrganizationName);
+        var volunteerName = Html(issued.VolunteerName);
+        var templateName = Html(issued.TemplateName);
+        var templateType = issued.TemplateType == CertificateTemplateTypes.HoursLog ? "Hours Log" : "Certificate";
+        var signatoryName = string.IsNullOrWhiteSpace(issued.SignatoryName) ? "Not specified" : Html(issued.SignatoryName);
+        var signatoryTitle = string.IsNullOrWhiteSpace(issued.SignatoryTitle) ? DefaultSignatoryTitle : Html(issued.SignatoryTitle);
+        var revokedText = issued.RevokedAt.HasValue ? issued.RevokedAt.Value.ToString("yyyy-MM-dd HH:mm 'UTC'") : "N/A";
+
+        return $$"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Certificate Verification</title>
+  <style>
+    :root{--ink:#0f172a;--muted:#64748b;--line:#dbe4f0;--panel:#ffffff;--bg1:#f8fafc;--bg2:#e0f2fe;--accent:#0f766e;}
+    *{box-sizing:border-box} body{margin:0;font-family:Segoe UI,Arial,sans-serif;color:var(--ink);background:
+    radial-gradient(circle at top left,#dbeafe 0,#f8fafc 35%),
+    linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;padding:32px 16px}
+    .shell{max-width:860px;margin:0 auto}
+    .hero{background:rgba(255,255,255,.82);backdrop-filter:blur(8px);border:1px solid rgba(219,228,240,.9);border-radius:28px;padding:28px;box-shadow:0 20px 60px rgba(15,23,42,.08)}
+    .eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:10px}
+    h1{margin:0 0 12px;font-size:34px}
+    .lead{margin:0;color:var(--muted);font-size:15px;line-height:1.6}
+    .status{display:inline-block;margin-top:20px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;background:{{statusBg}};color:{{statusColor}};border:1px solid {{statusBorder}}}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:24px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+    .label{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .value{font-size:20px;font-weight:700;line-height:1.3}
+    .sub{font-size:14px;color:var(--muted);margin-top:6px;line-height:1.5}
+    .wide{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:18px 24px}
+    .meta-item{min-width:0}
+    .meta-value{font-size:15px;font-weight:600;word-break:break-word}
+    .foot{margin-top:16px;font-size:13px;color:var(--muted)}
+    @media (max-width:640px){body{padding:18px 10px}.hero{padding:20px}.meta{grid-template-columns:1fr}h1{font-size:28px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hero">
+      <div class="eyebrow">VSMS Verification Portal</div>
+      <h1>Certificate Verification</h1>
+      <p class="lead">This page confirms whether the certificate ID below matches a document issued through the VSMS platform.</p>
+      <div class="status">{{statusLabel}}</div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="label">Certificate ID</div>
+          <div class="value">{{Html(issued.CertificateId)}}</div>
+          <div class="sub">{{templateType}}</div>
+        </div>
+        <div class="card">
+          <div class="label">Volunteer</div>
+          <div class="value">{{volunteerName}}</div>
+          <div class="sub">{{orgName}}</div>
+        </div>
+        <div class="card">
+          <div class="label">Issued At</div>
+          <div class="value">{{issued.IssuedAt.ToString("yyyy-MM-dd")}}</div>
+          <div class="sub">{{issued.IssuedAt.ToString("HH:mm 'UTC'")}}</div>
+        </div>
+        <div class="card">
+          <div class="label">Verified Hours</div>
+          <div class="value">{{issued.TotalHours:F1}}</div>
+          <div class="sub">{{issued.CompletedOpportunities}} completed opportunities</div>
+        </div>
+      </div>
+
+      <div class="wide">
+        <div class="meta">
+          <div class="meta-item">
+            <div class="label">Template</div>
+            <div class="meta-value">{{templateName}}</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">Organization</div>
+            <div class="meta-value">{{orgName}}</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">Signatory</div>
+            <div class="meta-value">{{signatoryName}}</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">Signatory Title</div>
+            <div class="meta-value">{{signatoryTitle}}</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">Revoked</div>
+            <div class="meta-value">{{(issued.IsRevoked ? "Yes" : "No")}}</div>
+          </div>
+          <div class="meta-item">
+            <div class="label">Revoked At</div>
+            <div class="meta-value">{{revokedText}}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">If this information does not match the document you received, treat the certificate as unverified.</div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+    }
+
+    private static string BuildVerificationNotFoundHtml(string certificateId)
+    {
+        return $$"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Certificate Not Found</title>
+  <style>
+    body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#f8fafc;color:#0f172a;display:grid;place-items:center;min-height:100vh;padding:24px}
+    .card{max-width:640px;background:white;border:1px solid #e2e8f0;border-radius:24px;padding:28px;box-shadow:0 18px 50px rgba(15,23,42,.08)}
+    .tag{display:inline-block;padding:8px 12px;border-radius:999px;background:#fef2f2;color:#991b1b;font-weight:700;font-size:13px;margin-bottom:14px}
+    h1{margin:0 0 12px;font-size:30px} p{margin:0;color:#64748b;line-height:1.7} .id{margin-top:18px;font-family:Consolas,monospace;font-size:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="tag">Certificate Not Found</div>
+    <h1>We couldn’t verify this certificate.</h1>
+    <p>No issued certificate record was found for the ID below. Double-check the certificate ID or treat the document as unverified.</p>
+    <div class="id">{{Html(certificateId)}}</div>
+  </div>
+</body>
+</html>
+""";
+    }
+
+    private static string Html(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 }
 
 // ==================== Request / Response DTOs ====================
