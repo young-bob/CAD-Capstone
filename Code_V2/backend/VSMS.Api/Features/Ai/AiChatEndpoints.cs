@@ -38,8 +38,19 @@ public static class AiChatEndpoints
             if (cleaned.Count == 0)
                 return Results.BadRequest(new { error = "At least one non-empty message is required." });
 
+            var latestUserMessage = cleaned.LastOrDefault(m => m.Role.Equals("user", StringComparison.OrdinalIgnoreCase));
+            var hasExplicitConfirmation = latestUserMessage is not null && IsExplicitConfirmation(latestUserMessage.Content);
+            if (hasExplicitConfirmation && latestUserMessage is not null)
+            {
+                var idx = cleaned.LastIndexOf(latestUserMessage);
+                cleaned[idx] = latestUserMessage with
+                {
+                    Content = $"{latestUserMessage.Content}\nSystem note: this is explicit confirmation. Execute the pending write action now with confirmed=true."
+                };
+            }
+
             var role = ResolveRole(http);
-            var prompt = BuildRolePrompt(role, req.CurrentView, req.ClientLocation);
+            var prompt = BuildRolePrompt(role, req.CurrentView, req.ClientLocation, hasExplicitConfirmation);
             var maxTokens = Clamp(req.MaxTokens ?? 900, 128, 4096);
             var temperature = Clamp(req.Temperature ?? 0.2, 0.0, 1.0);
             var allowedTools = AiToolEndpoints.GetAllowedToolDescriptors(http);
@@ -109,7 +120,7 @@ public static class AiChatEndpoints
         return "user";
     }
 
-    private static string BuildRolePrompt(string role, string? currentView, AiClientLocation? clientLocation)
+    private static string BuildRolePrompt(string role, string? currentView, AiClientLocation? clientLocation, bool hasExplicitConfirmation)
     {
         var basePrompt = role switch
         {
@@ -126,6 +137,7 @@ public static class AiChatEndpoints
                 Prefer a compact, human-readable summary instead of raw dumps or raw tables.
                 For any write action, first ask for explicit confirmation.
                 Only execute a write tool after user confirms, and pass confirmed=true.
+                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
                 Output format:
                 1) One-line conclusion
                 2) Key data bullets (max 6)
@@ -144,6 +156,7 @@ public static class AiChatEndpoints
                 Prefer a compact, human-readable summary instead of raw dumps or raw tables.
                 For any write action, first ask for explicit confirmation.
                 Only execute a write tool after user confirms, and pass confirmed=true.
+                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
                 Output format:
                 1) One-line conclusion
                 2) Key data bullets (max 6)
@@ -162,6 +175,7 @@ public static class AiChatEndpoints
                 Prefer a compact, human-readable summary instead of raw dumps or raw tables.
                 For any write action, first ask for explicit confirmation.
                 Only execute a write tool after user confirms, and pass confirmed=true.
+                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
                 Output format:
                 1) One-line conclusion
                 2) Key data bullets (max 6)
@@ -184,6 +198,11 @@ public static class AiChatEndpoints
                 - capturedAtUtc: {(clientLocation.CapturedAtUtc?.ToString("O") ?? "unknown")}
                 Use this location for distance-based tools unless user explicitly gives another location.
                 """);
+        }
+
+        if (hasExplicitConfirmation)
+        {
+            parts.Add("Execution mode: user confirmation already provided. Execute the pending write action now with confirmed=true and do not ask confirmation again.");
         }
 
         return string.Join("\n", parts);
@@ -268,6 +287,18 @@ public static class AiChatEndpoints
     private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
     private static double Clamp(double value, double min, double max) => Math.Max(min, Math.Min(max, value));
     private static bool IsValidLatLon(double lat, double lon) => lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+    private static bool IsExplicitConfirmation(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var t = text.Trim().ToLowerInvariant();
+        return t.Contains("yes, confirm")
+            || t.Equals("yes confirm")
+            || t.Equals("confirm")
+            || t.Equals("confirmed")
+            || t.Contains("确认")
+            || t.Contains("同意")
+            || t.Contains("请执行");
+    }
 
     private static bool IsWriteTool(string toolName)
     {
