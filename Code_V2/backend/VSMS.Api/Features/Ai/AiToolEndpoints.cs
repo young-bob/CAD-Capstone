@@ -478,8 +478,12 @@ public static class AiToolEndpoints
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"Pending\"' (or 'Approved', 'Rejected', 'All') in your JSON arguments object. Please retry calling this tool with the status parameter included.");
-                ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
+                ApplicationStatus? status = ApplicationStatus.Pending; // Default to Pending for safety against AI hallucinations
+                if (!string.IsNullOrEmpty(statusStr))
+                {
+                    if (string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase)) status = null;
+                    else if (Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed)) status = parsed;
+                }
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
                 return await applicationQueryService.GetByVolunteerAsync(callerGrainId, status, skip, take);
@@ -490,8 +494,11 @@ public static class AiToolEndpoints
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
-                AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
+                AttendanceStatus? status = null;
+                if (!string.IsNullOrEmpty(statusStr))
+                {
+                    if (!string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase) && Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed)) status = parsed;
+                }
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
                 return await attendanceQueryService.GetByVolunteerAsync(callerGrainId, status, skip, take);
@@ -579,8 +586,11 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"All\"' (or a specific enum value like 'Draft', 'Published') in your JSON arguments object. Please retry calling this tool.");
-                OpportunityStatus? status = Enum.TryParse<OpportunityStatus>(statusStr, true, out var parsed) ? parsed : null;
+                OpportunityStatus? status = null; 
+                if (!string.IsNullOrEmpty(statusStr))
+                {
+                    if (!string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase) && Enum.TryParse<OpportunityStatus>(statusStr, true, out var parsed)) status = parsed;
+                }
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
                 return await opportunityQueryService.GetByOrganizationAsync(orgId, status, skip, take);
@@ -591,8 +601,12 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"Pending\"' (or 'Approved', 'Waitlisted', 'All') in your JSON arguments object. Do not explain, just retry calling the tool.");
-                ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
+                ApplicationStatus? status = ApplicationStatus.Pending; // Default to Pending for safety
+                if (!string.IsNullOrEmpty(statusStr))
+                {
+                    if (string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase)) status = null;
+                    else if (Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed)) status = parsed;
+                }
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
                 return await applicationQueryService.GetByOrganizationAsync(orgId, status, skip, take);
@@ -604,8 +618,11 @@ public static class AiToolEndpoints
                 var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
                 if (!canManage) throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
-                AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
+                AttendanceStatus? status = null;
+                if (!string.IsNullOrEmpty(statusStr))
+                {
+                    if (!string.Equals(statusStr, "All", StringComparison.OrdinalIgnoreCase) && Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed)) status = parsed;
+                }
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
                 return await attendanceQueryService.GetByOpportunityAsync(opportunityId, status, skip, take);
