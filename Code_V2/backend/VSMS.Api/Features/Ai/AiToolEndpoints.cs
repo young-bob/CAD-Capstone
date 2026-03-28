@@ -57,7 +57,8 @@ public static class AiToolEndpoints
         "verify_certificate_public",
     };
 
-    private sealed record ToolDefinition(string Name, string Description, string[] Roles);
+    internal sealed record ToolDefinition(string Name, string Description, string[] Roles);
+    internal sealed record ToolDescriptor(string Name, string Description);
 
     private static readonly ToolDefinition[] ToolCatalog =
     [
@@ -94,9 +95,7 @@ public static class AiToolEndpoints
 
         group.MapGet("/tools", (HttpContext http) =>
         {
-            var tools = ResolveAllowedTools(http);
-            var result = ToolCatalog
-                .Where(t => tools.Contains(t.Name))
+            var result = GetAllowedToolDefinitions(http)
                 .OrderBy(t => t.Name)
                 .Select(t => new
                 {
@@ -166,7 +165,22 @@ public static class AiToolEndpoints
         });
     }
 
-    private static async Task<object?> ExecuteToolAsync(
+    internal static IReadOnlyList<ToolDefinition> GetAllowedToolDefinitions(HttpContext http)
+    {
+        var tools = ResolveAllowedTools(http);
+        return ToolCatalog
+            .Where(t => tools.Contains(t.Name))
+            .ToList();
+    }
+
+    internal static IReadOnlyList<ToolDescriptor> GetAllowedToolDescriptors(HttpContext http)
+    {
+        return GetAllowedToolDefinitions(http)
+            .Select(t => new ToolDescriptor(t.Name, t.Description))
+            .ToList();
+    }
+
+    internal static async Task<object?> ExecuteToolAsync(
         string tool,
         JsonElement arguments,
         HttpContext http,
@@ -785,7 +799,7 @@ public static class AiToolEndpoints
         return orgId.Value;
     }
 
-    private static HashSet<string> ResolveAllowedTools(HttpContext http)
+    internal static HashSet<string> ResolveAllowedTools(HttpContext http)
     {
         if (http.IsSystemAdmin())
             return AdminTools;

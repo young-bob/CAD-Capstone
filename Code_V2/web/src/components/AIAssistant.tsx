@@ -160,7 +160,8 @@ export default function AIAssistant({ userRole, currentView }: Props) {
     const sendMessage = useCallback(async (userText: string) => {
         if (!userText.trim() || isStreaming) return;
 
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: userText.trim() };
+        const userInput = userText.trim();
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: userInput };
         const assistantId = crypto.randomUUID();
         const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true };
 
@@ -189,7 +190,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                 .map(m => ({ role: m.role, content: m.content }));
 
             const res = await aiService.chat({
-                messages: [...history, { role: 'user', content: userText.trim() }],
+                messages: [...history, { role: 'user', content: userInput }],
                 currentView,
             });
 
@@ -197,7 +198,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             const cancel = simulateStream(text, onChunk, onDone);
             cancelRef.current = cancel;
         } catch (error: any) {
-            const mockText = getMockResponse(userText, userRole);
+            const mockText = getMockResponse(userInput, userRole);
             const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
             const fallback = `${mockText}\n\n_Warning: ${backendError}_`;
             await new Promise(r => setTimeout(r, 400));
@@ -385,30 +386,49 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input bar */}
-                        <form
-                            onSubmit={handleSubmit}
-                            className="flex items-end gap-2 px-3 py-3 border-t border-white/10 flex-shrink-0"
-                        >
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Ask anything about VSMS…"
-                                rows={1}
-                                disabled={isStreaming}
-                                className="flex-1 resize-none bg-gray-800 text-white placeholder-gray-500 text-sm px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 border border-white/10 disabled:opacity-50"
-                                style={{ maxHeight: '140px', overflowY: 'auto' }}
-                            />
-                            <button
-                                type="submit"
-                                disabled={isStreaming || !input.trim()}
-                                className="p-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        {/* Input area */}
+                        <div className="border-t border-white/10 flex-shrink-0">
+                            <div className="px-3 pt-2 pb-1">
+                                <div className="text-[11px] text-gray-500 mb-1">Quick Prompts</div>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                    {suggestions.map((s, i) => (
+                                        <button
+                                            key={`quick-${i}`}
+                                            type="button"
+                                            onClick={() => sendMessage(s)}
+                                            disabled={isStreaming}
+                                            className="whitespace-nowrap text-xs text-gray-300 bg-gray-800 hover:bg-gray-700 border border-white/10 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <form
+                                onSubmit={handleSubmit}
+                                className="flex items-end gap-2 px-3 pb-3"
                             >
-                                <Send className="w-4 h-4" />
-                            </button>
-                        </form>
+                                <textarea
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Ask anything about VSMS…"
+                                    rows={1}
+                                    disabled={isStreaming}
+                                    className="flex-1 resize-none bg-gray-800 text-white placeholder-gray-500 text-sm px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 border border-white/10 disabled:opacity-50"
+                                    style={{ maxHeight: '140px', overflowY: 'auto' }}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isStreaming || !input.trim()}
+                                    className="p-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}

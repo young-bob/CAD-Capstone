@@ -71,6 +71,7 @@ app.MapNotificationEndpoints();
 app.MapEventTaskEndpoints();
 app.MapAiToolEndpoints();
 app.MapAiChatEndpoints();
+app.MapMcpEndpoints();
 
 // ==================== Database Init & Admin Seed ====================
 using (var scope = app.Services.CreateScope())
