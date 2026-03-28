@@ -478,7 +478,7 @@ public static class AiToolEndpoints
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter (e.g., 'Pending', 'Approved'). If the user requests ALL records, pass 'All'.");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"Pending\"' (or 'Approved', 'Rejected', 'All') in your JSON arguments object. Please retry calling this tool with the status parameter included.");
                 ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -579,7 +579,7 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"All\"' (or a specific enum value like 'Draft', 'Published') in your JSON arguments object. Please retry calling this tool.");
                 OpportunityStatus? status = Enum.TryParse<OpportunityStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -591,7 +591,7 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
-                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("Tool Error: Missing 'status' parameter. You MUST include exactly '\"status\": \"Pending\"' (or 'Approved', 'Waitlisted', 'All') in your JSON arguments object. Do not explain, just retry calling the tool.");
                 ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -1929,9 +1929,17 @@ public static class AiToolEndpoints
     private static string? GetOptionalString(JsonElement args, string name)
     {
         if (args.ValueKind != JsonValueKind.Object) return null;
-        if (!args.TryGetProperty(name, out var val)) return null;
-        if (val.ValueKind == JsonValueKind.String) return val.GetString();
-        if (val.ValueKind == JsonValueKind.Number) return val.GetRawText();
+        foreach (var prop in args.EnumerateObject())
+        {
+            if (string.Equals(prop.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                if (prop.Value.ValueKind == JsonValueKind.String) return prop.Value.GetString();
+                if (prop.Value.ValueKind == JsonValueKind.Number) return prop.Value.GetRawText();
+                if (prop.Value.ValueKind == JsonValueKind.True) return "true";
+                if (prop.Value.ValueKind == JsonValueKind.False) return "false";
+                return prop.Value.ToString();
+            }
+        }
         return null;
     }
 
