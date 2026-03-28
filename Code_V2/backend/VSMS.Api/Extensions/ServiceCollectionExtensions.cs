@@ -83,7 +83,7 @@ public static class ServiceCollectionExtensions
         }
 
         builder.Services.AddSingleton<IRealTimePushService, ExpoPushService>();
-        builder.Services.AddSingleton<IAiInferenceService, AwsApiInferenceService>();
+        builder.Services.AddSingleton<IAiInferenceService, BedrockInferenceService>();
 
         // EventBus: switchable via appsettings "EventBus:Provider"
         var eventBusProvider = builder.Configuration.GetValue<string>("EventBus:Provider") ?? "InMemory";
