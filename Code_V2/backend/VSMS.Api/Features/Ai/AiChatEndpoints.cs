@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Orleans;
 using VSMS.Infrastructure.Data.EfCoreQuery;
@@ -69,9 +70,13 @@ public static class AiChatEndpoints
                         if (!allowedSet.Contains(toolName))
                             throw new UnauthorizedAccessException($"Tool '{toolName}' is not allowed for current role.");
 
+                        var effectiveArgs = hasExplicitConfirmation
+                            ? EnsureConfirmedForWriteTool(toolName, args)
+                            : args;
+
                         return await AiToolEndpoints.ExecuteToolAsync(
                             toolName,
-                            args,
+                            effectiveArgs,
                             http,
                             db,
                             grains,
@@ -310,6 +315,33 @@ public static class AiChatEndpoints
             !toolName.StartsWith("admin_get_", StringComparison.OrdinalIgnoreCase))
             return true;
         return false;
+    }
+
+    private static JsonElement EnsureConfirmedForWriteTool(string toolName, JsonElement args)
+    {
+        if (!IsWriteTool(toolName))
+            return args;
+
+        if (args.ValueKind != JsonValueKind.Object)
+            return ParseObjectElement("""{"confirmed":true}""");
+
+        if (args.TryGetProperty("confirmed", out var confirmedNode) &&
+            confirmedNode.ValueKind == JsonValueKind.True)
+            return args;
+
+        var map = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var prop in args.EnumerateObject())
+            map[prop.Name] = JsonSerializer.Deserialize<object?>(prop.Value.GetRawText());
+        map["confirmed"] = true;
+
+        var json = JsonSerializer.Serialize(map);
+        return ParseObjectElement(json);
+    }
+
+    private static JsonElement ParseObjectElement(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
     }
 
     private static string PostProcessReply(string content)
