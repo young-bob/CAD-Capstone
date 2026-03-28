@@ -89,34 +89,28 @@ function getMockResponse(input: string, role: string): string {
 // ─── Quick suggestions per role ───────────────────────────────────────────────
 const SUGGESTIONS: Record<string, string[]> = {
     volunteer: [
-        'Show my current applications and their status.',
-        'List my attendance records for the last 30 days.',
-        'Recommend opportunities for me based on my skills.',
-        'Show my profile and skill summary.',
-        'Show my unread notifications and latest messages.',
-        'List active certificate templates I can use.',
-        'Search opportunities with keyword: community health.',
-        'Get details for opportunity: <opportunityId>.',
+        'Recommend opportunities based on my profile.',
+        'Show my application status list.',
+        'Show my attendance records.',
+        'Show my volunteer profile summary.',
+        'Show unread and recent notifications.',
+        'List available certificate templates.',
     ],
     coordinator: [
-        'Show my organization state and basic profile.',
+        'Show my organization status and overview.',
         'List opportunities under my organization.',
         'List latest applications for my organization.',
-        'Show volunteers engaged/following my organization.',
-        'List event templates for my organization.',
-        'Show attendance for opportunity: <opportunityId>.',
-        'List tasks for opportunity: <opportunityId>.',
+        'Show volunteers engaged with my organization.',
+        'List my organization event templates.',
         'Show the global skill catalog.',
     ],
     admin: [
-        'Show real-time system info and silo status.',
-        'Show grain distribution grouped by silo.',
-        'How many users are in the system? Include role breakdown.',
-        'List latest users and active/banned summary.',
+        'Show real-time cluster system info.',
+        'Show grain distribution by silo.',
+        'Show user list and role distribution.',
         'Show pending organizations for review.',
-        'Show pending disputes that need action.',
-        'Show a summary of the skill catalog.',
-        'Search published opportunities by keyword: seniors.',
+        'Show pending disputes.',
+        'Show platform skill catalog summary.',
     ],
 };
 
@@ -212,9 +206,14 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             const cancel = simulateStream(text, onChunk, onDone);
             cancelRef.current = cancel;
         } catch (error: any) {
-            const mockText = getMockResponse(userInput, userRole);
             const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
-            const fallback = `${mockText}\n\n_Warning: ${backendError}_`;
+            const fallback = [
+                '当前未能从系统获取实时数据。',
+                '',
+                `错误信息：${backendError}`,
+                '',
+                '请稍后重试，或先检查 API / AI 服务连通性。',
+            ].join('\n');
             await new Promise(r => setTimeout(r, 400));
             const cancel = simulateStream(fallback, onChunk, onDone);
             cancelRef.current = cancel;
@@ -403,7 +402,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                         {/* Input area */}
                         <div className="border-t border-white/10 flex-shrink-0">
                             <div className="px-3 pt-2 pb-1">
-                                <div className="text-[11px] text-gray-500 mb-1">Quick Prompts</div>
+                                <div className="text-[11px] text-gray-500 mb-1">Quick Prompts · {userRole.toUpperCase()}</div>
                                 <div className="flex gap-2 overflow-x-auto pb-1">
                                     {suggestions.map((s, i) => (
                                         <button

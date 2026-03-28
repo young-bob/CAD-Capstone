@@ -56,6 +56,7 @@ public class BedrockInferenceService(
             var messageHistory = BuildBedrockMessages(request.Messages);
             var toolConfig = BuildToolConfiguration(tools);
             var maxIterations = 8;
+            var toolResultCache = new Dictionary<string, string>(StringComparer.Ordinal);
 
             for (var round = 0; round < maxIterations; round++)
             {
@@ -99,7 +100,13 @@ public class BedrockInferenceService(
                         try
                         {
                             var toolInput = ParseDocumentToJsonElement(block.Input);
-                            var toolData = await toolExecutor(toolName, toolInput, cts.Token);
+                            var cacheKey = BuildToolCacheKey(toolName, toolInput);
+                            if (!toolResultCache.TryGetValue(cacheKey, out var toolPayload))
+                            {
+                                var toolData = await toolExecutor(toolName, toolInput, cts.Token);
+                                toolPayload = BuildToolPayloadText(ok: true, toolData, error: null);
+                                toolResultCache[cacheKey] = toolPayload;
+                            }
 
                             toolResultBlocks.Add(new ContentBlock
                             {
@@ -111,11 +118,7 @@ public class BedrockInferenceService(
                                     [
                                         new ToolResultContentBlock
                                         {
-                                            Json = Document.FromObject(new
-                                            {
-                                                ok = true,
-                                                data = toolData
-                                            })
+                                            Text = toolPayload
                                         }
                                     ]
                                 }
@@ -123,6 +126,7 @@ public class BedrockInferenceService(
                         }
                         catch (Exception ex)
                         {
+                            var toolPayload = BuildToolPayloadText(ok: false, toolData: null, error: ex.Message);
                             toolResultBlocks.Add(new ContentBlock
                             {
                                 ToolResult = new ToolResultBlock
@@ -133,11 +137,7 @@ public class BedrockInferenceService(
                                     [
                                         new ToolResultContentBlock
                                         {
-                                            Json = Document.FromObject(new
-                                            {
-                                                ok = false,
-                                                error = ex.Message
-                                            })
+                                            Text = toolPayload
                                         }
                                     ]
                                 }
@@ -347,6 +347,54 @@ public class BedrockInferenceService(
             using var parsed = JsonDocument.Parse("{}");
             return parsed.RootElement.Clone();
         }
+    }
+
+    private static string BuildToolCacheKey(string toolName, JsonElement toolInput)
+    {
+        var inputRaw = toolInput.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+            ? "{}"
+            : toolInput.GetRawText();
+
+        return $"{toolName}:{inputRaw}";
+    }
+
+    private static string BuildToolPayloadText(bool ok, object? toolData, string? error)
+    {
+        var payload = new
+        {
+            ok,
+            data = ok ? toolData : null,
+            error = ok ? null : error
+        };
+
+        try
+        {
+            var text = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                WriteIndented = false,
+                MaxDepth = 32
+            });
+
+            return LimitText(text, 12000);
+        }
+        catch (Exception ex)
+        {
+            var fallback = $"{{\"ok\":false,\"error\":\"tool_result_serialization_failed: {Sanitize(ex.Message)}\"}}";
+            return LimitText(fallback, 4000);
+        }
+    }
+
+    private static string LimitText(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            return value;
+
+        return value[..maxLength];
+    }
+
+    private static string Sanitize(string value)
+    {
+        return value.Replace("\"", "'");
     }
 
     private static int ParseInt(string? raw, int fallback, int min, int max)

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Orleans;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Abstractions.Services;
@@ -70,8 +71,10 @@ public static class AiChatEndpoints
                     },
                     ct);
 
+                var reply = PostProcessReply(result.Content);
+
                 return Results.Ok(new AiChatResponse(
-                    result.Content,
+                    reply,
                     result.Provider,
                     result.Model,
                     role,
@@ -117,6 +120,15 @@ public static class AiChatEndpoints
                 Use numbered steps for action guidance.
                 Use available tools to fetch factual data before answering.
                 Never fabricate system/runtime values.
+                Always answer in the same language as the user's latest message.
+                Do not show internal tool names in the final response.
+                Use only the minimum required tools; avoid duplicate calls.
+                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
+                Output format:
+                1) One-line conclusion
+                2) Key data bullets (max 6)
+                3) Optional next action (max 2)
+                If any tool fails, state the failure briefly and continue with available facts.
                 """,
             "Coordinator" =>
                 """
@@ -124,6 +136,15 @@ public static class AiChatEndpoints
                 Focus on event management, applications, attendance, members, and certificates.
                 Use available tools to fetch factual data before answering.
                 Keep instructions practical and concise.
+                Always answer in the same language as the user's latest message.
+                Do not show internal tool names in the final response.
+                Use only the minimum required tools; avoid duplicate calls.
+                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
+                Output format:
+                1) One-line conclusion
+                2) Key data bullets (max 6)
+                3) Optional next action (max 2)
+                If any tool fails, state the failure briefly and continue with available facts.
                 """,
             _ =>
                 """
@@ -131,6 +152,15 @@ public static class AiChatEndpoints
                 Focus on finding opportunities, applications, attendance, profile, skills, and certificates.
                 Use available tools to fetch factual data before answering.
                 Keep answers friendly, concrete, and concise.
+                Always answer in the same language as the user's latest message.
+                Do not show internal tool names in the final response.
+                Use only the minimum required tools; avoid duplicate calls.
+                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
+                Output format:
+                1) One-line conclusion
+                2) Key data bullets (max 6)
+                3) Optional next action (max 2)
+                If any tool fails, state the failure briefly and continue with available facts.
                 """
         };
 
@@ -186,6 +216,38 @@ public static class AiChatEndpoints
 
     private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
     private static double Clamp(double value, double min, double max) => Math.Max(min, Math.Min(max, value));
+
+    private static string PostProcessReply(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return content;
+
+        var text = content.Replace("\r\n", "\n").Trim();
+
+        // Remove raw tool heading lines like: [admin_get_system_info] ...
+        text = Regex.Replace(
+            text,
+            @"^\[[a-z0-9_]+\]\s.*(?:\n|$)",
+            string.Empty,
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+        // Remove duplicated paragraphs while preserving order.
+        var paragraphs = Regex.Split(text, @"\n\s*\n")
+            .Select(p => p.Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .ToList();
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var deduped = new List<string>(paragraphs.Count);
+        foreach (var paragraph in paragraphs)
+        {
+            if (seen.Add(paragraph))
+                deduped.Add(paragraph);
+        }
+
+        var cleaned = string.Join("\n\n", deduped).Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? content.Trim() : cleaned;
+    }
 }
 
 public sealed record AiChatRequest(
