@@ -51,7 +51,7 @@ public static class McpEndpoints
 
                     case "tools/list":
                     {
-                        var tools = AiToolEndpoints.GetAllowedToolDescriptors(http)
+                        var allTools = AiToolEndpoints.GetAllowedToolDescriptors(http)
                             .OrderBy(t => t.Name)
                             .Select(t => new
                             {
@@ -61,7 +61,24 @@ public static class McpEndpoints
                             })
                             .ToList();
 
-                        return Results.Json(Success(id, new { tools }));
+                        // MCP spec: support optional cursor-based pagination
+                        var @params = TryReadParams(rpc);
+                        var cursor = GetStringProperty(@params, "cursor");
+                        var startIndex = 0;
+                        if (!string.IsNullOrEmpty(cursor) && int.TryParse(cursor, out var ci))
+                            startIndex = ci;
+
+                        const int pageSize = 100;
+                        var page = allTools.Skip(startIndex).Take(pageSize).ToList();
+                        var nextCursor = startIndex + pageSize < allTools.Count
+                            ? (startIndex + pageSize).ToString()
+                            : (string?)null;
+
+                        var result = nextCursor is not null
+                            ? (object)new { tools = page, nextCursor }
+                            : new { tools = page };
+
+                        return Results.Json(Success(id, result));
                     }
 
                     case "tools/call":
@@ -73,35 +90,51 @@ public static class McpEndpoints
 
                         var allowed = AiToolEndpoints.ResolveAllowedTools(http);
                         if (!allowed.Contains(toolName))
-                            return Results.Json(Error(id, -32001, $"Tool '{toolName}' is not allowed for this role."));
+                            return Results.Json(Error(id, -32602, $"Unknown tool: {toolName}"));
 
                         var args = GetObjectPropertyOrEmpty(@params, "arguments");
-                        var data = await AiToolEndpoints.ExecuteToolAsync(
-                            toolName,
-                            args,
-                            http,
-                            db,
-                            grains,
-                            organizationQueryService,
-                            opportunityQueryService,
-                            applicationQueryService,
-                            attendanceQueryService);
 
-                        var text = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
-
-                        return Results.Json(Success(id, new
+                        // MCP spec: tool execution errors → result with isError=true (not JSON-RPC error)
+                        try
                         {
-                            content = new[]
+                            var data = await AiToolEndpoints.ExecuteToolAsync(
+                                toolName,
+                                args,
+                                http,
+                                db,
+                                grains,
+                                organizationQueryService,
+                                opportunityQueryService,
+                                applicationQueryService,
+                                attendanceQueryService);
+
+                            var text = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = false });
+
+                            return Results.Json(Success(id, new
                             {
-                                new { type = "text", text }
-                            },
-                            structuredContent = data,
-                            isError = false
-                        }));
+                                content = new[]
+                                {
+                                    new { type = "text", text }
+                                },
+                                isError = false
+                            }));
+                        }
+                        catch (Exception toolEx)
+                        {
+                            // Per MCP spec: tool execution failures are returned as result with isError=true
+                            return Results.Json(Success(id, new
+                            {
+                                content = new[]
+                                {
+                                    new { type = "text", text = $"Tool execution failed: {toolEx.Message}" }
+                                },
+                                isError = true
+                            }));
+                        }
                     }
 
                     case "ping":
-                        return Results.Json(Success(id, new { ok = true, utc = DateTime.UtcNow }));
+                        return Results.Json(Success(id, new { }));
 
                     default:
                         return Results.Json(Error(id, -32601, $"Method not found: {method}"));
@@ -110,14 +143,6 @@ public static class McpEndpoints
             catch (UnauthorizedAccessException ex)
             {
                 return Results.Json(Error(id, -32003, ex.Message));
-            }
-            catch (ArgumentException ex)
-            {
-                return Results.Json(Error(id, -32602, ex.Message));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.Json(Error(id, -32010, ex.Message));
             }
             catch (Exception ex)
             {

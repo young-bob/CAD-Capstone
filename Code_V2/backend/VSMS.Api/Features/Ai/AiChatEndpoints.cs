@@ -52,7 +52,7 @@ public static class AiChatEndpoints
 
             var role = ResolveRole(http);
             var prompt = BuildRolePrompt(role, req.CurrentView, req.ClientLocation, hasExplicitConfirmation);
-            var maxTokens = Clamp(req.MaxTokens ?? 900, 128, 4096);
+            var maxTokens = Clamp(req.MaxTokens ?? 2048, 128, 4096);
             var temperature = Clamp(req.Temperature ?? 0.2, 0.0, 1.0);
             var allowedTools = AiToolEndpoints.GetAllowedToolDescriptors(http);
             var allowedSet = new HashSet<string>(allowedTools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);

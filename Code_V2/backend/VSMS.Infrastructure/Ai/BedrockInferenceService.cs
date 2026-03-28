@@ -18,7 +18,7 @@ public class BedrockInferenceService(
     private readonly string _model = ReadString(config, "AI:Model", "us.amazon.nova-2-lite-v1:0");
     private readonly int _timeoutSeconds = ParseInt(config["AI:TimeoutSeconds"], 60, 10, 300);
     private readonly double _defaultTemperature = ParseDouble(config["AI:DefaultTemperature"], 0.2, 0.0, 1.0);
-    private readonly int _defaultMaxTokens = ParseInt(config["AI:DefaultMaxTokens"], 900, 128, 4096);
+    private readonly int _defaultMaxTokens = ParseInt(config["AI:DefaultMaxTokens"], 2048, 128, 4096);
 
     public async Task<AiInferenceResult> GenerateAsync(
         AiInferenceRequest request,
@@ -92,6 +92,56 @@ public class BedrockInferenceService(
                         throw new InvalidOperationException("Model requested tool use but no tool payload was found.");
 
                     var toolResultBlocks = new List<ContentBlock>();
+
+                    // Execute tools in parallel when multiple are requested
+                    if (toolUseBlocks.Count > 1)
+                    {
+                        var tasks = toolUseBlocks.Select(async block =>
+                        {
+                            var toolName = block.Name ?? string.Empty;
+                            var toolUseId = string.IsNullOrWhiteSpace(block.ToolUseId) ? Guid.NewGuid().ToString("N") : block.ToolUseId;
+                            try
+                            {
+                                var toolInput = ParseDocumentToJsonElement(block.Input);
+                                var cacheKey = BuildToolCacheKey(toolName, toolInput);
+                                if (!toolResultCache.TryGetValue(cacheKey, out var toolPayload))
+                                {
+                                    logger.LogInformation("Tool call: {ToolName} (parallel)", toolName);
+                                    var toolData = await toolExecutor(toolName, toolInput, cts.Token);
+                                    toolPayload = BuildToolPayloadText(ok: true, toolData, error: null);
+                                    toolResultCache[cacheKey] = toolPayload;
+                                }
+                                return new ContentBlock
+                                {
+                                    ToolResult = new ToolResultBlock
+                                    {
+                                        ToolUseId = toolUseId,
+                                        Status = ToolResultStatus.Success,
+                                        Content = [new ToolResultContentBlock { Text = toolPayload }]
+                                    }
+                                };
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogWarning(ex, "Tool call failed: {ToolName}", toolName);
+                                var toolPayload = BuildToolPayloadText(ok: false, toolData: null, error: ex.Message);
+                                return new ContentBlock
+                                {
+                                    ToolResult = new ToolResultBlock
+                                    {
+                                        ToolUseId = toolUseId,
+                                        Status = ToolResultStatus.Error,
+                                        Content = [new ToolResultContentBlock { Text = toolPayload }]
+                                    }
+                                };
+                            }
+                        }).ToList();
+
+                        var results = await Task.WhenAll(tasks);
+                        toolResultBlocks.AddRange(results);
+                    }
+                    else
+                    {
                     foreach (var block in toolUseBlocks)
                     {
                         var toolName = block.Name ?? string.Empty;
@@ -103,6 +153,7 @@ public class BedrockInferenceService(
                             var cacheKey = BuildToolCacheKey(toolName, toolInput);
                             if (!toolResultCache.TryGetValue(cacheKey, out var toolPayload))
                             {
+                                logger.LogInformation("Tool call: {ToolName}", toolName);
                                 var toolData = await toolExecutor(toolName, toolInput, cts.Token);
                                 toolPayload = BuildToolPayloadText(ok: true, toolData, error: null);
                                 toolResultCache[cacheKey] = toolPayload;
@@ -126,6 +177,7 @@ public class BedrockInferenceService(
                         }
                         catch (Exception ex)
                         {
+                            logger.LogWarning(ex, "Tool call failed: {ToolName}", toolName);
                             var toolPayload = BuildToolPayloadText(ok: false, toolData: null, error: ex.Message);
                             toolResultBlocks.Add(new ContentBlock
                             {
@@ -143,6 +195,7 @@ public class BedrockInferenceService(
                                 }
                             });
                         }
+                    }
                     }
 
                     messageHistory.Add(new Message

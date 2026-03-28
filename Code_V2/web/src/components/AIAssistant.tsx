@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Sparkles, Trash2, LocateFixed, MapPin } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Trash2, LocateFixed, MapPin, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiService, type AiChatMessage, type AiClientLocation } from '../services/ai';
@@ -22,6 +22,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     streaming?: boolean;
+    error?: boolean;
 }
 
 interface Props {
@@ -193,17 +194,28 @@ export default function AIAssistant({ userRole, currentView }: Props) {
         } catch (error: any) {
             const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
             const fallback = [
-                '当前未能从系统获取实时数据。',
+                '⚠️ 当前未能从系统获取实时数据。',
                 '',
                 `错误信息：${backendError}`,
-                '',
-                '请稍后重试，或先检查 API / AI 服务连通性。',
             ].join('\n');
-            await new Promise(r => setTimeout(r, 400));
-            const cancel = simulateStream(fallback, onChunk, onDone);
-            cancelRef.current = cancel;
+            setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: fallback, streaming: false, error: true } : m
+            ));
+            setIsStreaming(false);
+            cancelRef.current = null;
         }
     }, [isStreaming, messages, userRole, currentView, clientLocation]);
+
+    const handleRetry = useCallback((errorMsgId: string) => {
+        // Find the user message right before the error message
+        const idx = messages.findIndex(m => m.id === errorMsgId);
+        if (idx <= 0) return;
+        const lastUserMsg = messages.slice(0, idx).reverse().find(m => m.role === 'user');
+        if (!lastUserMsg) return;
+        // Remove the failed assistant message and re-send
+        setMessages(prev => prev.filter(m => m.id !== errorMsgId));
+        setTimeout(() => sendMessage(lastUserMsg.content), 100);
+    }, [messages, sendMessage]);
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -325,7 +337,9 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                                         className={`px-4 py-2.5 max-w-[85%] text-sm leading-relaxed ${
                                             msg.role === 'user'
                                                 ? 'bg-orange-500 text-white rounded-2xl rounded-br-sm'
-                                                : 'bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-800 dark:text-zinc-200 rounded-2xl rounded-bl-sm'
+                                                : msg.error
+                                                    ? 'bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800 text-red-700 dark:text-red-300 rounded-2xl rounded-bl-sm'
+                                                    : 'bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-800 dark:text-zinc-200 rounded-2xl rounded-bl-sm'
                                         }`}
                                     >
                                         {msg.role === 'assistant' && msg.streaming && msg.content === '' ? (
@@ -379,6 +393,16 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                                             </ReactMarkdown>
                                         ) : (
                                             msg.content
+                                        )}
+                                        {/* Retry button for error messages */}
+                                        {msg.error && !isStreaming && (
+                                            <button
+                                                onClick={() => handleRetry(msg.id)}
+                                                className="mt-2 inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60 px-3 py-1.5 rounded-full transition-colors"
+                                            >
+                                                <RefreshCw className="w-3 h-3" />
+                                                Retry
+                                            </button>
                                         )}
                                     </div>
                                 </div>
