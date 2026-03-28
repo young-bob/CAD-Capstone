@@ -375,6 +375,48 @@ public class BedrockInferenceService(
                 MaxDepth = 32
             });
 
+            if (text.Length <= 12000)
+                return text;
+
+            // Smart truncation: if data is an array-like structure, summarize instead of hard-cut
+            if (ok && toolData is not null)
+            {
+                try
+                {
+                    var dataJson = JsonSerializer.Serialize(toolData, new JsonSerializerOptions { WriteIndented = false, MaxDepth = 32 });
+                    using var doc = JsonDocument.Parse(dataJson);
+                    var root = doc.RootElement;
+
+                    // Find the first array property and truncate it
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        var totalItems = root.GetArrayLength();
+                        var truncated = TruncateArray(root, 20);
+                        var summary = new { ok, data = truncated, _meta = new { totalItems, shown = Math.Min(totalItems, 20), truncated = totalItems > 20 } };
+                        var summaryText = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = false, MaxDepth = 32 });
+                        return LimitText(summaryText, 12000);
+                    }
+
+                    // For objects, try to find array-valued properties
+                    if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var prop in root.EnumerateObject())
+                        {
+                            if (prop.Value.ValueKind == JsonValueKind.Array && prop.Value.GetArrayLength() > 20)
+                            {
+                                // Re-serialize with truncated array
+                                var truncatedPayload = $"{{\"ok\":true,\"data\":{dataJson.Substring(0, Math.Min(dataJson.Length, 10000))},\"_meta\":{{\"note\":\"Result truncated. Total items in '{prop.Name}': {prop.Value.GetArrayLength()}. Showing partial data.\"}}}}";
+                                return LimitText(truncatedPayload, 12000);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall through to basic truncation
+                }
+            }
+
             return LimitText(text, 12000);
         }
         catch (Exception ex)
@@ -382,6 +424,19 @@ public class BedrockInferenceService(
             var fallback = $"{{\"ok\":false,\"error\":\"tool_result_serialization_failed: {Sanitize(ex.Message)}\"}}";
             return LimitText(fallback, 4000);
         }
+    }
+
+    private static object[] TruncateArray(JsonElement arrayElement, int maxItems)
+    {
+        var items = new List<object>();
+        var count = 0;
+        foreach (var item in arrayElement.EnumerateArray())
+        {
+            if (count >= maxItems) break;
+            items.Add(JsonSerializer.Deserialize<object>(item.GetRawText())!);
+            count++;
+        }
+        return items.ToArray();
     }
 
     private static string LimitText(string value, int maxLength)

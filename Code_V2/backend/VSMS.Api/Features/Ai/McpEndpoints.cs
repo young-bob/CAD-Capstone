@@ -57,7 +57,7 @@ public static class McpEndpoints
                             {
                                 name = t.Name,
                                 description = t.Description,
-                                inputSchema = BuildToolInputSchema(t.Name)
+                                inputSchema = AiToolEndpoints.BuildToolInputSchema(t.Name)
                             })
                             .ToList();
 
@@ -192,47 +192,5 @@ public static class McpEndpoints
         return doc.RootElement.Clone();
     }
 
-    private static object BuildToolInputSchema(string toolName)
-    {
-        return toolName switch
-        {
-            "get_opportunity_detail" or "get_opportunity_attendance" or "get_event_tasks" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    opportunityId = new { type = "string", description = "Opportunity Guid." },
-                    skip = new { type = "integer" },
-                    take = new { type = "integer" }
-                },
-                required = new[] { "opportunityId" },
-                additionalProperties = true
-            },
-            "verify_certificate_public" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    certificateId = new { type = "string", description = "Public certificate id." }
-                },
-                required = new[] { "certificateId" },
-                additionalProperties = true
-            },
-            "get_org_announcements" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    organizationId = new { type = "string", description = "Organization Guid." }
-                },
-                required = new[] { "organizationId" },
-                additionalProperties = true
-            },
-            _ => new
-            {
-                type = "object",
-                additionalProperties = true
-            }
-        };
-    }
 }
+

@@ -2058,6 +2058,508 @@ public static class AiToolEndpoints
             $"Write action '{tool}' requires explicit confirmation. Ask for confirmation first, then call again with confirmed=true.");
     }
 
+    // ─── Unified Tool Input Schema (shared by AiChat + MCP) ─────────────────────
+    public static object BuildToolInputSchema(string toolName)
+    {
+        return toolName switch
+        {
+            // ── Shared read tools ──────────────────────────────────────
+            "search_opportunities" => Obj(new
+            {
+                query = Str("Search keyword for title or organization name."),
+                category = Str("Category filter, e.g. Community, Environment, Education, Health, Technology."),
+                skip = Int("Paging offset (default 0)."),
+                take = Int("Page size (default 100, max 500).")
+            }),
+            "recommend_opportunities" => Obj(new
+            {
+                query = Str("Optional search keyword."),
+                category = Str("Optional category filter."),
+                lat = Num("Client latitude for distance ranking."),
+                lon = Num("Client longitude for distance ranking."),
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "get_opportunity_detail" => Obj(new
+            {
+                opportunityId = Str("Opportunity Guid.")
+            }, "opportunityId"),
+            "get_my_applications" => Obj(new
+            {
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "get_my_attendance" => Obj(new
+            {
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "get_my_profile" => EmptyObj(),
+            "get_my_skills" => EmptyObj(),
+            "get_notifications" => Obj(new
+            {
+                limit = Int("Max notifications to return (default 50, max 100).")
+            }),
+            "get_unread_notification_count" => EmptyObj(),
+            "get_org_announcements" => Obj(new
+            {
+                organizationId = Str("Organization Guid.")
+            }, "organizationId"),
+            "get_org_state" => Obj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved for coordinator).")
+            }),
+            "get_org_opportunities" => Obj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "get_org_applications" => Obj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "get_opportunity_attendance" => Obj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }, "opportunityId"),
+            "get_org_volunteers" => Obj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved for coordinator).")
+            }),
+            "get_org_event_templates" => Obj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved for coordinator).")
+            }),
+            "get_event_tasks" => Obj(new
+            {
+                opportunityId = Str("Opportunity Guid.")
+            }, "opportunityId"),
+            "get_skill_catalog" => EmptyObj(),
+            "get_certificate_templates" => Obj(new
+            {
+                organizationId = Str("Optional organization Guid to include org-specific templates.")
+            }),
+            "verify_certificate_public" => Obj(new
+            {
+                certificateId = Str("Public certificate id string.")
+            }, "certificateId"),
+
+            // ── Volunteer write tools ──────────────────────────────────
+            "volunteer_apply_shift" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                shiftId = Str("Shift Guid to apply for."),
+                idempotencyKey = Str("Optional idempotency key."),
+                confirmed = Bool()
+            }, "opportunityId", "shiftId", "confirmed"),
+            "volunteer_withdraw_application" => WriteObj(new
+            {
+                applicationId = Str("Application Guid to withdraw."),
+                confirmed = Bool()
+            }, "applicationId", "confirmed"),
+            "volunteer_geo_checkin" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                lat = Num("Latitude for geo check-in."),
+                lon = Num("Longitude for geo check-in."),
+                proofPhotoUrl = Str("Optional proof photo URL."),
+                confirmed = Bool()
+            }, "attendanceId", "lat", "lon", "confirmed"),
+            "volunteer_checkout" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                confirmed = Bool()
+            }, "attendanceId", "confirmed"),
+            "volunteer_raise_dispute" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                reason = Str("Dispute reason text."),
+                evidenceUrl = Str("Optional evidence URL."),
+                confirmed = Bool()
+            }, "attendanceId", "reason", "confirmed"),
+            "volunteer_mark_notification_read" => WriteObj(new
+            {
+                notificationId = Str("Notification Guid."),
+                confirmed = Bool()
+            }, "notificationId", "confirmed"),
+            "volunteer_mark_all_notifications_read" => WriteObj(new
+            {
+                confirmed = Bool()
+            }, "confirmed"),
+            "volunteer_follow_org" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid to follow."),
+                confirmed = Bool()
+            }, "organizationId", "confirmed"),
+            "volunteer_unfollow_org" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid to unfollow."),
+                confirmed = Bool()
+            }, "organizationId", "confirmed"),
+            "volunteer_update_profile" => WriteObj(new
+            {
+                firstName = Str("Updated first name."),
+                lastName = Str("Updated last name."),
+                email = Str("Updated email."),
+                phone = Str("Updated phone."),
+                bio = Str("Updated bio."),
+                confirmed = Bool()
+            }, "confirmed"),
+            "volunteer_update_privacy" => WriteObj(new
+            {
+                isProfilePublic = new { type = "boolean", description = "Whether profile is public." },
+                allowEmail = new { type = "boolean", description = "Allow email notifications." },
+                allowPush = new { type = "boolean", description = "Allow push notifications." },
+                confirmed = Bool()
+            }, "confirmed"),
+            "volunteer_add_skill" => WriteObj(new
+            {
+                skillId = Str("Skill Guid from skill catalog."),
+                confirmed = Bool()
+            }, "skillId", "confirmed"),
+            "volunteer_remove_skill" => WriteObj(new
+            {
+                skillId = Str("Skill Guid to remove."),
+                confirmed = Bool()
+            }, "skillId", "confirmed"),
+            "volunteer_sign_waiver" => WriteObj(new
+            {
+                confirmed = Bool()
+            }, "confirmed"),
+
+            // ── Coordinator write tools ────────────────────────────────
+            "coordinator_approve_application" => WriteObj(new
+            {
+                applicationId = Str("Application Guid to approve."),
+                confirmed = Bool()
+            }, "applicationId", "confirmed"),
+            "coordinator_reject_application" => WriteObj(new
+            {
+                applicationId = Str("Application Guid to reject."),
+                reason = Str("Rejection reason."),
+                confirmed = Bool()
+            }, "applicationId", "reason", "confirmed"),
+            "coordinator_waitlist_application" => WriteObj(new
+            {
+                applicationId = Str("Application Guid."),
+                confirmed = Bool()
+            }, "applicationId", "confirmed"),
+            "coordinator_promote_application" => WriteObj(new
+            {
+                applicationId = Str("Application Guid to promote from waitlist."),
+                confirmed = Bool()
+            }, "applicationId", "confirmed"),
+            "coordinator_mark_application_noshow" => WriteObj(new
+            {
+                applicationId = Str("Application Guid."),
+                confirmed = Bool()
+            }, "applicationId", "confirmed"),
+            "coordinator_publish_opportunity" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid to publish."),
+                confirmed = Bool()
+            }, "opportunityId", "confirmed"),
+            "coordinator_cancel_opportunity" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid to cancel."),
+                reason = Str("Cancellation reason."),
+                confirmed = Bool()
+            }, "opportunityId", "reason", "confirmed"),
+            "coordinator_add_shift" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                name = Str("Shift name."),
+                startTime = Str("Shift start datetime ISO 8601."),
+                endTime = Str("Shift end datetime ISO 8601."),
+                maxCapacity = Int("Max volunteer capacity."),
+                confirmed = Bool()
+            }, "opportunityId", "name", "startTime", "endTime", "confirmed"),
+            "coordinator_update_shift" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                shiftId = Str("Shift Guid to update."),
+                name = Str("Updated shift name."),
+                startTime = Str("Updated start datetime."),
+                endTime = Str("Updated end datetime."),
+                maxCapacity = Int("Updated max capacity."),
+                confirmed = Bool()
+            }, "opportunityId", "shiftId", "name", "startTime", "endTime", "confirmed"),
+            "coordinator_remove_shift" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                shiftId = Str("Shift Guid to remove."),
+                confirmed = Bool()
+            }, "opportunityId", "shiftId", "confirmed"),
+            "coordinator_update_opportunity_info" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                title = Str("Updated title."),
+                description = Str("Updated description."),
+                category = Str("Updated category."),
+                lat = Num("Updated latitude."),
+                lon = Num("Updated longitude."),
+                radiusMeters = Num("Updated geo-fence radius in meters."),
+                confirmed = Bool()
+            }, "opportunityId", "title", "description", "category", "lat", "lon", "radiusMeters", "confirmed"),
+            "coordinator_set_required_skills" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                skillIds = new { type = "array", items = new { type = "string" }, description = "List of skill Guids." },
+                confirmed = Bool()
+            }, "opportunityId", "skillIds", "confirmed"),
+            "coordinator_post_announcement" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                text = Str("Announcement text content."),
+                confirmed = Bool()
+            }, "text", "confirmed"),
+            "coordinator_update_org_profile" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                websiteUrl = Str("Updated website URL."),
+                contactEmail = Str("Updated contact email."),
+                tags = new { type = "array", items = new { type = "string" }, description = "Updated tags." },
+                confirmed = Bool()
+            }, "confirmed"),
+            "coordinator_create_event_task" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                title = Str("Task title."),
+                note = Str("Optional task note."),
+                assignedToGrainId = Str("Optional volunteer grain id to assign."),
+                assignedToEmail = Str("Optional assignee email."),
+                assignedToName = Str("Optional assignee name."),
+                confirmed = Bool()
+            }, "opportunityId", "title", "confirmed"),
+            "coordinator_toggle_event_task_complete" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                taskId = Str("Task Guid."),
+                confirmed = Bool()
+            }, "opportunityId", "taskId", "confirmed"),
+            "coordinator_delete_event_task" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                taskId = Str("Task Guid."),
+                confirmed = Bool()
+            }, "opportunityId", "taskId", "confirmed"),
+            "coordinator_create_event_template" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                name = Str("Template name."),
+                title = Str("Event title."),
+                description = Str("Event description."),
+                category = Str("Category."),
+                tags = new { type = "array", items = new { type = "string" }, description = "Tags." },
+                approvalPolicy = Str("AutoApprove | ManualApprove | InviteOnly."),
+                requiredSkillIds = new { type = "array", items = new { type = "string" }, description = "Required skill Guids." },
+                latitude = Num("Latitude."),
+                longitude = Num("Longitude."),
+                radiusMeters = Int("Geo-fence radius."),
+                confirmed = Bool()
+            }, "name", "confirmed"),
+            "coordinator_delete_event_template" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                templateId = Str("Template Guid to delete."),
+                confirmed = Bool()
+            }, "templateId", "confirmed"),
+            "coordinator_notify_volunteers" => WriteObj(new
+            {
+                opportunityId = Str("Opportunity Guid."),
+                message = Str("Notification message text."),
+                targetStatus = Str("Filter: All | Approved (default All)."),
+                targetIds = new { type = "array", items = new { type = "string" }, description = "Optional specific volunteer grain ids." },
+                confirmed = Bool()
+            }, "opportunityId", "message", "confirmed"),
+            "coordinator_block_volunteer" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                volunteerId = Str("Volunteer grain id to block."),
+                confirmed = Bool()
+            }, "volunteerId", "confirmed"),
+            "coordinator_unblock_volunteer" => WriteObj(new
+            {
+                organizationId = Str("Organization Guid (auto-resolved)."),
+                volunteerId = Str("Volunteer grain id to unblock."),
+                confirmed = Bool()
+            }, "volunteerId", "confirmed"),
+            "coordinator_coordinator_checkin" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                confirmed = Bool()
+            }, "attendanceId", "confirmed"),
+            "coordinator_confirm_attendance" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                rating = Int("Supervisor rating 1-5 (default 5)."),
+                supervisorId = Str("Optional supervisor grain id."),
+                confirmed = Bool()
+            }, "attendanceId", "confirmed"),
+            "coordinator_adjust_attendance" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                newCheckIn = Str("Adjusted check-in datetime ISO 8601."),
+                newCheckOut = Str("Adjusted check-out datetime ISO 8601."),
+                reason = Str("Adjustment reason."),
+                coordinatorId = Str("Optional coordinator grain id."),
+                confirmed = Bool()
+            }, "attendanceId", "newCheckIn", "newCheckOut", "reason", "confirmed"),
+            "coordinator_mark_dispute_review" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                coordinatorId = Str("Optional coordinator grain id."),
+                confirmed = Bool()
+            }, "attendanceId", "confirmed"),
+            "coordinator_resolve_dispute" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                resolution = Str("Resolution text."),
+                adjustedHours = Num("Adjusted total hours."),
+                resolverId = Str("Optional resolver grain id."),
+                confirmed = Bool()
+            }, "attendanceId", "resolution", "adjustedHours", "confirmed"),
+
+            // ── Admin read tools ───────────────────────────────────────
+            "admin_get_system_info" => EmptyObj(),
+            "admin_get_grain_distribution" => EmptyObj(),
+            "admin_get_users" => Obj(new
+            {
+                role = Str("Filter by role: Volunteer | Coordinator."),
+                search = Str("Search by email."),
+                status = Str("Filter: active | banned."),
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "admin_get_pending_orgs" => Obj(new
+            {
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+            "admin_get_pending_disputes" => Obj(new
+            {
+                skip = Int("Paging offset."),
+                take = Int("Page size.")
+            }),
+
+            // ── Admin write tools ──────────────────────────────────────
+            "admin_approve_org" => WriteObj(new
+            {
+                orgId = Str("Organization Guid to approve."),
+                confirmed = Bool()
+            }, "orgId", "confirmed"),
+            "admin_reject_org" => WriteObj(new
+            {
+                orgId = Str("Organization Guid to reject."),
+                reason = Str("Rejection reason."),
+                confirmed = Bool()
+            }, "orgId", "reason", "confirmed"),
+            "admin_ban_user" => WriteObj(new
+            {
+                userId = Str("User Guid to ban."),
+                confirmed = Bool()
+            }, "userId", "confirmed"),
+            "admin_unban_user" => WriteObj(new
+            {
+                userId = Str("User Guid to unban."),
+                confirmed = Bool()
+            }, "userId", "confirmed"),
+            "admin_resolve_dispute" => WriteObj(new
+            {
+                attendanceId = Str("Attendance record Guid."),
+                resolution = Str("Resolution text."),
+                adjustedHours = Num("Adjusted total hours."),
+                confirmed = Bool()
+            }, "attendanceId", "resolution", "adjustedHours", "confirmed"),
+            "admin_reset_user_password" => WriteObj(new
+            {
+                userId = Str("User Guid."),
+                newPassword = Str("New password (min 6 chars)."),
+                confirmed = Bool()
+            }, "userId", "newPassword", "confirmed"),
+            "admin_change_user_role" => WriteObj(new
+            {
+                userId = Str("User Guid."),
+                newRole = Str("Target role: Volunteer | Coordinator."),
+                confirmed = Bool()
+            }, "userId", "newRole", "confirmed"),
+            "admin_reassign_coordinator" => WriteObj(new
+            {
+                orgId = Str("Organization Guid."),
+                coordinatorUserId = Str("New coordinator user Guid."),
+                confirmed = Bool()
+            }, "orgId", "coordinatorUserId", "confirmed"),
+            "admin_add_coordinator" => WriteObj(new
+            {
+                orgId = Str("Organization Guid."),
+                coordinatorUserId = Str("Coordinator user Guid to add."),
+                confirmed = Bool()
+            }, "orgId", "coordinatorUserId", "confirmed"),
+            "admin_remove_coordinator" => WriteObj(new
+            {
+                orgId = Str("Organization Guid."),
+                coordinatorUserId = Str("Coordinator user Guid to remove."),
+                confirmed = Bool()
+            }, "orgId", "coordinatorUserId", "confirmed"),
+            "admin_create_skill" => WriteObj(new
+            {
+                name = Str("Skill name."),
+                category = Str("Skill category."),
+                description = Str("Optional skill description."),
+                confirmed = Bool()
+            }, "name", "category", "confirmed"),
+            "admin_update_skill" => WriteObj(new
+            {
+                skillId = Str("Skill Guid."),
+                name = Str("Updated name."),
+                category = Str("Updated category."),
+                description = Str("Updated description."),
+                confirmed = Bool()
+            }, "skillId", "confirmed"),
+            "admin_delete_skill" => WriteObj(new
+            {
+                skillId = Str("Skill Guid to delete."),
+                confirmed = Bool()
+            }, "skillId", "confirmed"),
+
+            _ => EmptyObj()
+        };
+    }
+
+    // ── Schema builder helpers ────────────────────────────────────────────────────
+    private static object Str(string desc) => new { type = "string", description = desc };
+    private static object Num(string desc) => new { type = "number", description = desc };
+    private static object Int(string desc) => new { type = "integer", description = desc };
+    private static object Bool() => new { type = "boolean", description = "Must be true for confirmed write actions." };
+
+    private static object EmptyObj() => new
+    {
+        type = "object",
+        properties = new { },
+        additionalProperties = true
+    };
+
+    private static object Obj(object properties, params string[] required) => new
+    {
+        type = "object",
+        properties,
+        required = required.Length > 0 ? required : Array.Empty<string>(),
+        additionalProperties = true
+    };
+
+    private static object WriteObj(object properties, params string[] required) => new
+    {
+        type = "object",
+        properties,
+        required = required.Length > 0 ? required : new[] { "confirmed" },
+        additionalProperties = true
+    };
+
     private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
 
     private static double DistanceScore(double distanceKm)

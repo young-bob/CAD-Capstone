@@ -29,62 +29,6 @@ interface Props {
     currentView?: string;
 }
 
-// ─── Mock response bank (keyword-matched) ────────────────────────────────────
-const MOCK_RESPONSES: Record<string, string[]> = {
-    apply: [
-        `To apply for a volunteer opportunity:\n\n1. Go to **Find Opportunities** in the sidebar\n2. Browse or search for an event that interests you\n3. Click on the opportunity card to view details\n4. Select a shift and click **Apply**\n\nYour application will show as **Pending** until the coordinator reviews it. Good luck! 🙌`,
-    ],
-    'impact score': [
-        `Your **Impact Score** reflects your volunteer contributions:\n\n- **+10 points** for each completed opportunity\n- **+1 point** per volunteer hour logged\n- Displayed on your profile and dashboard\n\nHigher scores improve your opportunity matching rank. Keep volunteering to grow it! ⭐`,
-    ],
-    'check in|checkin|geo|attendance': [
-        `For **Geo Check-In**:\n\n1. Go to **Geo Check-in** in the sidebar\n2. Find your approved shift that's starting\n3. Click **Check In Now** (available 30 min before shift start)\n4. Allow location access when prompted\n5. Confirm your position on the map\n6. Click **Confirm Check-In**\n\nCheck out the same way after your shift ends. Your hours are calculated automatically. 📍`,
-    ],
-    certificate: [
-        `**Certificates** are issued automatically after:\n\n1. You complete a volunteer shift\n2. The coordinator confirms your attendance\n3. The system generates a PDF certificate\n\nTo download yours, go to **Certificates** in the sidebar. You can download and share them anytime. 🏆`,
-    ],
-    skill: [
-        `To manage your **Skills**:\n\n1. Go to **My Skills** in the sidebar\n2. Click **+ Add Skill** to browse available skills\n3. Add skills that match your experience\n\nYour skills are used in **opportunity matching** — the more accurate your skills, the better your recommendations! ✨`,
-    ],
-    create: [
-        `To **create a volunteer event** (opportunity):\n\n1. Go to **Manage Events** in the sidebar\n2. Click the **+** (plus) button\n3. Fill in: title, description, location, and approval policy\n4. Add one or more **shifts** (date, time, capacity)\n5. Click **Publish** when ready\n\nVolunteers can then apply for your event! 📋`,
-    ],
-    'approval polic': [
-        `There are **3 approval policies** for opportunities:\n\n- **AutoApprove**: Applications are accepted instantly (no review needed)\n- **ManualApprove**: You review and approve/reject each application\n- **InviteOnly**: Only volunteers you personally invite can join\n\nChoose based on how much control you want over who participates. 🎯`,
-    ],
-    application: [
-        `To **review volunteer applications**:\n\n1. Go to **Applications** in the sidebar\n2. You'll see all pending applications for your events\n3. Click an application to view volunteer details\n4. Choose **Approve** or **Reject**\n\nApproved volunteers are notified immediately. Waitlisted applicants are promoted automatically when spots open. ✅`,
-    ],
-    organization: [
-        `To **approve or reject an organization**:\n\n1. Go to **Organizations** in the sidebar\n2. You'll see a list of pending applications\n3. Click **Approve** or **Reject** with a reason\n\nApproved organizations can immediately start creating events and inviting volunteers. 🏢`,
-    ],
-    ban: [
-        `To **ban a user**:\n\n1. Go to **User Control** in the sidebar\n2. Search for the user by email or name\n3. Click the user row to expand options\n4. Click **Ban User** and confirm\n\nBanned users cannot log in until you **Unban** them. Use this for policy violations. 🚫`,
-    ],
-    dispute: [
-        `To **resolve an attendance dispute**:\n\n1. Go to **Disputes** in the sidebar\n2. View the dispute details (volunteer name, event, reason)\n3. Review the evidence if provided\n4. Click **Resolve** and enter your decision\n\nThe volunteer and coordinator are notified of the resolution. ⚖️`,
-    ],
-};
-
-function getMockResponse(input: string, role: string): string {
-    const lower = input.toLowerCase();
-
-    for (const [key, responses] of Object.entries(MOCK_RESPONSES)) {
-        const patterns = key.split('|');
-        if (patterns.some(p => lower.includes(p))) {
-            return responses[0];
-        }
-    }
-
-    // Fallback per role
-    const fallbacks: Record<string, string> = {
-        volunteer: `I can help you with:\n\n- **Finding & applying** for opportunities\n- **Geo check-in** process\n- **Impact score** and tracking\n- **Certificate** collection\n- **Skills** management\n\nWhat would you like to know? 😊`,
-        coordinator: `I can help you with:\n\n- **Creating events** and shifts\n- **Approval policies** (Auto, Manual, InviteOnly)\n- **Reviewing applications**\n- **Certificate templates**\n- **Member management**\n\nWhat do you need help with? 💼`,
-        admin: `I can help you with:\n\n- **Approving organizations**\n- **User management** (ban, reset password)\n- **Dispute resolution**\n- **Skills taxonomy**\n- **System health metrics**\n\nWhat would you like to know? 🛡️`,
-    };
-
-    return fallbacks[role] || fallbacks.volunteer;
-}
 
 // ─── Quick suggestions per role ───────────────────────────────────────────────
 const SUGGESTIONS: Record<string, string[]> = {
@@ -357,29 +301,14 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[#fafafa] dark:bg-zinc-950" style={{ minHeight: 0 }}>
                             {/* Welcome message */}
                             {messages.length === 0 && (
-                                <div className="space-y-3">
-                                    <div className="flex gap-2.5">
-                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <Bot className="w-3.5 h-3.5 text-white" />
-                                        </div>
-                                        <div className="bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%]">
-                                            <p className="text-sm text-gray-700 dark:text-zinc-300 leading-relaxed">
-                                                Hi! I'm your VSMS assistant. How can I help you today? 👋
-                                            </p>
-                                        </div>
+                                <div className="flex gap-2.5">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <Bot className="w-3.5 h-3.5 text-white" />
                                     </div>
-
-                                    {/* Quick suggestion pills */}
-                                    <div className="flex flex-wrap gap-2 pl-8">
-                                        {suggestions.map((s, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => sendMessage(s)}
-                                                className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-orange-50 dark:hover:bg-orange-950/30 border border-gray-200 dark:border-zinc-700 hover:border-orange-200 dark:hover:border-orange-800 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
+                                    <div className="bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%]">
+                                        <p className="text-sm text-gray-700 dark:text-zinc-300 leading-relaxed">
+                                            Hi! I'm your VSMS assistant. How can I help you today? 👋
+                                        </p>
                                     </div>
                                 </div>
                             )}

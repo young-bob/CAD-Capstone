@@ -57,7 +57,7 @@ public static class AiChatEndpoints
             var allowedTools = AiToolEndpoints.GetAllowedToolDescriptors(http);
             var allowedSet = new HashSet<string>(allowedTools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
             var aiTools = allowedTools
-                .Select(t => new AiInferenceTool(t.Name, t.Description, BuildToolInputSchema(t.Name)))
+                .Select(t => new AiInferenceTool(t.Name, t.Description, AiToolEndpoints.BuildToolInputSchema(t.Name)))
                 .ToList();
 
             try
@@ -127,65 +127,51 @@ public static class AiChatEndpoints
 
     private static string BuildRolePrompt(string role, string? currentView, AiClientLocation? clientLocation, bool hasExplicitConfirmation)
     {
+        var sharedRules = """
+            Always use available tools to fetch factual data before answering. Never fabricate data.
+            Always answer in the same language as the user's latest message.
+            Do not show internal tool names or raw JSON in the final response.
+            Use only the minimum required tools; avoid duplicate calls.
+            Prefer a compact, human-readable summary instead of raw dumps or large tables.
+            For any write action, first ask for explicit confirmation.
+            Only execute a write tool after user confirms, and pass confirmed=true.
+            If the latest user message is an explicit confirmation (e.g. "Yes", "确认", "请执行"), execute the pending action immediately with confirmed=true without re-asking.
+            For bulk requests (e.g. "approve all"), execute the write tool per target item after one confirmation.
+            Output format: 1) One-line conclusion, 2) Key data bullets (max 6), 3) Optional next action (max 2).
+            If any tool fails, state the failure briefly and continue with available facts.
+
+            Tool usage rules:
+            - For coordinator tools that require organizationId: you may omit it and the system auto-resolves to the coordinator's managed organization.
+            - All Guid parameters must be valid UUID strings.
+            - For geo check-in, use lat/lon from the client location context if available.
+            - When the user asks to check in, first call get_my_attendance to find the eligible attendanceId, then call volunteer_geo_checkin.
+            - When the user asks about notifications, call get_notifications first, then offer to mark as read.
+            - For recommendation queries, use recommend_opportunities with the client location if available.
+            """;
+
         var basePrompt = role switch
         {
             "SystemAdmin" =>
-                """
+                $"""
                 You are the VSMS AI assistant for a SystemAdmin.
                 Be precise, concise, and operationally safe.
                 Use numbered steps for action guidance.
-                Use available tools to fetch factual data before answering.
                 Never fabricate system/runtime values.
-                Always answer in the same language as the user's latest message.
-                Do not show internal tool names in the final response.
-                Use only the minimum required tools; avoid duplicate calls.
-                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
-                For any write action, first ask for explicit confirmation.
-                Only execute a write tool after user confirms, and pass confirmed=true.
-                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
-                Output format:
-                1) One-line conclusion
-                2) Key data bullets (max 6)
-                3) Optional next action (max 2)
-                If any tool fails, state the failure briefly and continue with available facts.
+                {sharedRules}
                 """,
             "Coordinator" =>
-                """
+                $"""
                 You are the VSMS AI assistant for a Coordinator.
                 Focus on event management, applications, attendance, members, and certificates.
-                Use available tools to fetch factual data before answering.
                 Keep instructions practical and concise.
-                Always answer in the same language as the user's latest message.
-                Do not show internal tool names in the final response.
-                Use only the minimum required tools; avoid duplicate calls.
-                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
-                For any write action, first ask for explicit confirmation.
-                Only execute a write tool after user confirms, and pass confirmed=true.
-                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
-                Output format:
-                1) One-line conclusion
-                2) Key data bullets (max 6)
-                3) Optional next action (max 2)
-                If any tool fails, state the failure briefly and continue with available facts.
+                {sharedRules}
                 """,
             _ =>
-                """
+                $"""
                 You are the VSMS AI assistant for a Volunteer.
                 Focus on finding opportunities, applications, attendance, profile, skills, and certificates.
-                Use available tools to fetch factual data before answering.
                 Keep answers friendly, concrete, and concise.
-                Always answer in the same language as the user's latest message.
-                Do not show internal tool names in the final response.
-                Use only the minimum required tools; avoid duplicate calls.
-                Prefer a compact, human-readable summary instead of raw dumps or raw tables.
-                For any write action, first ask for explicit confirmation.
-                Only execute a write tool after user confirms, and pass confirmed=true.
-                If the latest user message is an explicit confirmation (for example: "Yes, confirm", "确认", "请执行"), do not ask again and execute the pending write action immediately with confirmed=true.
-                Output format:
-                1) One-line conclusion
-                2) Key data bullets (max 6)
-                3) Optional next action (max 2)
-                If any tool fails, state the failure briefly and continue with available facts.
+                {sharedRules}
                 """
         };
 
@@ -213,81 +199,6 @@ public static class AiChatEndpoints
         return string.Join("\n", parts);
     }
 
-    private static object BuildToolInputSchema(string toolName)
-    {
-        if (toolName.Equals("volunteer_geo_checkin", StringComparison.OrdinalIgnoreCase))
-        {
-            return new
-            {
-                type = "object",
-                properties = new
-                {
-                    attendanceId = new { type = "string", description = "Attendance record Guid." },
-                    lat = new { type = "number", description = "Latitude for geo check-in." },
-                    lon = new { type = "number", description = "Longitude for geo check-in." },
-                    proofPhotoUrl = new { type = "string", description = "Optional proof photo URL or marker." },
-                    confirmed = new { type = "boolean", description = "Must be true for confirmed write actions." }
-                },
-                required = new[] { "attendanceId", "lat", "lon", "confirmed" },
-                additionalProperties = true
-            };
-        }
-
-        if (IsWriteTool(toolName))
-        {
-            return new
-            {
-                type = "object",
-                properties = new
-                {
-                    confirmed = new { type = "boolean", description = "Must be true for confirmed write actions." }
-                },
-                required = new[] { "confirmed" },
-                additionalProperties = true
-            };
-        }
-
-        return toolName switch
-        {
-            "get_opportunity_detail" or "get_opportunity_attendance" or "get_event_tasks" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    opportunityId = new { type = "string", description = "Opportunity Guid." },
-                    skip = new { type = "integer" },
-                    take = new { type = "integer" }
-                },
-                required = new[] { "opportunityId" },
-                additionalProperties = true
-            },
-            "verify_certificate_public" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    certificateId = new { type = "string", description = "Public certificate id." }
-                },
-                required = new[] { "certificateId" },
-                additionalProperties = true
-            },
-            "get_org_announcements" => new
-            {
-                type = "object",
-                properties = new
-                {
-                    organizationId = new { type = "string", description = "Organization Guid." }
-                },
-                required = new[] { "organizationId" },
-                additionalProperties = true
-            },
-            _ => new
-            {
-                type = "object",
-                additionalProperties = true
-            }
-        };
-    }
 
     private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
     private static double Clamp(double value, double min, double max) => Math.Max(min, Math.Min(max, value));
@@ -295,14 +206,27 @@ public static class AiChatEndpoints
     private static bool IsExplicitConfirmation(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return false;
-        var t = text.Trim().ToLowerInvariant();
-        return t.Contains("yes, confirm")
-            || t.Equals("yes confirm")
-            || t.Equals("confirm")
-            || t.Equals("confirmed")
-            || t.Contains("确认")
-            || t.Contains("同意")
-            || t.Contains("请执行");
+        var t = Regex.Replace(text.Trim().ToLowerInvariant(), @"\s+", " ");
+
+        if (t.Contains("确认") || t.Contains("同意") || t.Contains("请执行"))
+            return true;
+
+        if (t == "yes" || t == "y" || t == "confirm" || t == "confirmed")
+            return true;
+
+        if (t.Contains("yes, confirm") || t.Contains("yes confirm"))
+            return true;
+
+        if (Regex.IsMatch(t, @"^yes\b.*\b(confirm|approved?|approve|proceed|execute)\b"))
+            return true;
+
+        if (Regex.IsMatch(t, @"^(go ahead|please proceed|do it)\b"))
+            return true;
+
+        if (Regex.IsMatch(t, @"^yes\b.*\bapprove all\b"))
+            return true;
+
+        return false;
     }
 
     private static bool IsWriteTool(string toolName)
