@@ -37,6 +37,13 @@ public static class OrleansExtensions
                         options.ServiceId = serviceId;
                     });
 
+                    // Configure automatic background cleanup of Dead (Status=6) silos
+                    silo.Configure<Orleans.Configuration.ClusterMembershipOptions>(options =>
+                    {
+                        options.DefunctSiloCleanupPeriod = TimeSpan.FromHours(1); // Run cleanup every hour
+                        options.DefunctSiloExpiration = TimeSpan.FromDays(2);      // Delete silos that have been dead for 2 days
+                    });
+
                     silo.ConfigureEndpoints(
                         advertisedIP: System.Net.IPAddress.Parse(advertisedIp),
                         siloPort: siloPort,
