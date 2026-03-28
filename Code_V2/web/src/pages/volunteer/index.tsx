@@ -70,6 +70,8 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
     const [gpsState, setGpsState] = useState<'idle' | 'locating' | 'ready' | 'error'>('idle');
     const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
     const [errMsg, setErrMsg] = useState('');
+    const [qrToken, setQrToken] = useState('');
+    const [qrLoading, setQrLoading] = useState(false);
 
     // Compute check-in availability (30 min before shift start)
     const checkInOpenTime = shiftStartTime
@@ -90,30 +92,48 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
     };
 
     const locate = () => {
-        if (!navigator.geolocation) { doFallback(); return; }
+        if (!navigator.geolocation) {
+            setErrMsg('当前设备不支持定位，请使用现场二维码签到。');
+            setGpsState('error');
+            return;
+        }
         setGpsState('locating');
         navigator.geolocation.getCurrentPosition(
             (pos) => { setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setGpsState('ready'); },
-            () => { setErrMsg('Location access denied – submitting without GPS.'); setGpsState('error'); },
+            () => { setErrMsg('定位失败或权限被拒绝，请使用现场二维码签到。'); setGpsState('error'); },
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
     };
 
-    const doFallback = async () => {
-        setLoading(true);
-        try { await attendanceService.webCheckIn(attendanceId); onDone(); }
-        catch (e: any) { setErrMsg(extractErrMsg(e)); setGpsState('error'); }
-        finally { setLoading(false); }
-    };
-
     const doCheckIn = async () => {
-        if (!coords) { doFallback(); return; }
+        if (!coords) {
+            setErrMsg('未获取到定位，请使用现场二维码签到。');
+            setGpsState('error');
+            return;
+        }
         setLoading(true);
         try {
             await attendanceService.checkIn(attendanceId, { lat: coords.lat, lon: coords.lon, proofPhotoUrl: '' });
             onDone();
         } catch (e: any) { setErrMsg(extractErrMsg(e)); setGpsState('error'); }
         finally { setLoading(false); }
+    };
+
+    const doQrFallback = async () => {
+        if (!qrToken.trim()) {
+            setErrMsg('请输入或粘贴现场二维码里的 token。');
+            return;
+        }
+        setQrLoading(true);
+        try {
+            await attendanceService.qrCheckIn(attendanceId, { qrToken: qrToken.trim() });
+            onDone();
+        } catch (e: any) {
+            setErrMsg(extractErrMsg(e));
+            setGpsState('error');
+        } finally {
+            setQrLoading(false);
+        }
     };
 
     // Too early — show disabled button with available time
@@ -143,9 +163,21 @@ function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone 
     if (gpsState === 'error') return (
         <div className="mt-2 space-y-2">
             <p className="text-xs text-rose-500 font-medium">⚠️ {errMsg}</p>
-            <button onClick={() => { setGpsState('idle'); setErrMsg(''); }} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">
-                Try Again
-            </button>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                <input
+                    type="text"
+                    value={qrToken}
+                    onChange={e => setQrToken(e.target.value)}
+                    placeholder="粘贴现场二维码 token"
+                    className="px-3 py-2 rounded-lg border border-stone-200 text-xs"
+                />
+                <button onClick={() => { void doQrFallback(); }} disabled={qrLoading || !qrToken.trim()} className="text-xs font-bold text-white bg-emerald-500 px-3 py-1.5 rounded-lg hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
+                    {qrLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : '🔐'} QR 签到
+                </button>
+                <button onClick={() => { setGpsState('idle'); setErrMsg(''); }} className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1.5 rounded-lg hover:bg-stone-200">
+                    Retry GPS
+                </button>
+            </div>
         </div>
     );
 

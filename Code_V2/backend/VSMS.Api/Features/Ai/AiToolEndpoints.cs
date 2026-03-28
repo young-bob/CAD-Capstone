@@ -25,6 +25,20 @@ public static class AiToolEndpoints
         "get_certificate_templates",
         "verify_certificate_public",
         "get_org_announcements",
+        "volunteer_apply_shift",
+        "volunteer_withdraw_application",
+        "volunteer_geo_checkin",
+        "volunteer_checkout",
+        "volunteer_raise_dispute",
+        "volunteer_mark_notification_read",
+        "volunteer_mark_all_notifications_read",
+        "volunteer_follow_org",
+        "volunteer_unfollow_org",
+        "volunteer_update_profile",
+        "volunteer_update_privacy",
+        "volunteer_add_skill",
+        "volunteer_remove_skill",
+        "volunteer_sign_waiver",
     };
 
     private static readonly HashSet<string> CoordinatorTools = new(StringComparer.OrdinalIgnoreCase)
@@ -41,6 +55,33 @@ public static class AiToolEndpoints
         "get_skill_catalog",
         "get_certificate_templates",
         "verify_certificate_public",
+        "coordinator_approve_application",
+        "coordinator_reject_application",
+        "coordinator_waitlist_application",
+        "coordinator_promote_application",
+        "coordinator_mark_application_noshow",
+        "coordinator_publish_opportunity",
+        "coordinator_cancel_opportunity",
+        "coordinator_add_shift",
+        "coordinator_update_shift",
+        "coordinator_remove_shift",
+        "coordinator_update_opportunity_info",
+        "coordinator_set_required_skills",
+        "coordinator_post_announcement",
+        "coordinator_update_org_profile",
+        "coordinator_create_event_task",
+        "coordinator_toggle_event_task_complete",
+        "coordinator_delete_event_task",
+        "coordinator_create_event_template",
+        "coordinator_delete_event_template",
+        "coordinator_notify_volunteers",
+        "coordinator_block_volunteer",
+        "coordinator_unblock_volunteer",
+        "coordinator_coordinator_checkin",
+        "coordinator_confirm_attendance",
+        "coordinator_adjust_attendance",
+        "coordinator_mark_dispute_review",
+        "coordinator_resolve_dispute",
     };
 
     private static readonly HashSet<string> AdminTools = new(StringComparer.OrdinalIgnoreCase)
@@ -55,6 +96,19 @@ public static class AiToolEndpoints
         "get_skill_catalog",
         "get_certificate_templates",
         "verify_certificate_public",
+        "admin_approve_org",
+        "admin_reject_org",
+        "admin_ban_user",
+        "admin_unban_user",
+        "admin_resolve_dispute",
+        "admin_reset_user_password",
+        "admin_change_user_role",
+        "admin_reassign_coordinator",
+        "admin_add_coordinator",
+        "admin_remove_coordinator",
+        "admin_create_skill",
+        "admin_update_skill",
+        "admin_delete_skill",
     };
 
     internal sealed record ToolDefinition(string Name, string Description, string[] Roles);
@@ -82,12 +136,124 @@ public static class AiToolEndpoints
         new("get_skill_catalog", "Get global skill catalog.", ["Coordinator", "SystemAdmin"]),
         new("get_certificate_templates", "Get active certificate templates (system + optional org).", ["Volunteer", "Coordinator", "SystemAdmin"]),
         new("verify_certificate_public", "Verify certificate by public certificate id.", ["Volunteer", "Coordinator", "SystemAdmin"]),
+        new("volunteer_apply_shift", "Volunteer applies to a shift. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_withdraw_application", "Volunteer withdraws own application. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_geo_checkin", "Volunteer geo check-in for attendance with lat/lon. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_checkout", "Volunteer checks out attendance. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_raise_dispute", "Volunteer raises attendance dispute. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_mark_notification_read", "Mark one notification as read. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_mark_all_notifications_read", "Mark all notifications as read. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_follow_org", "Volunteer follows an organization. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_unfollow_org", "Volunteer unfollows an organization. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_update_profile", "Update current volunteer profile fields. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_update_privacy", "Update volunteer privacy settings. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_add_skill", "Add one skill to current volunteer. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_remove_skill", "Remove one skill from current volunteer. Requires confirmed=true.", ["Volunteer"]),
+        new("volunteer_sign_waiver", "Sign volunteer waiver. Requires confirmed=true.", ["Volunteer"]),
+        new("coordinator_approve_application", "Approve one application. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_reject_application", "Reject one application with reason. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_waitlist_application", "Move one application to waitlist. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_promote_application", "Promote one waitlisted application. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_mark_application_noshow", "Mark one application as no-show. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_publish_opportunity", "Publish opportunity. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_cancel_opportunity", "Cancel opportunity with reason. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_add_shift", "Add shift to opportunity. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_update_shift", "Update one shift. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_remove_shift", "Remove one shift. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_update_opportunity_info", "Update opportunity core info. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_set_required_skills", "Set required skills for opportunity. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_post_announcement", "Post organization announcement. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_update_org_profile", "Update organization public profile. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_create_event_task", "Create event task for opportunity. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_toggle_event_task_complete", "Toggle task completion. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_delete_event_task", "Delete event task. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_create_event_template", "Create organization event template. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_delete_event_template", "Delete organization event template. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_notify_volunteers", "Send notification to volunteers in an opportunity. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_block_volunteer", "Block volunteer from organization. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_unblock_volunteer", "Unblock volunteer from organization. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_coordinator_checkin", "Coordinator check-in attendance for volunteer. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_confirm_attendance", "Coordinator confirms attendance with rating. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_adjust_attendance", "Coordinator adjusts check-in/out times. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_mark_dispute_review", "Coordinator marks dispute under review. Requires confirmed=true.", ["Coordinator"]),
+        new("coordinator_resolve_dispute", "Coordinator resolves dispute. Requires confirmed=true.", ["Coordinator"]),
         new("admin_get_system_info", "Get Orleans system info summary.", ["SystemAdmin"]),
         new("admin_get_grain_distribution", "Get Orleans grain distribution by silo/type.", ["SystemAdmin"]),
         new("admin_get_users", "Get users list with basic filters.", ["SystemAdmin"]),
         new("admin_get_pending_orgs", "Get pending organizations.", ["SystemAdmin"]),
         new("admin_get_pending_disputes", "Get pending disputes.", ["SystemAdmin"]),
+        new("admin_approve_org", "Approve organization. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_reject_org", "Reject organization with reason. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_ban_user", "Ban user account. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_unban_user", "Unban user account. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_resolve_dispute", "Resolve dispute from admin side. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_reset_user_password", "Reset user password. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_change_user_role", "Change user role to Volunteer/Coordinator. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_reassign_coordinator", "Reassign primary coordinator for organization. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_add_coordinator", "Add additional coordinator to organization. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_remove_coordinator", "Remove coordinator from organization. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_create_skill", "Create skill in global catalog. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_update_skill", "Update skill in global catalog. Requires confirmed=true.", ["SystemAdmin"]),
+        new("admin_delete_skill", "Delete skill from global catalog. Requires confirmed=true.", ["SystemAdmin"]),
     ];
+
+    private static readonly HashSet<string> WriteTools = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "volunteer_apply_shift",
+        "volunteer_withdraw_application",
+        "volunteer_geo_checkin",
+        "volunteer_checkout",
+        "volunteer_raise_dispute",
+        "volunteer_mark_notification_read",
+        "volunteer_mark_all_notifications_read",
+        "volunteer_follow_org",
+        "volunteer_unfollow_org",
+        "volunteer_update_profile",
+        "volunteer_update_privacy",
+        "volunteer_add_skill",
+        "volunteer_remove_skill",
+        "volunteer_sign_waiver",
+        "coordinator_approve_application",
+        "coordinator_reject_application",
+        "coordinator_waitlist_application",
+        "coordinator_promote_application",
+        "coordinator_mark_application_noshow",
+        "coordinator_publish_opportunity",
+        "coordinator_cancel_opportunity",
+        "coordinator_add_shift",
+        "coordinator_update_shift",
+        "coordinator_remove_shift",
+        "coordinator_update_opportunity_info",
+        "coordinator_set_required_skills",
+        "coordinator_post_announcement",
+        "coordinator_update_org_profile",
+        "coordinator_create_event_task",
+        "coordinator_toggle_event_task_complete",
+        "coordinator_delete_event_task",
+        "coordinator_create_event_template",
+        "coordinator_delete_event_template",
+        "coordinator_notify_volunteers",
+        "coordinator_block_volunteer",
+        "coordinator_unblock_volunteer",
+        "coordinator_coordinator_checkin",
+        "coordinator_confirm_attendance",
+        "coordinator_adjust_attendance",
+        "coordinator_mark_dispute_review",
+        "coordinator_resolve_dispute",
+        "admin_approve_org",
+        "admin_reject_org",
+        "admin_ban_user",
+        "admin_unban_user",
+        "admin_resolve_dispute",
+        "admin_reset_user_password",
+        "admin_change_user_role",
+        "admin_reassign_coordinator",
+        "admin_add_coordinator",
+        "admin_remove_coordinator",
+        "admin_create_skill",
+        "admin_update_skill",
+        "admin_delete_skill",
+    };
 
     public static void MapAiToolEndpoints(this WebApplication app)
     {
@@ -191,7 +357,10 @@ public static class AiToolEndpoints
         IApplicationQueryService applicationQueryService,
         IAttendanceQueryService attendanceQueryService)
     {
-        switch (tool.ToLowerInvariant())
+        var normalizedTool = tool.Trim().ToLowerInvariant();
+        EnsureWriteConfirmed(normalizedTool, arguments);
+
+        switch (normalizedTool)
         {
             case "search_opportunities":
             {
@@ -606,6 +775,922 @@ public static class AiToolEndpoints
                 return await attendanceQueryService.GetPendingDisputesAsync(skip, take);
             }
 
+            case "volunteer_apply_shift":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var shiftId = GetRequiredGuid(arguments, "shiftId");
+                var idempotencyKey = GetOptionalString(arguments, "idempotencyKey");
+                if (string.IsNullOrWhiteSpace(idempotencyKey))
+                    idempotencyKey = Guid.NewGuid().ToString("N");
+
+                var appId = await grains.GetGrain<IOpportunityGrain>(opportunityId)
+                    .SubmitApplication(callerGrainId, shiftId, idempotencyKey);
+
+                return new { ok = true, applicationId = appId, opportunityId, shiftId };
+            }
+
+            case "volunteer_withdraw_application":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var appState = await appGrain.GetState();
+                if (appState.VolunteerId != callerGrainId)
+                    throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(appState.OpportunityId).WithdrawApplication(applicationId);
+                return new { ok = true, withdrawn = true, applicationId };
+            }
+
+            case "volunteer_geo_checkin":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var lat = GetRequiredDouble(arguments, "lat");
+                var lon = GetRequiredDouble(arguments, "lon");
+                var proofPhotoUrl = GetOptionalString(arguments, "proofPhotoUrl") ?? "ai-geo-check-in";
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                if (state.VolunteerId != callerGrainId)
+                    throw new UnauthorizedAccessException();
+
+                await attendanceGrain.CheckIn(lat, lon, proofPhotoUrl);
+                return new { ok = true, attendanceId, action = "geo_checkin", lat, lon };
+            }
+
+            case "volunteer_checkout":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                if (state.VolunteerId != callerGrainId)
+                    throw new UnauthorizedAccessException();
+
+                await attendanceGrain.CheckOut();
+                return new { ok = true, attendanceId, action = "checkout" };
+            }
+
+            case "volunteer_raise_dispute":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var reason = GetRequiredString(arguments, "reason");
+                var evidenceUrl = GetOptionalString(arguments, "evidenceUrl") ?? string.Empty;
+
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                if (state.VolunteerId != callerGrainId)
+                    throw new UnauthorizedAccessException();
+
+                await attendanceGrain.RaiseDispute(reason, evidenceUrl);
+                return new { ok = true, attendanceId, action = "dispute_raised" };
+            }
+
+            case "volunteer_mark_notification_read":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var notificationId = GetRequiredGuid(arguments, "notificationId");
+                var notification = await db.Notifications
+                    .FirstOrDefaultAsync(n => n.Id == notificationId && n.VolunteerGrainId == callerGrainId);
+                if (notification is null)
+                    throw new ArgumentException("Notification not found.");
+
+                notification.IsRead = true;
+                await db.SaveChangesAsync();
+                return new { ok = true, notificationId, markedRead = true };
+            }
+
+            case "volunteer_mark_all_notifications_read":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var count = await db.Notifications
+                    .Where(n => n.VolunteerGrainId == callerGrainId && !n.IsRead)
+                    .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
+
+                return new { ok = true, markedCount = count };
+            }
+
+            case "volunteer_follow_org":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var organizationId = GetRequiredGuid(arguments, "organizationId");
+                var exists = await db.OrganizationReadModels
+                    .AsNoTracking()
+                    .AnyAsync(o => o.OrgId == organizationId);
+                if (!exists)
+                    throw new ArgumentException("Organization not found.");
+
+                var already = await db.VolunteerFollows
+                    .AsNoTracking()
+                    .AnyAsync(f => f.VolunteerGrainId == callerGrainId && f.OrgId == organizationId);
+                if (!already)
+                {
+                    db.VolunteerFollows.Add(new VSMS.Infrastructure.Data.EfCoreQuery.Entities.VolunteerFollowEntity
+                    {
+                        VolunteerGrainId = callerGrainId,
+                        OrgId = organizationId,
+                    });
+                    await db.SaveChangesAsync();
+                }
+
+                await grains.GetGrain<IVolunteerGrain>(callerGrainId).FollowOrg(organizationId);
+                return new { ok = true, organizationId, followed = true };
+            }
+
+            case "volunteer_unfollow_org":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var organizationId = GetRequiredGuid(arguments, "organizationId");
+                var row = await db.VolunteerFollows
+                    .FirstOrDefaultAsync(f => f.VolunteerGrainId == callerGrainId && f.OrgId == organizationId);
+                if (row is not null)
+                {
+                    db.VolunteerFollows.Remove(row);
+                    await db.SaveChangesAsync();
+                }
+
+                await grains.GetGrain<IVolunteerGrain>(callerGrainId).UnfollowOrg(organizationId);
+                return new { ok = true, organizationId, followed = false };
+            }
+
+            case "volunteer_update_profile":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var grain = grains.GetGrain<IVolunteerGrain>(callerGrainId);
+                var current = await grain.GetProfile();
+
+                var firstName = GetOptionalString(arguments, "firstName") ?? current.FirstName;
+                var lastName = GetOptionalString(arguments, "lastName") ?? current.LastName;
+                var email = GetOptionalString(arguments, "email") ?? current.Email;
+                var phone = GetOptionalString(arguments, "phone") ?? current.Phone;
+                var bio = GetOptionalString(arguments, "bio") ?? current.Bio;
+
+                await grain.UpdateProfile(firstName, lastName, email, phone, bio);
+                return new
+                {
+                    ok = true,
+                    profile = new { firstName, lastName, email, phone, bio }
+                };
+            }
+
+            case "volunteer_update_privacy":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var grain = grains.GetGrain<IVolunteerGrain>(callerGrainId);
+                var current = await grain.GetProfile();
+
+                var isProfilePublic = GetOptionalBool(arguments, "isProfilePublic") ?? current.IsProfilePublic;
+                var allowEmail = GetOptionalBool(arguments, "allowEmail") ?? current.AllowEmailNotifications;
+                var allowPush = GetOptionalBool(arguments, "allowPush") ?? current.AllowPushNotifications;
+
+                await grain.UpdatePrivacySettings(isProfilePublic, allowEmail, allowPush);
+                return new { ok = true, privacy = new { isProfilePublic, allowEmail, allowPush } };
+            }
+
+            case "volunteer_add_skill":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var skillId = GetRequiredGuid(arguments, "skillId");
+                var exists = await db.Skills.AsNoTracking().AnyAsync(s => s.Id == skillId);
+                if (!exists) throw new ArgumentException("Skill not found.");
+
+                var grain = grains.GetGrain<IVolunteerGrain>(callerGrainId);
+                await grain.AddSkill(skillId);
+                var skillIds = await grain.GetSkillIds();
+                return new { ok = true, skillId, totalSkills = skillIds.Count };
+            }
+
+            case "volunteer_remove_skill":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var skillId = GetRequiredGuid(arguments, "skillId");
+                var grain = grains.GetGrain<IVolunteerGrain>(callerGrainId);
+                await grain.RemoveSkill(skillId);
+                var skillIds = await grain.GetSkillIds();
+                return new { ok = true, skillId, totalSkills = skillIds.Count };
+            }
+
+            case "volunteer_sign_waiver":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var grain = grains.GetGrain<IVolunteerGrain>(callerGrainId);
+                await grain.SignWaiver();
+                var profile = await grain.GetProfile();
+                return new { ok = true, signedAt = profile.WaiverSignedAt };
+            }
+
+            case "coordinator_approve_application":
+            {
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var state = await appGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+                if (http.IsSelfByGrainId(state.VolunteerId))
+                    throw new InvalidOperationException("You cannot approve your own application.");
+
+                await appGrain.Approve();
+                return new { ok = true, applicationId, action = "approved" };
+            }
+
+            case "coordinator_reject_application":
+            {
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var reason = GetRequiredString(arguments, "reason");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var state = await appGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await appGrain.Reject(reason);
+                return new { ok = true, applicationId, action = "rejected" };
+            }
+
+            case "coordinator_waitlist_application":
+            {
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var state = await appGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await appGrain.Waitlist();
+                return new { ok = true, applicationId, action = "waitlisted" };
+            }
+
+            case "coordinator_promote_application":
+            {
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var state = await appGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await appGrain.Promote();
+                return new { ok = true, applicationId, action = "promoted" };
+            }
+
+            case "coordinator_mark_application_noshow":
+            {
+                var applicationId = GetRequiredGuid(arguments, "applicationId");
+                var appGrain = grains.GetGrain<IApplicationGrain>(applicationId);
+                var state = await appGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await appGrain.MarkAsNoShow();
+                return new { ok = true, applicationId, action = "no_show" };
+            }
+
+            case "coordinator_publish_opportunity":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).Publish();
+                return new { ok = true, opportunityId, action = "published" };
+            }
+
+            case "coordinator_cancel_opportunity":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var reason = GetRequiredString(arguments, "reason");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).Cancel(reason);
+                return new { ok = true, opportunityId, action = "canceled" };
+            }
+
+            case "coordinator_add_shift":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var name = GetRequiredString(arguments, "name");
+                var startTime = GetRequiredDateTime(arguments, "startTime");
+                var endTime = GetRequiredDateTime(arguments, "endTime");
+                var maxCapacity = Clamp(GetOptionalInt(arguments, "maxCapacity", 1), 1, 10_000);
+
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).AddShift(name, startTime, endTime, maxCapacity);
+                return new { ok = true, opportunityId, shiftName = name };
+            }
+
+            case "coordinator_update_shift":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var shiftId = GetRequiredGuid(arguments, "shiftId");
+                var name = GetRequiredString(arguments, "name");
+                var startTime = GetRequiredDateTime(arguments, "startTime");
+                var endTime = GetRequiredDateTime(arguments, "endTime");
+                var maxCapacity = Clamp(GetOptionalInt(arguments, "maxCapacity", 1), 1, 10_000);
+
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).UpdateShift(shiftId, name, startTime, endTime, maxCapacity);
+                return new { ok = true, opportunityId, shiftId, action = "updated" };
+            }
+
+            case "coordinator_remove_shift":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var shiftId = GetRequiredGuid(arguments, "shiftId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).RemoveShift(shiftId);
+                return new { ok = true, opportunityId, shiftId, action = "removed" };
+            }
+
+            case "coordinator_update_opportunity_info":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var title = GetRequiredString(arguments, "title");
+                var description = GetRequiredString(arguments, "description");
+                var category = GetRequiredString(arguments, "category");
+                var lat = GetRequiredDouble(arguments, "lat");
+                var lon = GetRequiredDouble(arguments, "lon");
+                var radiusMeters = GetRequiredDouble(arguments, "radiusMeters");
+
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId)
+                    .UpdateInfo(title, description, category, lat, lon, radiusMeters);
+                return new { ok = true, opportunityId, action = "updated" };
+            }
+
+            case "coordinator_set_required_skills":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var skillIds = GetGuidList(arguments, "skillIds");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await grains.GetGrain<IOpportunityGrain>(opportunityId).SetRequiredSkills(skillIds);
+                return new { ok = true, opportunityId, requiredSkillCount = skillIds.Count };
+            }
+
+            case "coordinator_post_announcement":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+                var text = GetRequiredString(arguments, "text").Trim();
+                if (string.IsNullOrWhiteSpace(text))
+                    throw new ArgumentException("Announcement text is required.");
+
+                await grains.GetGrain<IOrganizationGrain>(organizationId).PostAnnouncement(text);
+                return new { ok = true, organizationId, action = "announcement_posted" };
+            }
+
+            case "coordinator_update_org_profile":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+
+                var websiteUrl = GetOptionalString(arguments, "websiteUrl");
+                var contactEmail = GetOptionalString(arguments, "contactEmail");
+                var tags = GetStringList(arguments, "tags");
+
+                await grains.GetGrain<IOrganizationGrain>(organizationId).UpdateProfile(websiteUrl, contactEmail, tags);
+                return new { ok = true, organizationId, action = "profile_updated" };
+            }
+
+            case "coordinator_create_event_task":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var title = GetRequiredString(arguments, "title");
+                var note = GetOptionalString(arguments, "note");
+                var assignedToGrainId = GetOptionalGuid(arguments, "assignedToGrainId");
+                var assignedToEmail = GetOptionalString(arguments, "assignedToEmail");
+                var assignedToName = GetOptionalString(arguments, "assignedToName");
+
+                string? createdByEmail = null;
+                if (http.TryGetUserId(out var callerUserId))
+                {
+                    createdByEmail = await db.Users
+                        .AsNoTracking()
+                        .Where(u => u.Id == callerUserId)
+                        .Select(u => u.Email)
+                        .FirstOrDefaultAsync();
+                }
+
+                var opp = await grains.GetGrain<IOpportunityGrain>(opportunityId).GetState();
+                var task = new VSMS.Infrastructure.Data.EfCoreQuery.Entities.EventTaskEntity
+                {
+                    Id = Guid.NewGuid(),
+                    OpportunityId = opportunityId,
+                    OrganizationId = opp.OrganizationId,
+                    Title = title,
+                    Note = note,
+                    AssignedToGrainId = assignedToGrainId,
+                    AssignedToEmail = assignedToEmail,
+                    AssignedToName = assignedToName,
+                    CreatedByGrainId = callerGrainId,
+                    CreatedByEmail = createdByEmail,
+                    CreatedAt = DateTime.UtcNow,
+                };
+                db.EventTasks.Add(task);
+                await db.SaveChangesAsync();
+
+                return new { ok = true, opportunityId, taskId = task.Id, action = "created" };
+            }
+
+            case "coordinator_toggle_event_task_complete":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var taskId = GetRequiredGuid(arguments, "taskId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                var task = await db.EventTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.OpportunityId == opportunityId);
+                if (task is null) throw new ArgumentException("Task not found.");
+                task.IsCompleted = !task.IsCompleted;
+                task.CompletedAt = task.IsCompleted ? DateTime.UtcNow : null;
+                await db.SaveChangesAsync();
+
+                return new { ok = true, opportunityId, taskId, isCompleted = task.IsCompleted };
+            }
+
+            case "coordinator_delete_event_task":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var taskId = GetRequiredGuid(arguments, "taskId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                var task = await db.EventTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.OpportunityId == opportunityId);
+                if (task is null) throw new ArgumentException("Task not found.");
+                db.EventTasks.Remove(task);
+                await db.SaveChangesAsync();
+                return new { ok = true, opportunityId, taskId, action = "deleted" };
+            }
+
+            case "coordinator_create_event_template":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+
+                var name = GetRequiredString(arguments, "name").Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                    throw new ArgumentException("Template name is required.");
+
+                var title = GetOptionalString(arguments, "title")?.Trim() ?? string.Empty;
+                var description = GetOptionalString(arguments, "description")?.Trim() ?? string.Empty;
+                var category = GetOptionalString(arguments, "category")?.Trim() ?? string.Empty;
+                var tags = GetStringList(arguments, "tags").ToArray();
+                var approvalPolicy = GetOptionalString(arguments, "approvalPolicy") ?? "ManualApprove";
+                var requiredSkillIds = GetStringList(arguments, "requiredSkillIds").ToArray();
+                var latitude = GetOptionalDouble(arguments, "latitude");
+                var longitude = GetOptionalDouble(arguments, "longitude");
+                var radiusMeters = GetOptionalInt(arguments, "radiusMeters", 0);
+                int? safeRadius = radiusMeters > 0 ? radiusMeters : null;
+
+                var entity = new VSMS.Infrastructure.Data.EfCoreQuery.Entities.EventTemplateEntity
+                {
+                    OrganizationId = organizationId,
+                    Name = name,
+                    Title = title,
+                    Description = description,
+                    Category = category,
+                    TagsJson = JsonSerializer.Serialize(tags),
+                    ApprovalPolicy = approvalPolicy,
+                    RequiredSkillIdsJson = JsonSerializer.Serialize(requiredSkillIds),
+                    Latitude = latitude,
+                    Longitude = longitude,
+                    RadiusMeters = safeRadius,
+                };
+
+                db.EventTemplates.Add(entity);
+                await db.SaveChangesAsync();
+                return new { ok = true, organizationId, templateId = entity.Id, action = "created" };
+            }
+
+            case "coordinator_delete_event_template":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+                var templateId = GetRequiredGuid(arguments, "templateId");
+
+                var entity = await db.EventTemplates
+                    .FirstOrDefaultAsync(t => t.Id == templateId && t.OrganizationId == organizationId);
+                if (entity is null) throw new ArgumentException("Template not found.");
+
+                db.EventTemplates.Remove(entity);
+                await db.SaveChangesAsync();
+                return new { ok = true, organizationId, templateId, action = "deleted" };
+            }
+
+            case "coordinator_notify_volunteers":
+            {
+                var opportunityId = GetRequiredGuid(arguments, "opportunityId");
+                var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                var message = GetRequiredString(arguments, "message");
+                var targetStatus = GetOptionalString(arguments, "targetStatus") ?? "All";
+                var targetIds = GetGuidList(arguments, "targetIds");
+
+                var applications = await applicationQueryService.GetByOpportunityAsync(opportunityId);
+                var recipients = targetIds.Count > 0
+                    ? targetIds
+                    : targetStatus.Equals("Approved", StringComparison.OrdinalIgnoreCase)
+                        ? applications
+                            .Where(a => a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Promoted)
+                            .Select(a => a.VolunteerId)
+                            .Distinct()
+                            .ToList()
+                        : applications
+                            .Select(a => a.VolunteerId)
+                            .Distinct()
+                            .ToList();
+
+                if (recipients.Count > 0)
+                {
+                    var senderName = await db.OpportunityReadModels
+                        .AsNoTracking()
+                        .Where(o => o.OpportunityId == opportunityId)
+                        .Select(o => o.OrganizationName)
+                        .FirstOrDefaultAsync() ?? "Coordinator";
+
+                    var now = DateTime.UtcNow;
+                    var notifications = recipients.Select(volunteerId => new VSMS.Infrastructure.Data.EfCoreQuery.Entities.NotificationEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        VolunteerGrainId = volunteerId,
+                        Title = "Message from " + senderName,
+                        Message = message,
+                        SenderName = senderName,
+                        SentAt = now,
+                        IsRead = false,
+                    });
+
+                    db.Notifications.AddRange(notifications);
+                    await db.SaveChangesAsync();
+                    await grains.GetGrain<INotificationGrain>(Guid.Empty)
+                        .SendBulkNotification(recipients, "Coordinator Message", message);
+                }
+
+                return new { ok = true, opportunityId, sent = recipients.Count };
+            }
+
+            case "coordinator_block_volunteer":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+                var volunteerId = GetRequiredGuid(arguments, "volunteerId");
+                await grains.GetGrain<IOrganizationGrain>(organizationId).BlockVolunteer(volunteerId);
+                return new { ok = true, organizationId, volunteerId, blocked = true };
+            }
+
+            case "coordinator_unblock_volunteer":
+            {
+                var organizationId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
+                await EnsureCanManageOrganization(http, db, organizationId);
+                var volunteerId = GetRequiredGuid(arguments, "volunteerId");
+                await grains.GetGrain<IOrganizationGrain>(organizationId).UnblockVolunteer(volunteerId);
+                return new { ok = true, organizationId, volunteerId, blocked = false };
+            }
+
+            case "coordinator_coordinator_checkin":
+            {
+                if (!http.TryGetGrainId(out _))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await attendanceGrain.CoordinatorCheckIn();
+                return new { ok = true, attendanceId, action = "coordinator_checkin" };
+            }
+
+            case "coordinator_confirm_attendance":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var rating = Clamp(GetOptionalInt(arguments, "rating", 5), 1, 5);
+                var supervisorId = GetOptionalGuid(arguments, "supervisorId") ?? callerGrainId;
+
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await attendanceGrain.Confirm(supervisorId, rating);
+                return new { ok = true, attendanceId, action = "confirmed", rating };
+            }
+
+            case "coordinator_adjust_attendance":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var newCheckIn = GetRequiredDateTime(arguments, "newCheckIn");
+                var newCheckOut = GetRequiredDateTime(arguments, "newCheckOut");
+                var reason = GetRequiredString(arguments, "reason");
+                var coordinatorId = GetOptionalGuid(arguments, "coordinatorId") ?? callerGrainId;
+
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await attendanceGrain.ManualAdjustment(coordinatorId, newCheckIn, newCheckOut, reason);
+                return new { ok = true, attendanceId, action = "adjusted" };
+            }
+
+            case "coordinator_mark_dispute_review":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var coordinatorId = GetOptionalGuid(arguments, "coordinatorId") ?? callerGrainId;
+
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await attendanceGrain.MarkDisputeUnderReview(coordinatorId);
+                return new { ok = true, attendanceId, action = "under_review" };
+            }
+
+            case "coordinator_resolve_dispute":
+            {
+                if (!http.TryGetGrainId(out var callerGrainId))
+                    throw new UnauthorizedAccessException();
+
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var resolution = GetRequiredString(arguments, "resolution");
+                var adjustedHours = GetRequiredDouble(arguments, "adjustedHours");
+                var resolverId = GetOptionalGuid(arguments, "resolverId") ?? callerGrainId;
+
+                var attendanceGrain = grains.GetGrain<IAttendanceRecordGrain>(attendanceId);
+                var state = await attendanceGrain.GetState();
+                var canManage = await http.CanManageOpportunityAsync(db, state.OpportunityId, grains);
+                if (!canManage) throw new UnauthorizedAccessException();
+
+                await attendanceGrain.ResolveDispute(resolverId, resolution, adjustedHours);
+                return new { ok = true, attendanceId, action = "resolved", adjustedHours };
+            }
+
+            case "admin_approve_org":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var orgId = GetRequiredGuid(arguments, "orgId");
+                await grains.GetGrain<IAdminGrain>(Guid.Empty).ApproveOrganization(orgId);
+                return new { ok = true, orgId, action = "approved" };
+            }
+
+            case "admin_reject_org":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var orgId = GetRequiredGuid(arguments, "orgId");
+                var reason = GetRequiredString(arguments, "reason");
+                await grains.GetGrain<IAdminGrain>(Guid.Empty).RejectOrganization(orgId, reason);
+
+                var coords = await db.Coordinators.Where(c => c.OrganizationId == orgId).ToListAsync();
+                foreach (var c in coords) c.OrganizationId = null;
+                await db.SaveChangesAsync();
+
+                return new { ok = true, orgId, action = "rejected" };
+            }
+
+            case "admin_ban_user":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var userId = GetRequiredGuid(arguments, "userId");
+                if (http.TryGetUserId(out var callerUserId) && callerUserId == userId)
+                    throw new InvalidOperationException("You cannot ban yourself.");
+
+                await grains.GetGrain<IAdminGrain>(Guid.Empty).BanUser(userId);
+                return new { ok = true, userId, banned = true };
+            }
+
+            case "admin_unban_user":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var userId = GetRequiredGuid(arguments, "userId");
+                await grains.GetGrain<IAdminGrain>(Guid.Empty).UnbanUser(userId);
+                return new { ok = true, userId, banned = false };
+            }
+
+            case "admin_resolve_dispute":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var attendanceId = GetRequiredGuid(arguments, "attendanceId");
+                var resolution = GetRequiredString(arguments, "resolution");
+                var adjustedHours = GetRequiredDouble(arguments, "adjustedHours");
+                await grains.GetGrain<IAdminGrain>(Guid.Empty).ResolveDispute(attendanceId, resolution, adjustedHours);
+                return new { ok = true, attendanceId, action = "resolved", adjustedHours };
+            }
+
+            case "admin_reset_user_password":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var userId = GetRequiredGuid(arguments, "userId");
+                var newPassword = GetRequiredString(arguments, "newPassword");
+                if (newPassword.Length < 6)
+                    throw new ArgumentException("Password must be at least 6 characters.");
+
+                var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user is null) throw new ArgumentException("User not found.");
+                if (user.Role == "SystemAdmin")
+                    throw new InvalidOperationException("Cannot reset SystemAdmin password via this tool.");
+
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+                await db.SaveChangesAsync();
+                return new { ok = true, userId, action = "password_reset" };
+            }
+
+            case "admin_change_user_role":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var userId = GetRequiredGuid(arguments, "userId");
+                var newRole = (GetRequiredString(arguments, "newRole")).Trim();
+                if (!newRole.Equals("Volunteer", StringComparison.OrdinalIgnoreCase) &&
+                    !newRole.Equals("Coordinator", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("newRole must be Volunteer or Coordinator.");
+
+                var normalizedRole = char.ToUpperInvariant(newRole[0]) + newRole[1..].ToLowerInvariant();
+                var user = await db.Users
+                    .Include(u => u.VolunteerProfile)
+                    .Include(u => u.CoordinatorProfile)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
+                if (user is null) throw new ArgumentException("User not found.");
+                if (user.Role == "SystemAdmin")
+                    throw new InvalidOperationException("Cannot change SystemAdmin role.");
+                if (user.Role == normalizedRole)
+                    return new { ok = true, userId, role = normalizedRole, changed = false };
+
+                user.Role = normalizedRole;
+                if (normalizedRole == "Coordinator" && user.CoordinatorProfile is null)
+                {
+                    db.Coordinators.Add(new VSMS.Infrastructure.Data.EfCoreQuery.Entities.CoordinatorEntity
+                    {
+                        UserId = userId,
+                        GrainId = Guid.NewGuid()
+                    });
+                }
+                else if (normalizedRole == "Volunteer" && user.VolunteerProfile is null)
+                {
+                    db.Volunteers.Add(new VSMS.Infrastructure.Data.EfCoreQuery.Entities.VolunteerEntity
+                    {
+                        UserId = userId,
+                        GrainId = Guid.NewGuid()
+                    });
+                }
+
+                await db.SaveChangesAsync();
+                return new { ok = true, userId, role = normalizedRole, changed = true };
+            }
+
+            case "admin_reassign_coordinator":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var orgId = GetRequiredGuid(arguments, "orgId");
+                var coordinatorUserId = GetRequiredGuid(arguments, "coordinatorUserId");
+                var newCoord = await db.Coordinators.FirstOrDefaultAsync(c => c.UserId == coordinatorUserId);
+                if (newCoord is null)
+                    throw new ArgumentException("Coordinator profile not found.");
+
+                var oldCoords = await db.Coordinators.Where(c => c.OrganizationId == orgId).ToListAsync();
+                foreach (var old in oldCoords) old.OrganizationId = null;
+                newCoord.OrganizationId = orgId;
+                await db.SaveChangesAsync();
+                return new { ok = true, orgId, coordinatorUserId, action = "reassigned" };
+            }
+
+            case "admin_add_coordinator":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var orgId = GetRequiredGuid(arguments, "orgId");
+                var coordinatorUserId = GetRequiredGuid(arguments, "coordinatorUserId");
+                var coord = await db.Coordinators
+                    .Include(c => c.User)
+                    .FirstOrDefaultAsync(c => c.UserId == coordinatorUserId);
+                if (coord is null)
+                    throw new ArgumentException("Coordinator profile not found.");
+
+                coord.OrganizationId = orgId;
+                await db.SaveChangesAsync();
+                await grains.GetGrain<IOrganizationGrain>(orgId).AddCoordinator(coordinatorUserId, coord.User.Email);
+                return new { ok = true, orgId, coordinatorUserId, action = "added" };
+            }
+
+            case "admin_remove_coordinator":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var orgId = GetRequiredGuid(arguments, "orgId");
+                var coordinatorUserId = GetRequiredGuid(arguments, "coordinatorUserId");
+                var coord = await db.Coordinators.FirstOrDefaultAsync(c => c.UserId == coordinatorUserId);
+                if (coord is null)
+                    throw new ArgumentException("Coordinator profile not found.");
+
+                coord.OrganizationId = null;
+                await db.SaveChangesAsync();
+                await grains.GetGrain<IOrganizationGrain>(orgId).RemoveCoordinator(coordinatorUserId);
+                return new { ok = true, orgId, coordinatorUserId, action = "removed" };
+            }
+
+            case "admin_create_skill":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var name = GetRequiredString(arguments, "name");
+                var category = GetRequiredString(arguments, "category");
+                var description = GetOptionalString(arguments, "description") ?? string.Empty;
+
+                var exists = await db.Skills.AsNoTracking().AnyAsync(s => s.Name == name);
+                if (exists) throw new InvalidOperationException("Skill already exists.");
+
+                var skill = new VSMS.Infrastructure.Data.EfCoreQuery.Entities.SkillEntity
+                {
+                    Name = name,
+                    Category = category,
+                    Description = description,
+                };
+                db.Skills.Add(skill);
+                await db.SaveChangesAsync();
+                return new { ok = true, skillId = skill.Id, name, category };
+            }
+
+            case "admin_update_skill":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var skillId = GetRequiredGuid(arguments, "skillId");
+                var skill = await db.Skills.FirstOrDefaultAsync(s => s.Id == skillId);
+                if (skill is null) throw new ArgumentException("Skill not found.");
+
+                var name = GetOptionalString(arguments, "name") ?? skill.Name;
+                var category = GetOptionalString(arguments, "category") ?? skill.Category;
+                var description = GetOptionalString(arguments, "description") ?? skill.Description;
+
+                var duplicate = await db.Skills.AsNoTracking().AnyAsync(s => s.Name == name && s.Id != skillId);
+                if (duplicate) throw new InvalidOperationException("A skill with this name already exists.");
+
+                skill.Name = name;
+                skill.Category = category;
+                skill.Description = description;
+                await db.SaveChangesAsync();
+                return new { ok = true, skillId, name, category };
+            }
+
+            case "admin_delete_skill":
+            {
+                if (!http.IsSystemAdmin()) throw new UnauthorizedAccessException();
+                var skillId = GetRequiredGuid(arguments, "skillId");
+                var skill = await db.Skills.FirstOrDefaultAsync(s => s.Id == skillId);
+                if (skill is null) throw new ArgumentException("Skill not found.");
+                db.Skills.Remove(skill);
+                await db.SaveChangesAsync();
+                return new { ok = true, skillId, action = "deleted" };
+            }
+
             default:
                 throw new ArgumentException($"Unknown tool: {tool}");
         }
@@ -852,6 +1937,97 @@ public static class AiToolEndpoints
         return null;
     }
 
+    private static bool? GetOptionalBool(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object) return null;
+        if (!args.TryGetProperty(name, out var node)) return null;
+        if (node.ValueKind == JsonValueKind.True) return true;
+        if (node.ValueKind == JsonValueKind.False) return false;
+        if (node.ValueKind == JsonValueKind.String && bool.TryParse(node.GetString(), out var parsed)) return parsed;
+        return null;
+    }
+
+    private static DateTime GetRequiredDateTime(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object || !args.TryGetProperty(name, out var node))
+            throw new ArgumentException($"{name} is required.");
+
+        if (node.ValueKind == JsonValueKind.String &&
+            DateTime.TryParse(node.GetString(), out var parsed))
+            return parsed;
+
+        throw new ArgumentException($"{name} must be a valid datetime.");
+    }
+
+    private static double GetRequiredDouble(JsonElement args, string name)
+    {
+        var value = GetOptionalDouble(args, name);
+        if (!value.HasValue)
+            throw new ArgumentException($"{name} is required.");
+        return value.Value;
+    }
+
+    private static List<Guid> GetGuidList(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object || !args.TryGetProperty(name, out var node))
+            return [];
+
+        var list = new List<Guid>();
+        if (node.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in node.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && Guid.TryParse(item.GetString(), out var id))
+                    list.Add(id);
+            }
+        }
+        else if (node.ValueKind == JsonValueKind.String)
+        {
+            var raw = node.GetString();
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                var parts = raw.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in parts)
+                {
+                    if (Guid.TryParse(part, out var id))
+                        list.Add(id);
+                }
+            }
+        }
+
+        return list.Distinct().ToList();
+    }
+
+    private static List<string> GetStringList(JsonElement args, string name)
+    {
+        if (args.ValueKind != JsonValueKind.Object || !args.TryGetProperty(name, out var node))
+            return [];
+
+        var list = new List<string>();
+        if (node.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in node.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                    list.Add(item.GetString()!.Trim());
+                else if (item.ValueKind != JsonValueKind.Null && item.ValueKind != JsonValueKind.Undefined)
+                    list.Add(item.ToString().Trim());
+            }
+        }
+        else if (node.ValueKind == JsonValueKind.String)
+        {
+            var raw = node.GetString();
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                list.AddRange(raw
+                    .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .Where(x => !string.IsNullOrWhiteSpace(x)));
+            }
+        }
+
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     private static Guid GetRequiredGuid(JsonElement args, string name)
     {
         var value = GetOptionalGuid(args, name);
@@ -867,6 +2043,19 @@ public static class AiToolEndpoints
         if (node.ValueKind == JsonValueKind.String && Guid.TryParse(node.GetString(), out var id)) return id;
         if (node.ValueKind == JsonValueKind.Null) return null;
         return null;
+    }
+
+    private static void EnsureWriteConfirmed(string tool, JsonElement args)
+    {
+        if (!WriteTools.Contains(tool))
+            return;
+
+        var confirmed = GetOptionalBool(args, "confirmed");
+        if (confirmed == true)
+            return;
+
+        throw new InvalidOperationException(
+            $"Write action '{tool}' requires explicit confirmation. Ask for confirmation first, then call again with confirmed=true.");
     }
 
     private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));

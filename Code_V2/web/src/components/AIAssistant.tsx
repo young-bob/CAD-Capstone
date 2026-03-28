@@ -12,10 +12,10 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Sparkles, Trash2 } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Trash2, LocateFixed, MapPin } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { aiService, type AiChatMessage } from '../services/ai';
+import { aiService, type AiChatMessage, type AiClientLocation } from '../services/ai';
 
 interface Message {
     id: string;
@@ -91,26 +91,26 @@ const SUGGESTIONS: Record<string, string[]> = {
     volunteer: [
         'Recommend opportunities based on my profile.',
         'Show my application status list.',
-        'Show my attendance records.',
-        'Show my volunteer profile summary.',
+        'Apply me to a shift (ask me for opportunityId and shiftId first).',
+        'Check me in with my current location (ask attendanceId first).',
         'Show unread and recent notifications.',
-        'List available certificate templates.',
+        'Mark all my notifications as read.',
     ],
     coordinator: [
-        'Show my organization status and overview.',
-        'List opportunities under my organization.',
         'List latest applications for my organization.',
+        'Approve one application (ask applicationId first).',
+        'Reject one application with a reason (ask applicationId first).',
+        'Create an event task (ask opportunityId and title first).',
+        'Post an organization announcement.',
         'Show volunteers engaged with my organization.',
-        'List my organization event templates.',
-        'Show the global skill catalog.',
     ],
     admin: [
         'Show real-time cluster system info.',
-        'Show grain distribution by silo.',
         'Show user list and role distribution.',
+        'Approve pending organizations.',
+        'Ban or unban a user by id.',
+        'Reset a user password.',
         'Show pending organizations for review.',
-        'Show pending disputes.',
-        'Show platform skill catalog summary.',
     ],
 };
 
@@ -144,6 +144,9 @@ export default function AIAssistant({ userRole, currentView }: Props) {
     const [input, setInput] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
     const [hasOpened, setHasOpened] = useState(false);
+    const [clientLocation, setClientLocation] = useState<AiClientLocation | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
+    const [locationError, setLocationError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const cancelRef = useRef<(() => void) | null>(null);
@@ -163,6 +166,43 @@ export default function AIAssistant({ userRole, currentView }: Props) {
     const handleOpen = () => {
         setIsOpen(true);
         setHasOpened(true);
+    };
+
+    const handleCaptureLocation = () => {
+        if (!('geolocation' in navigator)) {
+            setLocationError('当前浏览器不支持定位。');
+            return;
+        }
+
+        setIsLocating(true);
+        setLocationError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                setClientLocation({
+                    lat: Number(pos.coords.latitude.toFixed(7)),
+                    lon: Number(pos.coords.longitude.toFixed(7)),
+                    accuracyMeters: Number(pos.coords.accuracy.toFixed(1)),
+                    capturedAtUtc: new Date().toISOString(),
+                    source: 'browser_geolocation',
+                });
+                setIsLocating(false);
+            },
+            err => {
+                const msg = err.code === 1
+                    ? '定位权限被拒绝。'
+                    : err.code === 2
+                        ? '无法获取当前位置。'
+                        : '定位超时，请重试。';
+                setLocationError(msg);
+                setIsLocating(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 60_000,
+            },
+        );
     };
 
     const sendMessage = useCallback(async (userText: string) => {
@@ -200,6 +240,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             const res = await aiService.chat({
                 messages: [...history, { role: 'user', content: userInput }],
                 currentView,
+                clientLocation: clientLocation ?? undefined,
             });
 
             const text = res.reply?.trim() || 'I could not generate a response.';
@@ -218,7 +259,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             const cancel = simulateStream(fallback, onChunk, onDone);
             cancelRef.current = cancel;
         }
-    }, [isStreaming, messages, userRole, currentView]);
+    }, [isStreaming, messages, userRole, currentView, clientLocation]);
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -252,6 +293,9 @@ export default function AIAssistant({ userRole, currentView }: Props) {
     };
 
     const suggestions = SUGGESTIONS[userRole] || SUGGESTIONS.volunteer;
+    const locationSummary = clientLocation
+        ? `${clientLocation.lat.toFixed(5)}, ${clientLocation.lon.toFixed(5)} · ±${Math.round(clientLocation.accuracyMeters ?? 0)}m`
+        : 'Not set';
 
     return (
         <>
@@ -416,7 +460,26 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                         {/* Input area */}
                         <div className="border-t border-gray-200 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-900">
                             <div className="px-3 pt-2 pb-1">
-                                <div className="text-[11px] text-gray-600 dark:text-zinc-400 mb-1">Quick Prompts · {userRole.toUpperCase()}</div>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="text-[11px] text-gray-600 dark:text-zinc-400">Quick Prompts · {userRole.toUpperCase()}</div>
+                                    <button
+                                        type="button"
+                                        onClick={handleCaptureLocation}
+                                        disabled={isStreaming || isLocating}
+                                        className="inline-flex items-center gap-1 text-[11px] text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-orange-50 dark:hover:bg-orange-950/30 border border-gray-200 dark:border-zinc-700 hover:border-orange-200 dark:hover:border-orange-800 px-2 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Use current browser location"
+                                    >
+                                        <LocateFixed className="w-3.5 h-3.5" />
+                                        {isLocating ? 'Locating…' : 'Use My Location'}
+                                    </button>
+                                </div>
+                                <div className="mb-2 flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-zinc-400">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                    <span>Location: {locationSummary}</span>
+                                </div>
+                                {locationError && (
+                                    <div className="mb-2 text-[11px] text-rose-600 dark:text-rose-400">{locationError}</div>
+                                )}
                                 <div className="flex flex-wrap gap-2 pb-1">
                                     {suggestions.map((s, i) => (
                                         <button

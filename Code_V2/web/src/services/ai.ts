@@ -5,9 +5,18 @@ export interface AiChatMessage {
     content: string;
 }
 
+export interface AiClientLocation {
+    lat: number;
+    lon: number;
+    accuracyMeters?: number;
+    capturedAtUtc?: string;
+    source?: string;
+}
+
 export interface AiChatRequest {
     messages: AiChatMessage[];
     currentView?: string;
+    clientLocation?: AiClientLocation;
     temperature?: number;
     maxTokens?: number;
 }
