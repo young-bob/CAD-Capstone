@@ -478,6 +478,7 @@ public static class AiToolEndpoints
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter (e.g., 'Pending', 'Approved'). If the user requests ALL records, pass 'All'.");
                 ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -489,6 +490,7 @@ public static class AiToolEndpoints
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
                 AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -577,6 +579,7 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
                 OpportunityStatus? status = Enum.TryParse<OpportunityStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -588,6 +591,7 @@ public static class AiToolEndpoints
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
                 var statusStr = GetOptionalString(arguments, "status");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
                 ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -600,6 +604,7 @@ public static class AiToolEndpoints
                 var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
                 if (!canManage) throw new UnauthorizedAccessException();
                 var statusStr = GetOptionalString(arguments, "status");
+                if (string.IsNullOrEmpty(statusStr)) throw new ArgumentException("You MUST specify the 'status' parameter. If the user requests ALL records, pass 'All'.");
                 AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
@@ -1923,10 +1928,11 @@ public static class AiToolEndpoints
 
     private static string? GetOptionalString(JsonElement args, string name)
     {
-        if (args.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return null;
         if (args.ValueKind != JsonValueKind.Object) return null;
-        if (!args.TryGetProperty(name, out var node)) return null;
-        return node.ValueKind == JsonValueKind.String ? node.GetString() : node.ToString();
+        if (!args.TryGetProperty(name, out var val)) return null;
+        if (val.ValueKind == JsonValueKind.String) return val.GetString();
+        if (val.ValueKind == JsonValueKind.Number) return val.GetRawText();
+        return null;
     }
 
     private static int GetOptionalInt(JsonElement args, string name, int defaultValue)
@@ -2096,16 +2102,16 @@ public static class AiToolEndpoints
             }, "opportunityId"),
             "get_my_applications" => Obj(new
             {
-                status = Str("Application status filter (must exactly be: 'Pending', 'Approved', 'Waitlisted', 'Rejected', 'Withdrawn'). IMPORTANT: You MUST pass 'Pending' if the user asks for pending applications!"),
+                status = Str("Status filter (e.g. 'Pending', 'Approved'). REQUIRED. Use 'All' for no filter."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
-            }),
+            }, "status"),
             "get_my_attendance" => Obj(new
             {
-                status = Str("Optional attendance status filter (e.g., 'Registered', 'CheckedIn', 'CheckedOut', 'NoShow')."),
+                status = Str("Status filter. REQUIRED. Use 'All' for no filter."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
-            }),
+            }, "status"),
             "get_my_profile" => EmptyObj(),
             "get_my_skills" => EmptyObj(),
             "get_notifications" => Obj(new
@@ -2124,24 +2130,24 @@ public static class AiToolEndpoints
             "get_org_opportunities" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
-                status = Str("Optional opportunity status filter (e.g., 'Draft', 'Published', 'Canceled')."),
+                status = Str("Status filter ('Draft', 'Published', etc). REQUIRED. Use 'All' for no filter."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
-            }),
+            }, "status"),
             "get_org_applications" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
-                status = Str("Application status filter (must exactly be: 'Pending', 'Approved', 'Waitlisted', 'Rejected', 'Withdrawn'). IMPORTANT: You MUST pass 'Pending' if the user asks for pending applications!"),
+                status = Str("Status filter ('Pending', 'Approved', etc). REQUIRED. Use 'All' for no filter."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
-            }),
+            }, "status"),
             "get_opportunity_attendance" => Obj(new
             {
                 opportunityId = Str("Opportunity Guid."),
-                status = Str("Optional attendance status filter (e.g., 'Registered', 'CheckedIn', 'CheckedOut', 'NoShow')."),
+                status = Str("Status filter. REQUIRED. Use 'All' for no filter."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
-            }, "opportunityId"),
+            }, "opportunityId", "status"),
             "get_org_volunteers" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator).")
