@@ -33,14 +33,14 @@ public static class AttendanceEndpoints
         {
             if (!await http.CanManageOpportunityAsync(db, opportunityId, grains))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, skip ?? 0, take ?? 500));
+            return Results.Ok(await queryService.GetByOpportunityAsync(opportunityId, null, skip ?? 0, take ?? 500));
         });
 
         group.MapGet("/volunteer/{volunteerId:guid}", async (Guid volunteerId, int? skip, int? take, HttpContext http, IAttendanceQueryService queryService) =>
         {
             if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(volunteerId))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, skip ?? 0, take ?? 500));
+            return Results.Ok(await queryService.GetByVolunteerAsync(volunteerId, null, skip ?? 0, take ?? 500));
         });
 
         group.MapGet("/disputes/pending", async (int? skip, int? take, IAttendanceQueryService queryService) =>

@@ -477,18 +477,22 @@ public static class AiToolEndpoints
             {
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
+                var statusStr = GetOptionalString(arguments, "status");
+                ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
-                return await applicationQueryService.GetByVolunteerAsync(callerGrainId, skip, take);
+                return await applicationQueryService.GetByVolunteerAsync(callerGrainId, status, skip, take);
             }
 
             case "get_my_attendance":
             {
                 if (!http.TryGetGrainId(out var callerGrainId))
                     throw new UnauthorizedAccessException();
+                var statusStr = GetOptionalString(arguments, "status");
+                AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
-                return await attendanceQueryService.GetByVolunteerAsync(callerGrainId, skip, take);
+                return await attendanceQueryService.GetByVolunteerAsync(callerGrainId, status, skip, take);
             }
 
             case "get_my_profile":
@@ -572,18 +576,22 @@ public static class AiToolEndpoints
             {
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
+                var statusStr = GetOptionalString(arguments, "status");
+                OpportunityStatus? status = Enum.TryParse<OpportunityStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
-                return await opportunityQueryService.GetByOrganizationAsync(orgId, skip, take);
+                return await opportunityQueryService.GetByOrganizationAsync(orgId, status, skip, take);
             }
 
             case "get_org_applications":
             {
                 var orgId = await ResolveManagedOrganizationIdAsync(http, db, arguments);
                 await EnsureCanManageOrganization(http, db, orgId);
+                var statusStr = GetOptionalString(arguments, "status");
+                ApplicationStatus? status = Enum.TryParse<ApplicationStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
-                return await applicationQueryService.GetByOrganizationAsync(orgId, skip, take);
+                return await applicationQueryService.GetByOrganizationAsync(orgId, status, skip, take);
             }
 
             case "get_opportunity_attendance":
@@ -591,9 +599,11 @@ public static class AiToolEndpoints
                 var opportunityId = GetRequiredGuid(arguments, "opportunityId");
                 var canManage = await http.CanManageOpportunityAsync(db, opportunityId, grains);
                 if (!canManage) throw new UnauthorizedAccessException();
+                var statusStr = GetOptionalString(arguments, "status");
+                AttendanceStatus? status = Enum.TryParse<AttendanceStatus>(statusStr, true, out var parsed) ? parsed : null;
                 var skip = Clamp(GetOptionalInt(arguments, "skip", 0), 0, 50_000);
                 var take = Clamp(GetOptionalInt(arguments, "take", 100), 1, 500);
-                return await attendanceQueryService.GetByOpportunityAsync(opportunityId, skip, take);
+                return await attendanceQueryService.GetByOpportunityAsync(opportunityId, status, skip, take);
             }
 
             case "get_org_volunteers":
@@ -2086,11 +2096,13 @@ public static class AiToolEndpoints
             }, "opportunityId"),
             "get_my_applications" => Obj(new
             {
+                status = Str("Optional application status filter (e.g., 'Pending', 'Approved', 'Rejected')."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
             "get_my_attendance" => Obj(new
             {
+                status = Str("Optional attendance status filter (e.g., 'Registered', 'CheckedIn', 'CheckedOut', 'NoShow')."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
@@ -2112,18 +2124,21 @@ public static class AiToolEndpoints
             "get_org_opportunities" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
+                status = Str("Optional opportunity status filter (e.g., 'Draft', 'Published', 'Canceled')."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
             "get_org_applications" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
+                status = Str("Optional application status filter (e.g., 'Pending', 'Approved', 'Rejected')."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
             "get_opportunity_attendance" => Obj(new
             {
                 opportunityId = Str("Opportunity Guid."),
+                status = Str("Optional attendance status filter (e.g., 'Registered', 'CheckedIn', 'CheckedOut', 'NoShow')."),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }, "opportunityId"),

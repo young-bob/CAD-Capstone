@@ -140,6 +140,12 @@ public static class AiChatEndpoints
             Output format: 1) One-line conclusion, 2) Key data bullets (max 6), 3) Optional next action (max 2).
             If any tool fails, state the failure briefly and continue with available facts.
 
+            CRITICAL - ID preservation rules:
+            - When listing items that the user may act upon (applications, attendance, notifications, etc.), ALWAYS include the item's ID (applicationId, attendanceId, etc.) in your response text.
+            - Format: include the ID in parentheses after each item, e.g. "Amelia Zhang - Set-up Crew (ID: 3fa85f64-5717-4562-b3fc-2c963f66afa6)".
+            - When handling a bulk write action (e.g. "approve all"), re-call the read tool first to fetch current IDs, then execute write tools with those exact IDs. NEVER fabricate or reuse IDs from memory.
+            - If you cannot find the required ID in conversation history, always re-fetch data from the appropriate read tool before attempting the write action.
+
             Tool usage rules:
             - For coordinator tools that require organizationId: you may omit it and the system auto-resolves to the coordinator's managed organization.
             - All Guid parameters must be valid UUID strings.

@@ -104,12 +104,19 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
             .ToListAsync();
     }
 
-    public async Task<List<OpportunitySummary>> GetByOrganizationAsync(Guid organizationId, int skip = 0, int take = 500)
+    public async Task<List<OpportunitySummary>> GetByOrganizationAsync(Guid organizationId, OpportunityStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
-        return await dbContext.OpportunityReadModels
+        var query = dbContext.OpportunityReadModels
             .AsNoTracking()
-            .Where(o => o.OrganizationId == organizationId)
+            .Where(o => o.OrganizationId == organizationId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(o => o.Status == status.Value);
+        }
+
+        return await query
             .OrderByDescending(o => o.PublishDate)
             .Skip(safeSkip)
             .Take(safeTake)
@@ -133,12 +140,19 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
 
 public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicationQueryService
 {
-    public async Task<List<ApplicationSummary>> GetByOpportunityAsync(Guid opportunityId, int skip = 0, int take = 500)
+    public async Task<List<ApplicationSummary>> GetByOpportunityAsync(Guid opportunityId, ApplicationStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
-        var apps = await dbContext.ApplicationReadModels
+        var query = dbContext.ApplicationReadModels
             .AsNoTracking()
-            .Where(a => a.OpportunityId == opportunityId)
+            .Where(a => a.OpportunityId == opportunityId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(a => a.Status == status.Value);
+        }
+
+        var apps = await query
             .OrderByDescending(a => a.AppliedAt)
             .Skip(safeSkip)
             .Take(safeTake)
@@ -158,12 +172,19 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
             .ToList();
     }
 
-    public async Task<List<ApplicationSummary>> GetByVolunteerAsync(Guid volunteerId, int skip = 0, int take = 500)
+    public async Task<List<ApplicationSummary>> GetByVolunteerAsync(Guid volunteerId, ApplicationStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
-        return await dbContext.ApplicationReadModels
+        var query = dbContext.ApplicationReadModels
             .AsNoTracking()
-            .Where(a => a.VolunteerId == volunteerId)
+            .Where(a => a.VolunteerId == volunteerId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(a => a.Status == status.Value);
+        }
+
+        return await query
             .Join(dbContext.OpportunityReadModels,
                 a => a.OpportunityId,
                 o => o.OpportunityId,
@@ -178,7 +199,7 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
             .ToListAsync();
     }
 
-    public async Task<List<ApplicationSummary>> GetByOrganizationAsync(Guid organizationId, int skip = 0, int take = 500)
+    public async Task<List<ApplicationSummary>> GetByOrganizationAsync(Guid organizationId, ApplicationStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
         var opportunityIds = await dbContext.OpportunityReadModels
@@ -187,9 +208,16 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
             .Select(o => o.OpportunityId)
             .ToListAsync();
 
-        var apps = await dbContext.ApplicationReadModels
+        var query = dbContext.ApplicationReadModels
             .AsNoTracking()
-            .Where(a => opportunityIds.Contains(a.OpportunityId))
+            .Where(a => opportunityIds.Contains(a.OpportunityId));
+
+        if (status.HasValue)
+        {
+            query = query.Where(a => a.Status == status.Value);
+        }
+
+        var apps = await query
             .OrderByDescending(a => a.AppliedAt)
             .Skip(safeSkip)
             .Take(safeTake)
@@ -212,12 +240,19 @@ public class EfCoreApplicationQueryService(AppDbContext dbContext) : IApplicatio
 
 public class EfCoreAttendanceQueryService(AppDbContext dbContext) : IAttendanceQueryService
 {
-    public async Task<List<AttendanceSummary>> GetByOpportunityAsync(Guid opportunityId, int skip = 0, int take = 500)
+    public async Task<List<AttendanceSummary>> GetByOpportunityAsync(Guid opportunityId, AttendanceStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
-        return await dbContext.AttendanceReadModels
+        var query = dbContext.AttendanceReadModels
             .AsNoTracking()
-            .Where(a => a.OpportunityId == opportunityId)
+            .Where(a => a.OpportunityId == opportunityId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(a => a.Status == status.Value);
+        }
+
+        return await query
             .OrderByDescending(a => a.ShiftStartTime)
             .Skip(safeSkip)
             .Take(safeTake)
@@ -227,12 +262,19 @@ public class EfCoreAttendanceQueryService(AppDbContext dbContext) : IAttendanceQ
             .ToListAsync();
     }
 
-    public async Task<List<AttendanceSummary>> GetByVolunteerAsync(Guid volunteerId, int skip = 0, int take = 500)
+    public async Task<List<AttendanceSummary>> GetByVolunteerAsync(Guid volunteerId, AttendanceStatus? status = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
-        return await dbContext.AttendanceReadModels
+        var query = dbContext.AttendanceReadModels
             .AsNoTracking()
-            .Where(a => a.VolunteerId == volunteerId)
+            .Where(a => a.VolunteerId == volunteerId);
+
+        if (status.HasValue)
+        {
+            query = query.Where(a => a.Status == status.Value);
+        }
+
+        return await query
             .OrderByDescending(a => a.CheckInTime)
             .Skip(safeSkip)
             .Take(safeTake)

@@ -87,7 +87,7 @@ public static class VolunteerEndpoints
         {
             if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByVolunteerAsync(id, skip ?? 0, take ?? 500));
+            return Results.Ok(await queryService.GetByVolunteerAsync(id, null, skip ?? 0, take ?? 500));
         });
 
         group.MapPost("/{id:guid}/background-check", async (Guid id, SetBackgroundCheckRequest req, HttpContext http, IGrainFactory grains) =>
