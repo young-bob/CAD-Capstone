@@ -13,6 +13,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { aiService, type AiChatMessage } from '../services/ai';
 
 interface Message {
@@ -230,23 +232,6 @@ export default function AIAssistant({ userRole, currentView }: Props) {
 
     const suggestions = SUGGESTIONS[userRole] || SUGGESTIONS.volunteer;
 
-    // Render markdown-ish bold (**text**) in message content
-    function renderContent(text: string) {
-        const parts = text.split(/(\*\*[^*]+\*\*)/g);
-        return parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
-            }
-            // Render newlines
-            return part.split('\n').map((line, j, arr) => (
-                <span key={`${i}-${j}`}>
-                    {line}
-                    {j < arr.length - 1 && <br />}
-                </span>
-            ));
-        });
-    }
-
     return (
         <>
             {/* ── Floating Button ── */}
@@ -267,7 +252,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             {isOpen && (
                 <div
                     className="fixed bottom-6 right-6 z-[9999] flex flex-col animate-slide-up"
-                    style={{ width: 'calc(min(384px, 100vw - 24px))', maxHeight: '520px' }}
+                    style={{ width: 'min(760px, calc(100vw - 24px))', height: 'min(78vh, 760px)' }}
                 >
                     <div className="flex flex-col h-full rounded-2xl overflow-hidden shadow-2xl border border-white/10"
                         style={{ background: '#09090b' }}>
@@ -350,7 +335,47 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                                                 <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
                                             </span>
                                         ) : msg.role === 'assistant' ? (
-                                            renderContent(msg.content)
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                    ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                                                    li: ({ children }) => <li>{children}</li>,
+                                                    a: ({ href, children }) => (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-violet-300 hover:text-violet-200 underline"
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    code: ({ className, children }) => {
+                                                        const isBlockCode = (className ?? '').includes('language-');
+                                                        return isBlockCode ? (
+                                                            <code className="block w-full overflow-x-auto p-3 rounded-lg bg-black/50 text-amber-200 font-mono text-[0.9em] whitespace-pre">
+                                                                {children}
+                                                            </code>
+                                                        ) : (
+                                                            <code className="px-1 py-0.5 rounded bg-black/40 text-amber-200 font-mono text-[0.92em]">
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                                                    h2: ({ children }) => <h2 className="text-sm font-semibold mb-2">{children}</h2>,
+                                                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="pl-3 border-l-2 border-violet-400/60 text-gray-300 italic mb-2">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
                                         ) : (
                                             msg.content
                                         )}
@@ -374,7 +399,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                                 rows={1}
                                 disabled={isStreaming}
                                 className="flex-1 resize-none bg-gray-800 text-white placeholder-gray-500 text-sm px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 border border-white/10 disabled:opacity-50"
-                                style={{ maxHeight: '80px', overflowY: 'auto' }}
+                                style={{ maxHeight: '140px', overflowY: 'auto' }}
                             />
                             <button
                                 type="submit"
