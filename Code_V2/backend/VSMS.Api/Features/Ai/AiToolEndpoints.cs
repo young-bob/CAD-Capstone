@@ -2096,7 +2096,7 @@ public static class AiToolEndpoints
             }, "opportunityId"),
             "get_my_applications" => Obj(new
             {
-                status = Str("Optional application status filter (e.g., 'Pending', 'Approved', 'Rejected')."),
+                status = Str("Application status filter (must exactly be: 'Pending', 'Approved', 'Waitlisted', 'Rejected', 'Withdrawn'). IMPORTANT: You MUST pass 'Pending' if the user asks for pending applications!"),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
@@ -2131,7 +2131,7 @@ public static class AiToolEndpoints
             "get_org_applications" => Obj(new
             {
                 organizationId = Str("Organization Guid (auto-resolved for coordinator)."),
-                status = Str("Optional application status filter (e.g., 'Pending', 'Approved', 'Rejected')."),
+                status = Str("Application status filter (must exactly be: 'Pending', 'Approved', 'Waitlisted', 'Rejected', 'Withdrawn'). IMPORTANT: You MUST pass 'Pending' if the user asks for pending applications!"),
                 skip = Int("Paging offset."),
                 take = Int("Page size.")
             }),
