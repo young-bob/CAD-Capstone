@@ -20,8 +20,21 @@ export const attendanceService = {
     checkIn: async (id: string, data: { lat: number; lon: number; proofPhotoUrl: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/checkin`, data);
     },
-    webCheckIn: async (id: string): Promise<void> => {
-        await api.post(`/api/attendance/${id}/web-checkin`);
+    qrCheckIn: async (id: string, data: { qrToken: string }): Promise<void> => {
+        await api.post(`/api/attendance/${id}/qr-checkin`, data);
+    },
+    issueQrCheckInToken: async (data: { opportunityId: string; shiftId: string }): Promise<{
+        token: string;
+        qrImageUrl: string;
+        opportunityId: string;
+        shiftId: string;
+        shiftName: string;
+        window: { openAtUtc: string; closeAtUtc: string };
+        generatedAtUtc: string;
+        expiresAtUtc: string;
+    }> => {
+        const res = await api.post('/api/attendance/qr/issue', data);
+        return res.data;
     },
     checkOut: async (id: string): Promise<void> => {
         await api.post(`/api/attendance/${id}/checkout`);

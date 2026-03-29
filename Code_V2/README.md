@@ -143,7 +143,7 @@ AI__Region=ca-central-1
 AI__Model=us.amazon.nova-2-lite-v1:0
 AI__TimeoutSeconds=60
 AI__DefaultTemperature=0.2
-AI__DefaultMaxTokens=900
+AI__DefaultMaxTokens=2048
 ```
 
 ---

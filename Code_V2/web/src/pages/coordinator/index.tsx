@@ -2328,6 +2328,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     // Live check-in mode
     const [liveMode, setLiveMode] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [qrGeneratingFor, setQrGeneratingFor] = useState<string | null>(null);
 
     // Adjust hours
     const [showAdjust, setShowAdjust] = useState(false);
@@ -2486,6 +2487,30 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     };
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const doOpenShiftQr = async (app: ApplicationSummary) => {
+        setQrGeneratingFor(app.shiftId);
+        try {
+            const qr = await attendanceService.issueQrCheckInToken({
+                opportunityId: app.opportunityId,
+                shiftId: app.shiftId,
+            });
+
+            const popup = window.open(qr.qrImageUrl, '_blank', 'noopener,noreferrer');
+            if (!popup) showToast('QR generated. Pop-up blocked; please allow pop-up and retry.');
+
+            try {
+                await navigator.clipboard.writeText(qr.token);
+                showToast(`QR ready (${qr.shiftName}). Token copied for print/backup.`);
+            } catch {
+                showToast(`QR ready (${qr.shiftName}).`);
+            }
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to generate QR check-in code'));
+        } finally {
+            setQrGeneratingFor(null);
+        }
+    };
 
     const doPublish = async () => {
         setActionId('pub');
@@ -3001,6 +3026,14 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                         )}
                                     </div>
                                     <div className="flex flex-wrap gap-2 justify-end shrink-0">
+                                        <button
+                                            onClick={() => doOpenShiftQr(app)}
+                                            disabled={qrGeneratingFor === app.shiftId}
+                                            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-sm hover:bg-indigo-100 disabled:opacity-50 flex items-center gap-1"
+                                            title="Generate on-site QR check-in code for this shift">
+                                            {qrGeneratingFor === app.shiftId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                            QR Code
+                                        </button>
                                         {!rec && (
                                             <button onClick={() => doInitAndCheckIn(app)} disabled={actionId === app.volunteerId + '_init'} className="px-3 py-1.5 bg-blue-500 text-white font-bold rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-1">
                                                 {actionId === app.volunteerId + '_init' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Check In
