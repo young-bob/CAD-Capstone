@@ -5,7 +5,7 @@ import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { organizationService, OrganizationSummary } from '../../services/organizations';
 import { volunteerService } from '../../services/volunteers';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function OrganizationsScreen() {
     const { linkedGrainId } = useAuthStore();

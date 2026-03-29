@@ -9,6 +9,7 @@ export default defineConfig({
     },
     server: {
         port: 3000,
+        host: true,   // bind to 0.0.0.0 so Android emulator can reach it via 10.0.2.2
         open: true,
         proxy: {
             '/api': {

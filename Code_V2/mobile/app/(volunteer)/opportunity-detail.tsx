@@ -6,10 +6,11 @@ import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { opportunityService } from '../../services/opportunities';
 import { applicationService } from '../../services/applications';
+import { skillService, Skill } from '../../services/skills';
 import { OpportunityState, Shift } from '../../types/opportunity';
 import { ApplicationStatus, OpportunityStatus } from '../../types/enums';
 import { ApplicationSummary } from '../../types/application';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function OpportunityDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,14 +19,21 @@ export default function OpportunityDetailScreen() {
     const [opp, setOpp] = useState<OpportunityState | null>(null);
     const [applications, setApplications] = useState<ApplicationSummary[]>([]);
     const [applying, setApplying] = useState<string | null>(null);
+    const [skillMap, setSkillMap] = useState<Record<string, string>>({});
 
     const fetchOpp = useCallback(async () => {
         try {
             if (!id || !linkedGrainId) return;
-            const data = await opportunityService.getById(id);
+            const [data, userApps, allSkills] = await Promise.all([
+                opportunityService.getById(id),
+                applicationService.getForVolunteer(linkedGrainId),
+                skillService.getAll(),
+            ]);
             setOpp(data);
-            const userApps = await applicationService.getForVolunteer(linkedGrainId);
             setApplications(userApps.filter(a => a.opportunityId === id));
+            const map: Record<string, string> = {};
+            allSkills.forEach((s: Skill) => { map[s.id] = s.name; });
+            setSkillMap(map);
         } catch {
             Alert.alert('Error', 'Failed to load opportunity');
         } finally {
@@ -223,7 +231,9 @@ export default function OpportunityDetailScreen() {
                     <Text variant="titleMedium" style={styles.sectionTitle}>Required Skills</Text>
                     <View style={styles.chipRow}>
                         {opp.requiredSkillIds.map((skillId: string, i: number) => (
-                            <Chip key={i} compact style={styles.tagChip} textStyle={{ color: COLORS.warning, fontSize: 11 }}>{skillId}</Chip>
+                            <Chip key={i} compact style={styles.tagChip} textStyle={{ color: COLORS.warning, fontSize: 11 }}>
+                                {skillMap[skillId] ?? skillId}
+                            </Chip>
                         ))}
                     </View>
                 </>

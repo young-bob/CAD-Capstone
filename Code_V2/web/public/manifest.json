@@ -10,9 +10,9 @@
   "categories": ["productivity", "social"],
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/icon.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
@@ -22,7 +22,7 @@
       "name": "Find Opportunities",
       "short_name": "Explore",
       "url": "/?view=opportunities",
-      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icon.png", "sizes": "any" }]
     }
   ]
 }

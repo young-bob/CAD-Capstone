@@ -4,7 +4,7 @@ import { Button, Card, Text, Surface, ActivityIndicator, Portal, Modal, TextInpu
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { certificateService, CertificateTemplate } from '../../services/certificates';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CertificateTemplatesScreen() {
     const { linkedGrainId } = useAuthStore();

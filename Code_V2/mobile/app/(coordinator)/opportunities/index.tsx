@@ -10,7 +10,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { organizationService } from '../../../services/organizations';
 import { opportunityService } from '../../../services/opportunities';
 import { OpportunitySummary } from '../../../types/opportunity';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLORS: Record<string, string> = {
     [OpportunityStatus.Draft]: COLORS.textSecondary,

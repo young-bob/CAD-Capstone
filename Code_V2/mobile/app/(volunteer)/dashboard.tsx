@@ -5,49 +5,72 @@ import { router } from 'expo-router';
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { volunteerService, VolunteerProfile } from '../../services/volunteers';
-import { applicationService } from '../../services/applications';
-import { ApplicationSummary } from '../../types/application';
-import { ApplicationStatus } from '../../types/enums';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { AttendanceSummary } from '../../types/attendance';
+import { AttendanceStatus } from '../../types/enums';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+const STATUS_COLOR: Record<string, string> = {
+    [AttendanceStatus.CheckedIn]: COLORS.primary,
+    [AttendanceStatus.CheckedOut]: COLORS.success,
+    [AttendanceStatus.Confirmed]: COLORS.success,
+    [AttendanceStatus.Pending]: COLORS.warning,
+    [AttendanceStatus.Disputed]: COLORS.error,
+    [AttendanceStatus.Resolved]: COLORS.textSecondary,
+};
+
+const STATUS_ICON: Record<string, string> = {
+    [AttendanceStatus.CheckedIn]: 'login',
+    [AttendanceStatus.CheckedOut]: 'logout',
+    [AttendanceStatus.Confirmed]: 'check-decagram',
+    [AttendanceStatus.Pending]: 'clock-outline',
+    [AttendanceStatus.Disputed]: 'alert-circle-outline',
+    [AttendanceStatus.Resolved]: 'check-circle-outline',
+};
 
 function StatCard({ icon, value, label, color }: { icon: string; value: number | string; label: string; color: string }) {
     return (
         <Surface style={styles.statCard} elevation={1}>
-            <MaterialCommunityIcons name={icon} size={28} color={color} />
+            <View style={[styles.statIconBg, { backgroundColor: color + '18' }]}>
+                <MaterialCommunityIcons name={icon} size={22} color={color} />
+            </View>
             <Text variant="headlineSmall" style={[styles.statValue, { color }]}>{value}</Text>
             <Text style={styles.statLabel}>{label}</Text>
         </Surface>
     );
 }
 
-const STATUS_COLOR: Record<string, string> = {
-    Approved: COLORS.success,
-    Pending: COLORS.warning,
-    Promoted: COLORS.primary,
-};
+function QuickAction({ icon, label, color, onPress }: { icon: string; label: string; color: string; onPress: () => void }) {
+    return (
+        <TouchableOpacity style={styles.actionCard} onPress={onPress}>
+            <View style={[styles.actionIconBg, { backgroundColor: color + '18' }]}>
+                <MaterialCommunityIcons name={icon} size={26} color={color} />
+            </View>
+            <Text style={styles.actionLabel}>{label}</Text>
+        </TouchableOpacity>
+    );
+}
 
 export default function DashboardScreen() {
     const { linkedGrainId, email } = useAuthStore();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
-    const [upcomingApps, setUpcomingApps] = useState<ApplicationSummary[]>([]);
+    const [attendanceHistory, setAttendanceHistory] = useState<AttendanceSummary[]>([]);
 
     const load = useCallback(async () => {
         if (!linkedGrainId) { setLoading(false); return; }
         try {
-            const [p, apps] = await Promise.all([
+            const [p, attendance] = await Promise.all([
                 volunteerService.getProfile(linkedGrainId),
-                applicationService.getForVolunteer(linkedGrainId),
+                volunteerService.getAttendance(linkedGrainId),
             ]);
             setProfile(p);
-            setUpcomingApps(
-                apps
-                    .filter(a => [ApplicationStatus.Approved, ApplicationStatus.Pending, ApplicationStatus.Promoted].includes(a.status as ApplicationStatus))
+            setAttendanceHistory(
+                attendance
                     .sort((a, b) => {
-                        if (!a.shiftStartTime) return 1;
-                        if (!b.shiftStartTime) return -1;
-                        return new Date(a.shiftStartTime).getTime() - new Date(b.shiftStartTime).getTime();
+                        const aTime = a.checkInTime ? new Date(a.checkInTime).getTime() : 0;
+                        const bTime = b.checkInTime ? new Date(b.checkInTime).getTime() : 0;
+                        return bTime - aTime;
                     })
                     .slice(0, 5)
             );
@@ -66,9 +89,7 @@ export default function DashboardScreen() {
         setRefreshing(false);
     }, [load]);
 
-    const displayName = profile?.firstName
-        ? `${profile.firstName} ${profile.lastName}`
-        : email ?? 'Volunteer';
+    const displayName = profile?.firstName || email?.split('@')[0] || 'Volunteer';
 
     if (loading) {
         return (
@@ -84,134 +105,89 @@ export default function DashboardScreen() {
             contentContainerStyle={styles.content}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         >
-            {/* Greeting */}
-            <Surface style={styles.greetingCard} elevation={2}>
-                <View style={styles.greetingRow}>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="headlineSmall" style={styles.greetingName}>
-                            Welcome back, {displayName.split(' ')[0]}!
-                        </Text>
-                        <Text style={styles.greetingSubtitle}>Here's your volunteer summary</Text>
-                    </View>
-                    <MaterialCommunityIcons name="hand-heart" size={40} color={COLORS.primary} />
+            {/* Greeting Banner */}
+            <View style={styles.heroBanner}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.heroSmall}>Welcome back,</Text>
+                    <Text style={styles.heroName}>{displayName} 👋</Text>
+                    <Text style={styles.heroSub}>Making a difference, one shift at a time.</Text>
                 </View>
-            </Surface>
+                <MaterialCommunityIcons name="hand-heart" size={52} color={COLORS.primary} />
+            </View>
 
             {/* Impact Stats */}
-            <Text variant="titleMedium" style={styles.sectionTitle}>Your Impact</Text>
+            <Text style={styles.sectionTitle}>Your Impact</Text>
             <View style={styles.statsRow}>
-                <StatCard
-                    icon="clock-outline"
-                    value={profile?.totalHours ?? 0}
-                    label="Hours"
-                    color={COLORS.primary}
-                />
-                <StatCard
-                    icon="check-decagram"
-                    value={profile?.completedOpportunities ?? 0}
-                    label="Completed"
-                    color={COLORS.success}
-                />
-                <StatCard
-                    icon="star"
-                    value={profile?.impactScore ?? 0}
-                    label="Impact"
-                    color={COLORS.warning}
-                />
+                <StatCard icon="clock-check-outline" value={profile?.totalHours ?? 0} label="Hours" color={COLORS.primary} />
+                <StatCard icon="check-decagram" value={profile?.completedOpportunities ?? 0} label="Completed" color={COLORS.success} />
+                <StatCard icon="star-four-points" value={profile?.impactScore ?? 0} label="Score" color={COLORS.warning} />
             </View>
 
             {/* Quick Actions */}
-            <Text variant="titleMedium" style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsRow}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(volunteer)/home')}>
-                    <MaterialCommunityIcons name="compass" size={28} color={COLORS.primary} />
-                    <Text style={styles.actionLabel}>Explore</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(volunteer)/checkin')}>
-                    <MaterialCommunityIcons name="map-marker-check" size={28} color={COLORS.success} />
-                    <Text style={styles.actionLabel}>Check In</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(volunteer)/organizations')}>
-                    <MaterialCommunityIcons name="domain" size={28} color={COLORS.secondary} />
-                    <Text style={styles.actionLabel}>Orgs</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(volunteer)/attendance')}>
-                    <MaterialCommunityIcons name="history" size={28} color={COLORS.warning} />
-                    <Text style={styles.actionLabel}>History</Text>
-                </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <Surface style={styles.actionsGrid} elevation={1}>
+                <QuickAction icon="compass" label="Explore" color={COLORS.primary} onPress={() => router.push('/(volunteer)/home')} />
+                <QuickAction icon="qrcode-scan" label="Check In" color={COLORS.success} onPress={() => router.push('/(volunteer)/checkin')} />
+                <QuickAction icon="domain" label="Orgs" color={COLORS.secondary} onPress={() => router.push('/(volunteer)/organizations')} />
+                <QuickAction icon="clipboard-list" label="Applications" color="#7C3AED" onPress={() => router.push('/(volunteer)/my-applications')} />
+            </Surface>
 
-            {/* Upcoming Schedule */}
+            {/* Attendance History */}
             <View style={styles.sectionHeader}>
-                <Text variant="titleMedium" style={styles.sectionTitle}>Upcoming Schedule</Text>
-                <Button compact textColor={COLORS.primary} onPress={() => router.push('/(volunteer)/my-applications')}>
+                <Text style={styles.sectionTitle}>Attendance History</Text>
+                <Button compact textColor={COLORS.primary} onPress={() => router.push('/(volunteer)/attendance')}>
                     View All
                 </Button>
             </View>
 
-            {upcomingApps.length === 0 ? (
+            {attendanceHistory.length === 0 ? (
                 <Card style={styles.emptyCard} mode="outlined">
-                    <Card.Content style={{ alignItems: 'center', paddingVertical: 24 }}>
-                        <MaterialCommunityIcons name="calendar-blank" size={40} color={COLORS.textSecondary} />
-                        <Text style={{ color: COLORS.textSecondary, marginTop: 8 }}>No upcoming events</Text>
-                        <Button compact textColor={COLORS.primary} onPress={() => router.push('/(volunteer)/home')} style={{ marginTop: 8 }}>
-                            Browse Opportunities
+                    <Card.Content style={styles.emptyContent}>
+                        <MaterialCommunityIcons name="calendar-blank-outline" size={48} color={COLORS.border} />
+                        <Text style={styles.emptyTitle}>No Attendance Yet</Text>
+                        <Text style={styles.emptyText}>Check in to your first shift to see history here.</Text>
+                        <Button compact textColor={COLORS.primary} onPress={() => router.push('/(volunteer)/home')} style={{ marginTop: 10 }}>
+                            Find Opportunities
                         </Button>
                     </Card.Content>
                 </Card>
             ) : (
-                upcomingApps.map(app => (
-                    <Card key={app.applicationId} style={styles.appCard} mode="outlined">
-                        <Card.Content>
-                            {app.organizationName ? (
-                                <View style={styles.orgRow}>
-                                    <MaterialCommunityIcons name="office-building-outline" size={12} color={COLORS.textSecondary} />
-                                    <Text style={styles.orgName}>{app.organizationName}</Text>
+                attendanceHistory.map(rec => {
+                    const color = STATUS_COLOR[rec.status] ?? COLORS.textSecondary;
+                    const icon = STATUS_ICON[rec.status] ?? 'clock-outline';
+                    return (
+                        <Card key={rec.attendanceId} style={styles.historyCard} mode="outlined">
+                            <Card.Content style={styles.historyRow}>
+                                <View style={[styles.historyIconBg, { backgroundColor: color + '18' }]}>
+                                    <MaterialCommunityIcons name={icon} size={20} color={color} />
                                 </View>
-                            ) : null}
-                            <Text style={styles.appTitle} numberOfLines={1}>{app.opportunityTitle}</Text>
-                            {app.shiftName ? <Text style={styles.shiftName}>{app.shiftName}</Text> : null}
-                            {app.shiftStartTime ? (
-                                <View style={styles.timeRow}>
-                                    <MaterialCommunityIcons name="calendar-clock" size={13} color={COLORS.textSecondary} />
-                                    <Text style={styles.timeText}>
-                                        {new Date(app.shiftStartTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                                        {' · '}
-                                        {new Date(app.shiftStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </Text>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <Text style={styles.historyTitle} numberOfLines={1}>{rec.opportunityTitle}</Text>
+                                    <View style={styles.historyMeta}>
+                                        {rec.checkInTime ? (
+                                            <Text style={styles.historyDate}>
+                                                {new Date(rec.checkInTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </Text>
+                                        ) : null}
+                                        {rec.totalHours > 0 && (
+                                            <Text style={styles.historyHours}>{rec.totalHours.toFixed(1)}h</Text>
+                                        )}
+                                    </View>
                                 </View>
-                            ) : null}
-                            <Chip
-                                compact
-                                style={[styles.chip, { backgroundColor: (STATUS_COLOR[app.status] ?? COLORS.textSecondary) + '20' }]}
-                                textStyle={{ color: STATUS_COLOR[app.status] ?? COLORS.textSecondary, fontSize: 11 }}
-                            >
-                                {app.status}
-                            </Chip>
-                        </Card.Content>
-                    </Card>
-                ))
+                                <Chip
+                                    compact
+                                    style={[styles.statusChip, { backgroundColor: color + '18' }]}
+                                    textStyle={{ color, fontSize: 10, fontWeight: '600' }}
+                                >
+                                    {rec.status}
+                                </Chip>
+                            </Card.Content>
+                        </Card>
+                    );
+                })
             )}
 
-            {/* Credentials Reminder */}
-            {profile && profile.credentials.length === 0 && (
-                <Card style={styles.reminderCard} mode="outlined">
-                    <Card.Content style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <MaterialCommunityIcons name="shield-alert-outline" size={28} color={COLORS.warning} />
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: COLORS.text, fontWeight: 'bold' }}>Upload your credentials</Text>
-                            <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginTop: 2 }}>
-                                Add certifications to qualify for more opportunities.
-                            </Text>
-                        </View>
-                        <Button compact textColor={COLORS.primary} onPress={() => router.push('/(volunteer)/profile')}>
-                            Go
-                        </Button>
-                    </Card.Content>
-                </Card>
-            )}
-
-            <View style={{ height: 32 }} />
+            <View style={{ height: 24 }} />
         </ScrollView>
     );
 }
@@ -219,32 +195,49 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
     content: { padding: 16 },
-    greetingCard: {
-        padding: 20, borderRadius: 16, backgroundColor: COLORS.surface, marginBottom: 20,
+
+    heroBanner: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderRadius: 16, padding: 20, marginBottom: 20,
+        borderWidth: 1, borderColor: COLORS.border,
     },
-    greetingRow: { flexDirection: 'row', alignItems: 'center' },
-    greetingName: { color: COLORS.text, fontWeight: 'bold' },
-    greetingSubtitle: { color: COLORS.textSecondary, marginTop: 4 },
-    sectionTitle: { color: COLORS.text, marginBottom: 12 },
+    heroSmall: { color: COLORS.textSecondary, fontSize: 13 },
+    heroName: { color: COLORS.text, fontSize: 22, fontWeight: '700', marginTop: 2 },
+    heroSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
+
+    sectionTitle: { color: COLORS.text, fontWeight: '700', fontSize: 15, marginBottom: 10 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+
     statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-    statCard: { flex: 1, alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: COLORS.surface },
-    statValue: { marginTop: 6, fontWeight: 'bold' },
-    statLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-    actionsRow: {
-        flexDirection: 'row', justifyContent: 'space-between',
-        backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 20,
+    statCard: {
+        flex: 1, alignItems: 'center', padding: 14, borderRadius: 12,
+        backgroundColor: COLORS.surface,
     },
-    actionBtn: { alignItems: 'center', flex: 1 },
-    actionLabel: { color: COLORS.text, fontSize: 12, marginTop: 6, fontWeight: '600' },
+    statIconBg: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+    statValue: { fontWeight: '700', fontSize: 20 },
+    statLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
+
+    actionsGrid: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        backgroundColor: COLORS.surface, borderRadius: 16,
+        padding: 16, marginBottom: 20,
+    },
+    actionCard: { alignItems: 'center', flex: 1 },
+    actionIconBg: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+    actionLabel: { color: COLORS.text, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+
     emptyCard: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12 },
-    appCard: { marginBottom: 10, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12 },
-    orgRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-    orgName: { color: COLORS.textSecondary, fontSize: 11 },
-    appTitle: { color: COLORS.text, fontWeight: 'bold', fontSize: 15 },
-    shiftName: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
-    timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, marginBottom: 8 },
-    timeText: { color: COLORS.textSecondary, fontSize: 12 },
-    chip: { alignSelf: 'flex-start' },
-    reminderCard: { marginTop: 8, backgroundColor: COLORS.surface, borderColor: COLORS.warning + '60', borderRadius: 12 },
+    emptyContent: { alignItems: 'center', paddingVertical: 28 },
+    emptyTitle: { color: COLORS.text, fontWeight: '700', fontSize: 16, marginTop: 10 },
+    emptyText: { color: COLORS.textSecondary, marginTop: 4, textAlign: 'center', fontSize: 13 },
+
+    historyCard: { marginBottom: 8, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: 12 },
+    historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    historyIconBg: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+    historyTitle: { color: COLORS.text, fontWeight: '600', fontSize: 14 },
+    historyMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+    historyDate: { color: COLORS.textSecondary, fontSize: 12 },
+    historyHours: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
+    statusChip: { borderRadius: 8, flexShrink: 0 },
 });

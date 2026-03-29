@@ -1,17 +1,20 @@
 // API base URL
-export const API_BASE_URL = 'https://www.vsms.foo';
+// DEV: Android emulator reaches host via 10.0.2.2. Vite dev server (port 3000)
+// proxies /api/* to the cloud backend via WireGuard.
+// Change to production URL (e.g. https://www.vsms.foo) for release builds.
+export const API_BASE_URL = 'http://10.0.2.2:3000';
 
 export const COLORS = {
-    primary: '#0D9488',       // Warm teal — growth, nature, community
-    primaryDark: '#0F766E',   // Deeper teal for headers
-    secondary: '#F97316',     // Warm orange — energy, enthusiasm
-    background: '#FAFAF5',    // Warm off-white, not clinical
-    surface: '#FFFFFF',       // Pure white cards
-    surfaceLight: '#F0F0EB',  // Light warm gray for inputs / sub-sections
-    text: '#1C1917',          // Dark charcoal — easy to read
-    textSecondary: '#78716C', // Warm gray
-    success: '#16A34A',       // Fresh green
-    warning: '#F59E0B',       // Amber
-    error: '#DC2626',         // Clear red
-    border: '#E5E2DB',        // Subtle warm border
+    primary: '#f59e0b',       // Amber — matches web primary brand color
+    primaryDark: '#d97706',   // Darker amber for hover/pressed states
+    secondary: '#8b5cf6',     // Violet — matches web accent color
+    background: '#fafaf9',    // Warm off-white (web surface background)
+    surface: '#ffffff',       // Pure white cards
+    surfaceLight: '#f5f5f4',  // Slightly darker off-white (web surface-2)
+    text: '#1c1917',          // Dark charcoal (web text-1)
+    textSecondary: '#57534e', // Medium gray (web text-2)
+    success: '#10b981',       // Emerald green (web success)
+    warning: '#f59e0b',       // Amber (same as primary)
+    error: '#f43f5e',         // Rose/pink (web error)
+    border: '#e7e5e4',        // Subtle warm border (web border color)
 };

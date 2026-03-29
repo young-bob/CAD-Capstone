@@ -51,7 +51,7 @@ function AuthGuard() {
                     router.replace('/(admin)/organizations');
                     break;
                 default:
-                    router.replace('/(volunteer)/home');
+                    router.replace('/(volunteer)/dashboard');
             }
         }
     }, [token, isLoading, segments]);

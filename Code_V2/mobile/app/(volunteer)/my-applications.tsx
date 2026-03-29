@@ -7,7 +7,7 @@ import { applicationService } from '../../services/applications';
 import { opportunityService } from '../../services/opportunities';
 import { ApplicationStatus } from '../../types/enums';
 import { ApplicationSummary } from '../../types/application';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLORS: Record<string, string> = {
     [ApplicationStatus.Pending]: COLORS.warning,

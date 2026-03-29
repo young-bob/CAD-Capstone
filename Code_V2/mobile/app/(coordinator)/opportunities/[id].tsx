@@ -11,7 +11,7 @@ import { certificateService, CertificateTemplate } from '../../../services/certi
 import { OpportunityState, Shift } from '../../../types/opportunity';
 import { ApplicationSummary } from '../../../types/application';
 import { OpportunityStatus, ApplicationStatus } from '../../../types/enums';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLORS: Record<string, string> = {
     [OpportunityStatus.Draft]: COLORS.textSecondary,

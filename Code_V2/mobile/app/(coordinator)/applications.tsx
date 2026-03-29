@@ -8,7 +8,7 @@ import { opportunityService } from '../../services/opportunities';
 import { applicationService } from '../../services/applications';
 import { ApplicationStatus } from '../../types/enums';
 import { ApplicationSummary } from '../../types/application';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function ApplicationsScreen() {
     const { linkedGrainId } = useAuthStore();
