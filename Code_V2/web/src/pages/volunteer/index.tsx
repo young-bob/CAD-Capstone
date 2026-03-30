@@ -1646,7 +1646,7 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', bio: '' });
+    const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', bio: '', linkedInUrl: '' });
     const [toast, setToast] = useState('');
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -1657,7 +1657,7 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
         try {
             const p = await volunteerService.getProfile(auth.linkedGrainId);
             setProfile(p);
-            setForm({ firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, bio: p.bio });
+            setForm({ firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone, bio: p.bio, linkedInUrl: p.linkedInUrl ?? '' });
         } catch (err: any) {
             setError(getErr(err, 'Failed to load profile'));
         } finally { setLoading(false); }
@@ -1727,11 +1727,45 @@ export function VolProfile({ onNavigate }: VolProfileProps) {
                     <div><label className="block text-sm font-medium text-stone-600 mb-1">Email</label><input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
                     <div><label className="block text-sm font-medium text-stone-600 mb-1">Phone</label><input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
                 </div>
-                <button onClick={handleSave} disabled={saving} className="mt-6 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
-                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {saving ? 'Saving...' : 'Save Profile'}
-                </button>
+                <div className="mt-6">
+                    <button onClick={handleSave} disabled={saving} className="bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-bold py-3 px-8 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2 w-fit">
+                        {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {saving ? 'Saving...' : 'Save Profile'}
+                    </button>
+                </div>
             </div>
+
+            {/* LinkedIn Verification */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
+                <h3 className="text-xl font-bold text-stone-800 mb-2">LinkedIn Verification</h3>
+                <p className="text-stone-500 text-sm mb-4">Add your LinkedIn profile URL and verify your identity. Coordinators will see a verification badge on your applications.</p>
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-stone-600 mb-1">LinkedIn URL <span className="text-stone-400 font-normal">(optional)</span></label>
+                    <input value={form.linkedInUrl} onChange={e => setForm(p => ({ ...p, linkedInUrl: e.target.value }))} placeholder="https://linkedin.com/in/your-profile" type="url" className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                {profile?.linkedInVerified ? (
+                    <span className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-700 font-semibold text-sm rounded-xl border border-blue-200 w-fit">
+                        <BadgeCheck className="w-4 h-4" /> LinkedIn Verified
+                    </span>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        <a href={`/api/auth/linkedin/url-redirect`}
+                            onClick={async (e) => {
+                                e.preventDefault();
+                                try {
+                                    const res = await fetch('/api/auth/linkedin/url', { headers: { Authorization: `Bearer ${localStorage.getItem('vsms_token')}` } });
+                                    const { url } = await res.json();
+                                    window.location.href = url;
+                                } catch { setError('Failed to initiate LinkedIn verification.'); }
+                            }}
+                            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer w-fit">
+                            <ExternalLink className="w-4 h-4" /> Verify with LinkedIn
+                        </a>
+                        <p className="text-xs text-stone-400">🔒 By connecting LinkedIn, VSMS only confirms your identity. We do not store any LinkedIn data.</p>
+                    </div>
+                )}
+            </div>
+
             {/* Upload Credential */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-stone-100">
                 <h3 className="text-xl font-bold text-stone-800 mb-2">Credentials</h3>
