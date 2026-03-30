@@ -15,7 +15,7 @@ public static class VolunteerEndpoints
 
         group.MapGet("/{id:guid}/profile", async (Guid id, HttpContext http, IGrainFactory grains) =>
         {
-            if (!http.IsSystemAdmin() && !http.IsSelfByGrainId(id))
+            if (!http.IsSystemAdmin() && !http.IsCoordinator() && !http.IsSelfByGrainId(id))
                 return Results.Forbid();
             var grain = grains.GetGrain<IVolunteerGrain>(id);
             return Results.Ok(await grain.GetProfile());
@@ -26,7 +26,7 @@ public static class VolunteerEndpoints
             if (!http.IsSelfByGrainId(id))
                 return Results.Forbid();
             var grain = grains.GetGrain<IVolunteerGrain>(id);
-            await grain.UpdateProfile(req.FirstName, req.LastName, req.Email, req.Phone, req.Bio);
+            await grain.UpdateProfile(req.FirstName, req.LastName, req.Email, req.Phone, req.Bio, req.LinkedInUrl);
             return Results.NoContent();
         });
 

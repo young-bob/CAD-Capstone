@@ -25,4 +25,6 @@ public sealed class VolunteerState
     [Id(17)] public string BackgroundCheckStatus { get; set; } = "NotSubmitted";
     [Id(18)] public DateTime? WaiverSignedAt { get; set; }
     [Id(19)] public HashSet<Guid> FollowedOrgIds { get; set; } = [];
+    [Id(20)] public string? LinkedInUrl { get; set; }
+    [Id(21)] public bool LinkedInVerified { get; set; }
 }

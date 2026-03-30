@@ -8,7 +8,8 @@ public interface IVolunteerGrain : IGrainWithGuidKey
     // Profile
     [AlwaysInterleave]
     Task<States.VolunteerState> GetProfile();
-    Task UpdateProfile(string firstName, string lastName, string email, string phone, string bio);
+    Task UpdateProfile(string firstName, string lastName, string email, string phone, string bio, string? linkedInUrl = null);
+    Task SetLinkedInVerified(string linkedInUrl);
     Task UpdatePrivacySettings(bool isProfilePublic, bool allowEmail, bool allowPush);
     Task UploadCredential(string credentialUrl);
 

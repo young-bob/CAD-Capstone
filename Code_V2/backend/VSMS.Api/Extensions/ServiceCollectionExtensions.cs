@@ -13,6 +13,7 @@ using VSMS.Infrastructure.Notifications;
 using VSMS.Infrastructure.Data;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Infrastructure.Storage;
+using VSMS.Infrastructure.LinkedIn;
 
 namespace VSMS.Api.Extensions;
 
@@ -57,6 +58,16 @@ public static class ServiceCollectionExtensions
     public static WebApplicationBuilder AddApplicationServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddMemoryCache();
+
+        // LinkedIn OAuth
+        var linkedInSettings = new LinkedInSettings
+        {
+            ClientId = builder.Configuration["LinkedIn:ClientId"] ?? string.Empty,
+            ClientSecret = builder.Configuration["LinkedIn:ClientSecret"] ?? string.Empty,
+            RedirectUri = builder.Configuration["LinkedIn:RedirectUri"] ?? "http://localhost:8080/api/auth/linkedin/callback",
+        };
+        builder.Services.AddSingleton(linkedInSettings);
+        builder.Services.AddScoped<LinkedInService>();
 
         // Infrastructure
         // Infrastructure - MinIO File Storage

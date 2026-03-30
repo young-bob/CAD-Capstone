@@ -83,6 +83,10 @@ services:
       Minio__SecretKey: ${MINIO_SECRET_KEY}
       Minio__BucketName: vsms
       Minio__UseSsl: "false"
+      # ---- LinkedIn OAuth ----
+      LinkedIn__ClientId: ${LINKEDIN_CLIENT_ID}
+      LinkedIn__ClientSecret: ${LINKEDIN_CLIENT_SECRET}
+      LinkedIn__RedirectUri: ${LINKEDIN_REDIRECT_URI}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/swagger/v1/swagger.json"]
       interval: 10s
