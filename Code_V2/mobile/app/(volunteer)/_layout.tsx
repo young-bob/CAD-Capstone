@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { COLORS } from '../../constants/config';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function VolunteerLayout() {
     return (
@@ -8,11 +8,27 @@ export default function VolunteerLayout() {
             screenOptions={{
                 headerStyle: { backgroundColor: COLORS.surface },
                 headerTintColor: COLORS.text,
-                tabBarStyle: { backgroundColor: COLORS.surface, borderTopColor: COLORS.border },
+                headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+                tabBarStyle: {
+                    backgroundColor: COLORS.surface,
+                    borderTopColor: COLORS.border,
+                    borderTopWidth: 1,
+                    height: 60,
+                    paddingBottom: 8,
+                },
                 tabBarActiveTintColor: COLORS.primary,
                 tabBarInactiveTintColor: COLORS.textSecondary,
+                tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+                tabBarItemStyle: { flex: 1 },
             }}
         >
+            <Tabs.Screen
+                name="dashboard"
+                options={{
+                    title: 'Home',
+                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />,
+                }}
+            />
             <Tabs.Screen
                 name="home"
                 options={{
@@ -23,7 +39,7 @@ export default function VolunteerLayout() {
             <Tabs.Screen
                 name="my-applications"
                 options={{
-                    title: 'Applications',
+                    title: 'My Apps',
                     tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="clipboard-list" size={size} color={color} />,
                 }}
             />
@@ -41,20 +57,11 @@ export default function VolunteerLayout() {
                     tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account" size={size} color={color} />,
                 }}
             />
-            <Tabs.Screen
-                name="attendance"
-                options={{
-                    title: 'History',
-                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="history" size={size} color={color} />,
-                }}
-            />
-            <Tabs.Screen
-                name="skills"
-                options={{
-                    title: 'Skills',
-                    tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="star-circle" size={size} color={color} />,
-                }}
-            />
+            {/* Hidden screens — accessible via router.push but not shown in tab bar */}
+            <Tabs.Screen name="attendance" options={{ title: 'History', href: null }} />
+            <Tabs.Screen name="skills" options={{ title: 'Skills', href: null }} />
+            <Tabs.Screen name="organizations" options={{ title: 'Organizations', href: null }} />
+            <Tabs.Screen name="opportunity-detail" options={{ title: 'Opportunity', href: null }} />
         </Tabs>
     );
 }

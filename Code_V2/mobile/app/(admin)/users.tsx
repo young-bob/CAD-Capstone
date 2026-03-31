@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, RefreshControl, Alert, TextInput } from '
 import { Card, Text, Button, Chip, ActivityIndicator, Surface } from 'react-native-paper';
 import { COLORS } from '../../constants/config';
 import { adminService, UserRecord } from '../../services/admin';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const ROLES = ['All', 'Volunteer', 'Coordinator', 'SystemAdmin'];
 

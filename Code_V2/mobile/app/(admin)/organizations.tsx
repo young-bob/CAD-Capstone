@@ -4,7 +4,7 @@ import { Text, TextInput, Button, Card, Surface, ActivityIndicator, Chip } from 
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { adminService, OrganizationSummary, UserRecord } from '../../services/admin';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function OrganizationsScreen() {
     const { logout } = useAuthStore();

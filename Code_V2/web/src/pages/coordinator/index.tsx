@@ -18,6 +18,7 @@ import { skillService } from '../../services/skills';
 import { attendanceService } from '../../services/attendance';
 import { taskService, type EventTask } from '../../services/tasks';
 import { volunteerService } from '../../services/volunteers';
+import { aiService } from '../../services/ai';
 import { MiniCalendar } from '../../components/MiniCalendar';
 import EventCalendar from '../../components/EventCalendar';
 import ActivityFeed, { type ActivityItem } from '../../components/ActivityFeed';
@@ -665,8 +666,6 @@ function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
         setContextText(`${opp.title} is a ${opp.category || 'volunteer'} opportunity organized by ${orgName}.`);
     }, []);
 
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
-
     const fallback = () => {
         const tag = opp.category ? `#${opp.category.replace(/\s+/g,'')}` : '#volunteer';
         setTwitter(`Join us at ${orgName}! We need volunteers for "${opp.title}". Sign up today! ${tag} #volunteering`);
@@ -674,31 +673,23 @@ function SocialPostModal({ opp, orgName, onClose }: SocialPostModalProps) {
     };
 
     const generate = async () => {
-        if (!apiKey) { fallback(); return; }
         setLoading(true);
         try {
             const prompt = `Org: ${orgName}\nEvent: ${opp.title}\nCategory: ${opp.category || 'General'}\nDescription: ${contextText || opp.title}`;
-            const res = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true',
-                },
-                body: JSON.stringify({
-                    model: 'claude-haiku-4-5-20251001',
-                    max_tokens: 600,
-                    stream: false,
-                    system: `You are a social media copywriter for nonprofits. Given a volunteer opportunity, generate:
-1. Twitter/X version: ≤280 chars with 2–3 hashtags
-2. Instagram/LinkedIn version: 3–4 engaging sentences + call to action + 4–5 hashtags
-Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITTER:" and "INSTAGRAM:" labels on separate lines.`,
-                    messages: [{ role: 'user', content: prompt }],
-                }),
+            const res = await aiService.chat({
+                currentView: 'Coordinator Portal / Social Post Generator',
+                maxTokens: 700,
+                messages: [{
+                    role: 'user',
+                    content: `You are a social media copywriter for nonprofits. Given a volunteer opportunity, generate:
+1. Twitter/X version: <=280 chars with 2-3 hashtags
+2. Instagram/LinkedIn version: 3-4 engaging sentences + call to action + 4-5 hashtags
+Be enthusiastic, authentic, and volunteer-focused. Return plain text with "TWITTER:" and "INSTAGRAM:" labels on separate lines.
+
+${prompt}`
+                }]
             });
-            const data = await res.json();
-            const text: string = data?.content?.[0]?.text ?? '';
+            const text = res.reply ?? '';
             const twMatch = text.match(/TWITTER:\s*([\s\S]*?)(?=INSTAGRAM:|$)/i);
             const igMatch = text.match(/INSTAGRAM:\s*([\s\S]*)/i);
             setTwitter(twMatch ? twMatch[1].trim() : text.slice(0, 280));
@@ -2341,6 +2332,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     // Live check-in mode
     const [liveMode, setLiveMode] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [qrGeneratingFor, setQrGeneratingFor] = useState<string | null>(null);
 
     // Adjust hours
     const [showAdjust, setShowAdjust] = useState(false);
@@ -2499,6 +2491,30 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     };
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+    const doOpenShiftQr = async (app: ApplicationSummary) => {
+        setQrGeneratingFor(app.shiftId);
+        try {
+            const qr = await attendanceService.issueQrCheckInToken({
+                opportunityId: app.opportunityId,
+                shiftId: app.shiftId,
+            });
+
+            const popup = window.open(qr.qrImageUrl, '_blank', 'noopener,noreferrer');
+            if (!popup) showToast('QR generated. Pop-up blocked; please allow pop-up and retry.');
+
+            try {
+                await navigator.clipboard.writeText(qr.token);
+                showToast(`QR ready (${qr.shiftName}). Token copied for print/backup.`);
+            } catch {
+                showToast(`QR ready (${qr.shiftName}).`);
+            }
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to generate QR check-in code'));
+        } finally {
+            setQrGeneratingFor(null);
+        }
+    };
 
     const doPublish = async () => {
         setActionId('pub');
@@ -3014,6 +3030,14 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                                         )}
                                     </div>
                                     <div className="flex flex-wrap gap-2 justify-end shrink-0">
+                                        <button
+                                            onClick={() => doOpenShiftQr(app)}
+                                            disabled={qrGeneratingFor === app.shiftId}
+                                            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-sm hover:bg-indigo-100 disabled:opacity-50 flex items-center gap-1"
+                                            title="Generate on-site QR check-in code for this shift">
+                                            {qrGeneratingFor === app.shiftId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                            QR Code
+                                        </button>
                                         {!rec && (
                                             <button onClick={() => doInitAndCheckIn(app)} disabled={actionId === app.volunteerId + '_init'} className="px-3 py-1.5 bg-blue-500 text-white font-bold rounded-lg text-sm hover:bg-blue-600 disabled:opacity-50 flex items-center gap-1">
                                                 {actionId === app.volunteerId + '_init' ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Check In

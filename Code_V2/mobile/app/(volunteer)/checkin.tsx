@@ -1,18 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Dimensions } from 'react-native';
-import { Button, Text, Surface, Card, ActivityIndicator, Portal, Modal, TextInput, Chip } from 'react-native-paper';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Button, Text, Surface, Card, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ExpoLocation from 'expo-location';
+import { WebView } from 'react-native-webview';
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { volunteerService } from '../../services/volunteers';
 import { applicationService } from '../../services/applications';
 import { attendanceService } from '../../services/attendance';
 import { opportunityService } from '../../services/opportunities';
-import { fileService } from '../../services/files';
 import { ApplicationStatus } from '../../types/enums';
 import { GeoFenceSettings } from '../../types/opportunity';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface ActiveApp {
     id: string;
@@ -27,14 +27,22 @@ export default function CheckInScreen() {
     const [activeApps, setActiveApps] = useState<ActiveApp[]>([]);
     const [selectedApp, setSelectedApp] = useState<ActiveApp | null>(null);
     const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
-    const [photo, setPhoto] = useState<string | null>(null);
+    const [locationLoading, setLocationLoading] = useState(true);
     const [checkedIn, setCheckedIn] = useState(false);
     const [attendanceId, setAttendanceId] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Geofence of selected opportunity
+    // Geofence
     const [geoFence, setGeoFence] = useState<GeoFenceSettings | null>(null);
     const [geoFenceLoading, setGeoFenceLoading] = useState(false);
+
+    // QR scanner
+    const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+    const [qrScanning, setQrScanning] = useState(false);
+    const scannedRef = useRef(false);
+
+    // Leaflet map WebView ref
+    const mapRef = useRef<WebView>(null);
 
     // Feedback state
     const [showFeedback, setShowFeedback] = useState(false);
@@ -46,7 +54,23 @@ export default function CheckInScreen() {
     const [disputeReason, setDisputeReason] = useState('');
     const [disputeEvidence, setDisputeEvidence] = useState('');
 
-    // Fetch approved applications
+    // Auto-watch user location
+    useEffect(() => {
+        let subscription: ExpoLocation.LocationSubscription | null = null;
+        (async () => {
+            const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+            if (status !== 'granted') { setLocationLoading(false); return; }
+            subscription = await ExpoLocation.watchPositionAsync(
+                { accuracy: ExpoLocation.Accuracy.High, distanceInterval: 5 },
+                (loc) => {
+                    setLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+                    setLocationLoading(false);
+                }
+            );
+        })();
+        return () => { subscription?.remove(); };
+    }, []);
+
     const fetchApps = useCallback(async () => {
         try {
             if (!linkedGrainId) return;
@@ -67,7 +91,31 @@ export default function CheckInScreen() {
 
     useEffect(() => { fetchApps(); }, [fetchApps]);
 
-    // When user selects an event, fetch its geofence
+    // Inject user position into map whenever location updates
+    useEffect(() => {
+        if (!location) return;
+        mapRef.current?.injectJavaScript(
+            `updateUser(${location.lat}, ${location.lon}); true;`
+        );
+    }, [location]);
+
+    // Inject geofence into map when a shift is selected
+    useEffect(() => {
+        if (geoFence) {
+            mapRef.current?.injectJavaScript(
+                `updateFence(${geoFence.latitude}, ${geoFence.longitude}, ${geoFence.radiusMeters}); true;`
+            );
+        } else {
+            mapRef.current?.injectJavaScript(`clearFence(); true;`);
+            // Re-center on user if we have location
+            if (location) {
+                mapRef.current?.injectJavaScript(
+                    `centerOn(${location.lat}, ${location.lon}, 15); true;`
+                );
+            }
+        }
+    }, [geoFence]);
+
     const handleSelectApp = async (app: ActiveApp) => {
         setSelectedApp(app);
         setGeoFence(null);
@@ -80,41 +128,10 @@ export default function CheckInScreen() {
         }
     };
 
-    const handleGetLocation = async () => {
-        try {
-            const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Location permission is required for check-in.');
-                return;
-            }
-            const loc = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
-            setLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
-        } catch {
-            Alert.alert('Error', 'Failed to get location.');
-        }
-    };
-
-    const handleTakePhoto = async () => {
-        try {
-            const { launchCameraAsync, requestCameraPermissionsAsync } = await import('expo-image-picker');
-            const { status } = await requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Camera permission is required.');
-                return;
-            }
-            const result = await launchCameraAsync({ quality: 0.5 });
-            if (!result.canceled) {
-                setPhoto(result.assets[0].uri);
-            }
-        } catch {
-            Alert.alert('Error', 'Failed to take photo.');
-        }
-    };
-
-    // Check if user is inside geofence (client-side preview)
+    // Haversine distance check
     const isInsideGeoFence = (): boolean | null => {
-        if (!geoFence || !location) return null; // no fence or no location yet
-        const R = 6371000; // Earth radius in metres
+        if (!geoFence || !location) return null;
+        const R = 6371000;
         const dLat = ((geoFence.latitude - location.lat) * Math.PI) / 180;
         const dLon = ((geoFence.longitude - location.lon) * Math.PI) / 180;
         const a =
@@ -128,19 +145,16 @@ export default function CheckInScreen() {
 
     const handleCheckIn = async () => {
         if (!location || !selectedApp || !linkedGrainId) {
-            Alert.alert('Missing', 'Select an event and get your location first.');
+            Alert.alert('Missing', 'Select an event first.');
             return;
         }
         setActionLoading(true);
         try {
-            // Step 0: Validate geo-fence location
             const isInRange = await opportunityService.validateGeo(selectedApp.oppId, location.lat, location.lon);
             if (!isInRange) {
-                Alert.alert('Out of Range', 'You are not within the allowed area for this event. Please move closer to the venue and try again.');
+                Alert.alert('Out of Range', 'You are not within the allowed area. Move closer to the venue and try again.');
                 return;
             }
-
-            // Step 1: Initialize attendance record
             const newAttendanceId = crypto.randomUUID?.() || `${Date.now()}`;
             await attendanceService.init(newAttendanceId, {
                 volunteerId: linkedGrainId,
@@ -148,31 +162,88 @@ export default function CheckInScreen() {
                 opportunityId: selectedApp.oppId,
             });
 
-            // Step 1.5: Upload proof photo
-            let proofPhotoUrl = '';
-            if (photo) {
-                try {
-                    proofPhotoUrl = await fileService.upload(photo, `checkin_${Date.now()}.jpg`, 'proof-photos');
-                } catch {
-                    proofPhotoUrl = '';
-                }
-            }
-
-            // Step 2: Check in
-            await attendanceService.checkIn(newAttendanceId, {
-                lat: location.lat,
-                lon: location.lon,
-                proofPhotoUrl,
-            });
-
+            await attendanceService.checkIn(newAttendanceId, { lat: location.lat, lon: location.lon, proofPhotoUrl: '' });
             setAttendanceId(newAttendanceId);
             setCheckedIn(true);
-            Alert.alert('Success', 'You have checked in!');
+            Alert.alert('Checked In!', 'You have successfully checked in.');
         } catch (err: any) {
             Alert.alert('Error', err.response?.data?.toString() || 'Check-in failed');
         } finally {
             setActionLoading(false);
         }
+    };
+
+    // QR Check-In: parse vsms://shift/<opportunityId>/<shiftId>
+    const handleBarcodeScanned = async ({ data }: { data: string }) => {
+        if (scannedRef.current || !linkedGrainId) return;
+        scannedRef.current = true;
+        setQrScanning(false);
+
+        try {
+            const prefix = 'vsms://shift/';
+            if (!data.startsWith(prefix)) {
+                Alert.alert('Invalid QR Code', 'This is not a valid shift check-in code.', [
+                    { text: 'Scan Again', onPress: () => { scannedRef.current = false; setQrScanning(true); } },
+                    { text: 'Cancel' },
+                ]);
+                return;
+            }
+            const parts = data.slice(prefix.length).split('/');
+            if (parts.length < 2) {
+                Alert.alert('Invalid QR Code', 'QR code format is invalid.', [
+                    { text: 'Scan Again', onPress: () => { scannedRef.current = false; setQrScanning(true); } },
+                    { text: 'Cancel' },
+                ]);
+                return;
+            }
+            const [opportunityId, shiftId] = parts;
+            const apps = await applicationService.getForVolunteer(linkedGrainId);
+            const match = apps.find(
+                a => a.opportunityId === opportunityId && a.shiftId === shiftId &&
+                    (a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
+            );
+            if (!match) {
+                Alert.alert('No Match', "You don't have an approved application for this shift.", [
+                    { text: 'OK', onPress: () => { scannedRef.current = false; } },
+                ]);
+                return;
+            }
+
+            setActionLoading(true);
+            const newAttendanceId = crypto.randomUUID?.() || `${Date.now()}`;
+            await attendanceService.init(newAttendanceId, {
+                volunteerId: linkedGrainId,
+                applicationId: match.applicationId,
+                opportunityId: match.opportunityId,
+            });
+            await attendanceService.checkIn(newAttendanceId, { lat: 0, lon: 0, proofPhotoUrl: '' });
+            setAttendanceId(newAttendanceId);
+            setSelectedApp({
+                id: match.applicationId,
+                oppId: match.opportunityId,
+                oppTitle: `${match.opportunityTitle} (${match.shiftName})`,
+                shiftId: match.shiftId,
+            });
+            setCheckedIn(true);
+            Alert.alert('Checked In!', `Successfully checked in to "${match.opportunityTitle}".`);
+        } catch (err: any) {
+            Alert.alert('Check-In Failed', err.response?.data?.toString() || 'An error occurred.');
+            scannedRef.current = false;
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleOpenQrScanner = async () => {
+        if (!cameraPermission?.granted) {
+            const result = await requestCameraPermission();
+            if (!result.granted) {
+                Alert.alert('Permission Denied', 'Camera access is required to scan QR codes.');
+                return;
+            }
+        }
+        scannedRef.current = false;
+        setQrScanning(true);
     };
 
     const handleCheckOut = async () => {
@@ -201,7 +272,7 @@ export default function CheckInScreen() {
                 comment: feedbackComment,
             });
             Alert.alert('Thank You', 'Feedback submitted!');
-        } catch (err: any) {
+        } catch {
             Alert.alert('Note', 'Feedback could not be submitted');
         } finally {
             setShowFeedback(false);
@@ -214,10 +285,7 @@ export default function CheckInScreen() {
         if (!attendanceId || !disputeReason) return;
         setActionLoading(true);
         try {
-            await attendanceService.dispute(attendanceId, {
-                reason: disputeReason,
-                evidenceUrl: disputeEvidence,
-            });
+            await attendanceService.dispute(attendanceId, { reason: disputeReason, evidenceUrl: disputeEvidence });
             Alert.alert('Submitted', 'Your dispute has been submitted for admin review.');
             setShowDispute(false);
             setDisputeReason('');
@@ -231,14 +299,39 @@ export default function CheckInScreen() {
 
     const resetState = () => {
         setCheckedIn(false);
-        setLocation(null);
-        setPhoto(null);
         setAttendanceId(null);
         setSelectedApp(null);
         setGeoFence(null);
         setFeedbackRating('5');
         setFeedbackComment('');
+        scannedRef.current = false;
     };
+
+    // QR scanner fullscreen
+    if (qrScanning) {
+        return (
+            <View style={styles.scannerContainer}>
+                <CameraView
+                    style={styles.scanner}
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={handleBarcodeScanned}
+                />
+                <View style={styles.scannerOverlay}>
+                    <View style={styles.scannerFrame} />
+                    <Text style={styles.scannerHint}>Point at the shift QR code</Text>
+                    <Button
+                        mode="contained"
+                        onPress={() => { setQrScanning(false); scannedRef.current = false; }}
+                        buttonColor="rgba(0,0,0,0.6)"
+                        style={styles.cancelScanBtn}
+                    >
+                        Cancel
+                    </Button>
+                </View>
+            </View>
+        );
+    }
 
     if (loading) {
         return (
@@ -250,36 +343,139 @@ export default function CheckInScreen() {
 
     const insideFence = isInsideGeoFence();
 
-    // Determine map region
-    const mapRegion = location
-        ? { latitude: location.lat, longitude: location.lon, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-        : geoFence
-            ? { latitude: geoFence.latitude, longitude: geoFence.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }
-            : { latitude: 43.6532, longitude: -79.3832, latitudeDelta: 0.05, longitudeDelta: 0.05 };
+    const leafletHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { height: 100%; width: 100%; background: #f5f5f4; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: true, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    map.setView([43.6532, -79.3832], 13);
+
+    var userMarker = null, userCircle = null, fenceMarker = null, fenceCircle = null;
+
+    var userIcon = L.divIcon({
+      className: '',
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+
+    function updateUser(lat, lon) {
+      if (userMarker) map.removeLayer(userMarker);
+      if (userCircle) map.removeLayer(userCircle);
+      userMarker = L.marker([lat, lon], { icon: userIcon }).addTo(map);
+      userCircle = L.circle([lat, lon], { radius: 15, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.3, weight: 2 }).addTo(map);
+      if (!fenceMarker) map.setView([lat, lon], 16);
+    }
+
+    function updateFence(lat, lon, radius) {
+      if (fenceMarker) map.removeLayer(fenceMarker);
+      if (fenceCircle) map.removeLayer(fenceCircle);
+      fenceMarker = L.marker([lat, lon]).addTo(map);
+      fenceCircle = L.circle([lat, lon], { radius: radius, color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 2 }).addTo(map);
+      map.setView([lat, lon], 16);
+    }
+
+    function clearFence() {
+      if (fenceMarker) { map.removeLayer(fenceMarker); fenceMarker = null; }
+      if (fenceCircle) { map.removeLayer(fenceCircle); fenceCircle = null; }
+    }
+
+    function centerOn(lat, lon, zoom) { map.setView([lat, lon], zoom || 16); }
+  </script>
+</body>
+</html>`;
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <Surface style={styles.card} elevation={2}>
-                <MaterialCommunityIcons name="map-marker-check" size={64} color={COLORS.primary} style={styles.icon} />
-                <Text variant="headlineSmall" style={styles.title}>
-                    {checkedIn ? 'You are Checked In' : 'Check In to Event'}
-                </Text>
+            {/* ── Leaflet Map ── */}
+            <Surface style={styles.mapSurface} elevation={1}>
+                <View style={styles.mapHeader}>
+                    <MaterialCommunityIcons name="crosshairs-gps" size={18} color={COLORS.primary} />
+                    <Text style={styles.mapHeaderTitle}>Live Location</Text>
+                    {locationLoading && <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 6 }} />}
+                    {!locationLoading && !location && (
+                        <View style={styles.gpsErrorBadge}>
+                            <MaterialCommunityIcons name="map-marker-off" size={14} color={COLORS.error} />
+                            <Text style={styles.gpsErrorText}>GPS unavailable</Text>
+                        </View>
+                    )}
+                </View>
 
+                <WebView
+                    ref={mapRef}
+                    source={{ html: leafletHtml }}
+                    style={styles.mapWebView}
+                    originWhitelist={['*']}
+                    scrollEnabled={false}
+                    javaScriptEnabled
+                    domStorageEnabled
+                />
+
+                {/* Geofence status strip */}
+                {selectedApp && !geoFenceLoading && (
+                    <View style={[
+                        styles.fenceStatusRow,
+                        { backgroundColor: insideFence === null
+                            ? COLORS.surfaceLight
+                            : insideFence ? COLORS.success + '18' : COLORS.error + '18' }
+                    ]}>
+                        <MaterialCommunityIcons
+                            name={insideFence === null ? 'map-marker-radius' : insideFence ? 'check-circle' : 'close-circle-outline'}
+                            size={16}
+                            color={insideFence === null ? COLORS.textSecondary : insideFence ? COLORS.success : COLORS.error}
+                        />
+                        <Text style={[styles.fenceStatusText, {
+                            color: insideFence === null ? COLORS.textSecondary : insideFence ? COLORS.success : COLORS.error,
+                            marginLeft: 8, flex: 1,
+                        }]}>
+                            {insideFence === null
+                                ? geoFence ? `Geofence: ${geoFence.radiusMeters}m radius` : 'No geofence — any location accepted'
+                                : insideFence
+                                    ? 'Inside geofence — ready to check in'
+                                    : 'Outside geofence — move closer to the venue'}
+                        </Text>
+                        {geoFenceLoading && <ActivityIndicator size="small" color={COLORS.primary} />}
+                    </View>
+                )}
+            </Surface>
+
+            {/* ── Check-In Card ── */}
+            <Surface style={styles.card} elevation={1}>
                 {!checkedIn ? (
                     <>
+                        <View style={styles.cardHeader}>
+                            <MaterialCommunityIcons name="map-marker-check" size={22} color={COLORS.primary} />
+                            <Text variant="titleMedium" style={styles.cardTitle}>Check In to Event</Text>
+                        </View>
+
                         {/* Step 1: Select Event */}
-                        <Text variant="titleSmall" style={styles.stepTitle}>1. Select Event</Text>
+                        <Text style={styles.stepTitle}>Select Event</Text>
                         {activeApps.length === 0 ? (
                             <Text style={styles.hint}>No approved applications. Get approved for an event first.</Text>
                         ) : (
                             activeApps.map((app) => (
-                                <Card key={app.id} mode="outlined"
+                                <Card
+                                    key={app.id}
+                                    mode="outlined"
                                     style={[styles.appCard, selectedApp?.id === app.id && styles.selectedCard]}
-                                    onPress={() => handleSelectApp(app)}>
+                                    onPress={() => handleSelectApp(app)}
+                                >
                                     <Card.Content style={styles.appRow}>
                                         <MaterialCommunityIcons
                                             name={selectedApp?.id === app.id ? 'radiobox-marked' : 'radiobox-blank'}
-                                            size={20} color={selectedApp?.id === app.id ? COLORS.primary : COLORS.textSecondary}
+                                            size={20}
+                                            color={selectedApp?.id === app.id ? COLORS.primary : COLORS.textSecondary}
                                         />
                                         <Text style={styles.appText}>{app.oppTitle}</Text>
                                     </Card.Content>
@@ -287,123 +483,67 @@ export default function CheckInScreen() {
                             ))
                         )}
 
-                        {/* Step 2: Location + Map */}
-                        <Text variant="titleSmall" style={styles.stepTitle}>2. Your Location</Text>
+                        {/* Action buttons */}
+                        <Button
+                            mode="contained"
+                            onPress={handleCheckIn}
+                            buttonColor={COLORS.primary}
+                            style={styles.mainButton}
+                            disabled={!location || !selectedApp || actionLoading || geoFenceLoading || (geoFence !== null && insideFence !== true)}
+                            loading={actionLoading}
+                            icon="map-marker-check"
+                        >
+                            GPS Check In
+                        </Button>
 
-                        {selectedApp && (
-                            <View style={styles.mapContainer}>
-                                <MapView
-                                    style={styles.map}
-                                    region={mapRegion}
-                                    showsUserLocation={false}
-                                >
-                                    {/* Geofence circle */}
-                                    {geoFence && (
-                                        <>
-                                            <Marker
-                                                coordinate={{ latitude: geoFence.latitude, longitude: geoFence.longitude }}
-                                                pinColor="blue"
-                                                title="Event Location"
-                                                description={`Allowed radius: ${geoFence.radiusMeters}m`}
-                                            />
-                                            <Circle
-                                                center={{ latitude: geoFence.latitude, longitude: geoFence.longitude }}
-                                                radius={geoFence.radiusMeters}
-                                                fillColor="rgba(59,130,246,0.12)"
-                                                strokeColor="rgba(59,130,246,0.5)"
-                                                strokeWidth={2}
-                                            />
-                                        </>
-                                    )}
-
-                                    {/* User's current location marker */}
-                                    {location && (
-                                        <Marker
-                                            coordinate={{ latitude: location.lat, longitude: location.lon }}
-                                            title="You are here"
-                                        >
-                                            <View style={styles.userMarker}>
-                                                <MaterialCommunityIcons name="account" size={18} color="#fff" />
-                                            </View>
-                                        </Marker>
-                                    )}
-                                </MapView>
-
-                                {/* Status banner on top of map */}
-                                {location && geoFence && (
-                                    <View style={[
-                                        styles.mapBadge,
-                                        { backgroundColor: insideFence ? COLORS.success + 'E0' : COLORS.error + 'E0' }
-                                    ]}>
-                                        <MaterialCommunityIcons
-                                            name={insideFence ? 'check-circle' : 'close-circle'}
-                                            size={16} color="#fff"
-                                        />
-                                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12, marginLeft: 6 }}>
-                                            {insideFence ? 'Inside geofence ✓' : 'Outside geofence ✗'}
-                                        </Text>
-                                    </View>
-                                )}
-
-                                {!geoFence && !geoFenceLoading && (
-                                    <View style={[styles.mapBadge, { backgroundColor: COLORS.textSecondary + 'D0' }]}>
-                                        <Text style={{ color: '#fff', fontSize: 11 }}>No geofence set — any location OK</Text>
-                                    </View>
-                                )}
-                            </View>
-                        )}
-
-                        <View style={styles.step}>
-                            <View style={styles.stepRow}>
-                                <MaterialCommunityIcons
-                                    name={location ? 'check-circle' : 'crosshairs-gps'} size={24}
-                                    color={location ? COLORS.success : COLORS.textSecondary}
-                                />
-                                <Text style={styles.stepText}>
-                                    {location ? `📍 ${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}` : 'Tap to get your location'}
-                                </Text>
-                            </View>
-                            <Button mode={location ? 'text' : 'contained'}
-                                onPress={handleGetLocation}
-                                buttonColor={location ? undefined : COLORS.primary}
-                                textColor={location ? COLORS.primary : '#fff'}
-                                icon={location ? 'refresh' : 'crosshairs-gps'}>
-                                {location ? 'Refresh Location' : 'Get My Location'}
-                            </Button>
+                        <View style={styles.dividerRow}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>or</Text>
+                            <View style={styles.dividerLine} />
                         </View>
 
-                        {/* Step 3: Photo */}
-                        <Text variant="titleSmall" style={styles.stepTitle}>3. Proof Photo (optional)</Text>
-                        <View style={styles.step}>
-                            <View style={styles.stepRow}>
-                                <MaterialCommunityIcons
-                                    name={photo ? 'check-circle' : 'camera'} size={24}
-                                    color={photo ? COLORS.success : COLORS.textSecondary}
-                                />
-                                <Text style={styles.stepText}>
-                                    {photo ? 'Photo captured ✓' : 'Take proof photo'}
-                                </Text>
-                            </View>
-                            <Button mode="outlined" onPress={handleTakePhoto} textColor={COLORS.primary}>
-                                {photo ? 'Retake' : 'Take Photo'}
-                            </Button>
-                        </View>
-
-                        <Button mode="contained" onPress={handleCheckIn} buttonColor={COLORS.success}
-                            style={styles.mainButton} disabled={!location || !selectedApp || actionLoading}
-                            loading={actionLoading}>
-                            Check In
+                        <Button
+                            mode="outlined"
+                            onPress={handleOpenQrScanner}
+                            textColor={COLORS.secondary}
+                            style={[styles.mainButton, { borderColor: COLORS.secondary }]}
+                            icon="qrcode-scan"
+                            loading={actionLoading}
+                            disabled={actionLoading}
+                        >
+                            Scan QR Code
                         </Button>
                     </>
                 ) : (
                     <>
-                        <Text style={styles.hint}>Event: {selectedApp?.oppTitle}</Text>
-                        <Button mode="contained" onPress={handleCheckOut} buttonColor={COLORS.secondary}
-                            style={styles.mainButton} loading={actionLoading} disabled={actionLoading}>
+                        <View style={styles.cardHeader}>
+                            <MaterialCommunityIcons name="check-decagram" size={22} color={COLORS.success} />
+                            <Text variant="titleMedium" style={[styles.cardTitle, { color: COLORS.success }]}>
+                                Checked In
+                            </Text>
+                        </View>
+                        <View style={styles.checkedInBadge}>
+                            <MaterialCommunityIcons name="calendar-check" size={16} color={COLORS.textSecondary} />
+                            <Text style={styles.checkedInText} numberOfLines={2}>{selectedApp?.oppTitle}</Text>
+                        </View>
+                        <Button
+                            mode="contained"
+                            onPress={handleCheckOut}
+                            buttonColor={COLORS.secondary}
+                            style={styles.mainButton}
+                            loading={actionLoading}
+                            disabled={actionLoading}
+                            icon="logout"
+                        >
                             Check Out
                         </Button>
-                        <Button mode="outlined" onPress={() => setShowDispute(true)} textColor={COLORS.warning}
-                            style={{ marginTop: 12 }} icon="alert">
+                        <Button
+                            mode="outlined"
+                            onPress={() => setShowDispute(true)}
+                            textColor={COLORS.warning}
+                            style={[styles.mainButton, { borderColor: COLORS.warning + '60', marginTop: 8 }]}
+                            icon="alert-circle-outline"
+                        >
                             Raise Dispute
                         </Button>
                     </>
@@ -412,9 +552,12 @@ export default function CheckInScreen() {
 
             {/* Feedback Modal */}
             <Portal>
-                <Modal visible={showFeedback} onDismiss={() => { setShowFeedback(false); resetState(); }}
-                    contentContainerStyle={styles.modal}>
-                    <Text variant="titleLarge" style={{ color: COLORS.text, marginBottom: 16 }}>Leave Feedback</Text>
+                <Modal
+                    visible={showFeedback}
+                    onDismiss={() => { setShowFeedback(false); resetState(); }}
+                    contentContainerStyle={styles.modal}
+                >
+                    <Text variant="titleLarge" style={styles.modalTitle}>Leave Feedback</Text>
                     <Text style={styles.hint}>How was your experience at "{selectedApp?.oppTitle}"?</Text>
                     <TextInput label="Rating (1-5)" value={feedbackRating} onChangeText={setFeedbackRating}
                         mode="outlined" keyboardType="numeric" style={styles.input}
@@ -423,16 +566,21 @@ export default function CheckInScreen() {
                         mode="outlined" multiline style={styles.input}
                         outlineColor={COLORS.border} activeOutlineColor={COLORS.primary} textColor={COLORS.text} />
                     <Button mode="contained" onPress={handleSubmitFeedback} loading={actionLoading}
-                        buttonColor={COLORS.primary} style={{ marginTop: 8 }}>Submit Feedback</Button>
+                        buttonColor={COLORS.primary} style={{ marginTop: 8 }}>
+                        Submit Feedback
+                    </Button>
                 </Modal>
             </Portal>
 
             {/* Dispute Modal */}
             <Portal>
-                <Modal visible={showDispute} onDismiss={() => setShowDispute(false)}
-                    contentContainerStyle={styles.modal}>
-                    <Text variant="titleLarge" style={{ color: COLORS.text, marginBottom: 16 }}>Raise Dispute</Text>
-                    <Text style={styles.hint}>If your attendance record is incorrect, describe the issue below.</Text>
+                <Modal
+                    visible={showDispute}
+                    onDismiss={() => setShowDispute(false)}
+                    contentContainerStyle={styles.modal}
+                >
+                    <Text variant="titleLarge" style={styles.modalTitle}>Raise Dispute</Text>
+                    <Text style={styles.hint}>Describe the issue with your attendance record.</Text>
                     <TextInput label="Reason" value={disputeReason} onChangeText={setDisputeReason}
                         mode="outlined" multiline style={styles.input}
                         outlineColor={COLORS.border} activeOutlineColor={COLORS.primary} textColor={COLORS.text} />
@@ -441,7 +589,9 @@ export default function CheckInScreen() {
                         outlineColor={COLORS.border} activeOutlineColor={COLORS.primary} textColor={COLORS.text} />
                     <Button mode="contained" onPress={handleRaiseDispute} loading={actionLoading}
                         disabled={!disputeReason || actionLoading}
-                        buttonColor={COLORS.warning} style={{ marginTop: 8 }}>Submit Dispute</Button>
+                        buttonColor={COLORS.warning} style={{ marginTop: 8 }}>
+                        Submit Dispute
+                    </Button>
                 </Modal>
             </Portal>
         </ScrollView>
@@ -450,37 +600,65 @@ export default function CheckInScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    content: { padding: 16 },
-    card: { padding: 24, borderRadius: 16, backgroundColor: COLORS.surface },
-    icon: { textAlign: 'center', marginBottom: 16 },
-    title: { textAlign: 'center', color: COLORS.text, marginBottom: 16 },
-    stepTitle: { color: COLORS.primary, marginTop: 16, marginBottom: 8 },
-    hint: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 12 },
-    appCard: { marginBottom: 8, backgroundColor: COLORS.surfaceLight, borderColor: COLORS.border },
+    content: { paddingBottom: 32 },
+
+    // Map
+    mapSurface: {
+        margin: 16, marginBottom: 0, borderRadius: 16, overflow: 'hidden',
+        backgroundColor: COLORS.surface,
+    },
+    mapHeader: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8,
+    },
+    mapHeaderTitle: { color: COLORS.text, fontWeight: '700', fontSize: 14, flex: 1 },
+    mapWebView: { height: 220, width: '100%' },
+    gpsErrorBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    gpsErrorText: { color: COLORS.error, fontSize: 12 },
+    fenceStatusRow: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 14, paddingVertical: 10,
+    },
+    fenceStatusText: { fontSize: 12, fontWeight: '600' },
+
+    // Card
+    card: { margin: 16, padding: 20, borderRadius: 16, backgroundColor: COLORS.surface },
+    cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    cardTitle: { color: COLORS.text, fontWeight: '700' },
+
+    stepTitle: { color: COLORS.primary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    hint: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 12, lineHeight: 18 },
+
+    appCard: { marginBottom: 8, backgroundColor: COLORS.surfaceLight, borderColor: COLORS.border, borderRadius: 10 },
     selectedCard: { borderColor: COLORS.primary, borderWidth: 2 },
     appRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    appText: { color: COLORS.text, flex: 1 },
-    step: { marginBottom: 12, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight },
-    stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-    stepText: { color: COLORS.text, flex: 1 },
-    mainButton: { marginTop: 16, paddingVertical: 4, borderRadius: 8 },
+    appText: { color: COLORS.text, flex: 1, fontSize: 13 },
+
+    mainButton: { marginTop: 12, borderRadius: 10 },
+
+    dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
+    dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+    dividerText: { color: COLORS.textSecondary, fontSize: 12 },
+
+    checkedInBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: COLORS.success + '12',
+        borderRadius: 10, padding: 12, marginBottom: 8,
+    },
+    checkedInText: { color: COLORS.text, fontSize: 13, fontWeight: '500', flex: 1 },
+
     modal: { backgroundColor: COLORS.surface, padding: 24, margin: 20, borderRadius: 16 },
+    modalTitle: { color: COLORS.text, fontWeight: '700', marginBottom: 12 },
     input: { marginBottom: 12, backgroundColor: COLORS.surfaceLight },
-    mapContainer: {
-        height: 220, borderRadius: 12, overflow: 'hidden',
-        marginBottom: 12, borderWidth: 1, borderColor: COLORS.border,
+
+    // QR scanner
+    scannerContainer: { flex: 1, backgroundColor: '#000' },
+    scanner: { flex: 1 },
+    scannerOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+    scannerFrame: { width: 220, height: 220, borderRadius: 16, borderWidth: 3, borderColor: '#fff', backgroundColor: 'transparent' },
+    scannerHint: {
+        color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 20, textAlign: 'center',
+        textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
     },
-    map: { flex: 1 },
-    userMarker: {
-        width: 32, height: 32, borderRadius: 16,
-        backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
-        borderWidth: 3, borderColor: '#fff',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3,
-    },
-    mapBadge: {
-        position: 'absolute', top: 8, left: 8, right: 8,
-        flexDirection: 'row', alignItems: 'center',
-        paddingHorizontal: 12, paddingVertical: 6,
-        borderRadius: 20,
-    },
+    cancelScanBtn: { marginTop: 28, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.6)' },
 });

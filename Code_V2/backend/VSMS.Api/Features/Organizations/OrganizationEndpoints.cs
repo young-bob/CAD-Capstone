@@ -242,14 +242,14 @@ public static class OrganizationEndpoints
         {
             if (!await http.CanManageOrganizationAsync(db, id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
+            return Results.Ok(await queryService.GetByOrganizationAsync(id, null, skip ?? 0, take ?? 500));
         });
 
         group.MapGet("/{id:guid}/applications", async (Guid id, int? skip, int? take, HttpContext http, AppDbContext db, IApplicationQueryService queryService) =>
         {
             if (!await http.CanManageOrganizationAsync(db, id))
                 return Results.Forbid();
-            return Results.Ok(await queryService.GetByOrganizationAsync(id, skip ?? 0, take ?? 500));
+            return Results.Ok(await queryService.GetByOrganizationAsync(id, null, skip ?? 0, take ?? 500));
         });
 
         group.MapGet("/{id:guid}/volunteers", async (Guid id, HttpContext http, AppDbContext db, IGrainFactory grains) =>

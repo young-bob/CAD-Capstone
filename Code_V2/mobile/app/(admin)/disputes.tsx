@@ -4,7 +4,7 @@ import { Text, TextInput, Button, Card, Surface, ActivityIndicator, Divider } fr
 import { COLORS } from '../../constants/config';
 import { adminService } from '../../services/admin';
 import { attendanceService, DisputeSummary } from '../../services/attendance';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function DisputesScreen() {
     const [disputes, setDisputes] = useState<DisputeSummary[]>([]);
@@ -196,7 +196,7 @@ function ManualAdjustSection() {
             <Card.Content>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text variant="titleMedium" style={styles.sectionTitle}>Manual Attendance Override</Text>
-                    <Button icon="close" mode="text" compact onPress={() => setExpanded(false)} textColor={COLORS.textSecondary} />
+                    <Button icon="close" mode="text" compact onPress={() => setExpanded(false)} textColor={COLORS.textSecondary}>Close</Button>
                 </View>
                 <Text style={styles.hint}>
                     Developer/Emergency tool to manually adjust any check-in/check-out time bypassing the normal dispute process.

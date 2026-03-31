@@ -14,20 +14,20 @@ public interface IOrganizationQueryService
 public interface IOpportunityQueryService
 {
     Task<List<OpportunitySummary>> SearchPublishedAsync(string? query = null, string? category = null, int skip = 0, int take = 500);
-    Task<List<OpportunitySummary>> GetByOrganizationAsync(Guid organizationId, int skip = 0, int take = 500);
+    Task<List<OpportunitySummary>> GetByOrganizationAsync(Guid organizationId, OpportunityStatus? status = null, int skip = 0, int take = 500);
     Task<List<OpportunitySummary>> GetByIdsAsync(IEnumerable<Guid> opportunityIds);
 }
 
 public interface IApplicationQueryService
 {
-    Task<List<ApplicationSummary>> GetByOpportunityAsync(Guid opportunityId, int skip = 0, int take = 500);
-    Task<List<ApplicationSummary>> GetByVolunteerAsync(Guid volunteerId, int skip = 0, int take = 500);
-    Task<List<ApplicationSummary>> GetByOrganizationAsync(Guid organizationId, int skip = 0, int take = 500);
+    Task<List<ApplicationSummary>> GetByOpportunityAsync(Guid opportunityId, ApplicationStatus? status = null, int skip = 0, int take = 500);
+    Task<List<ApplicationSummary>> GetByVolunteerAsync(Guid volunteerId, ApplicationStatus? status = null, int skip = 0, int take = 500);
+    Task<List<ApplicationSummary>> GetByOrganizationAsync(Guid organizationId, ApplicationStatus? status = null, int skip = 0, int take = 500);
 }
 
 public interface IAttendanceQueryService
 {
-    Task<List<AttendanceSummary>> GetByOpportunityAsync(Guid opportunityId, int skip = 0, int take = 500);
-    Task<List<AttendanceSummary>> GetByVolunteerAsync(Guid volunteerId, int skip = 0, int take = 500);
+    Task<List<AttendanceSummary>> GetByOpportunityAsync(Guid opportunityId, AttendanceStatus? status = null, int skip = 0, int take = 500);
+    Task<List<AttendanceSummary>> GetByVolunteerAsync(Guid volunteerId, AttendanceStatus? status = null, int skip = 0, int take = 500);
     Task<List<DisputeSummary>> GetPendingDisputesAsync(int skip = 0, int take = 500);
 }

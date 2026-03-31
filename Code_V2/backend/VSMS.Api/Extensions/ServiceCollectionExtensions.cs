@@ -14,6 +14,7 @@ using VSMS.Infrastructure.Data;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Infrastructure.Storage;
 using VSMS.Infrastructure.LinkedIn;
+using VSMS.Infrastructure.Ai;
 
 namespace VSMS.Api.Extensions;
 
@@ -93,6 +94,7 @@ public static class ServiceCollectionExtensions
         }
 
         builder.Services.AddSingleton<IRealTimePushService, ExpoPushService>();
+        builder.Services.AddSingleton<IAiInferenceService, BedrockInferenceService>();
 
         // EventBus: switchable via appsettings "EventBus:Provider"
         var eventBusProvider = builder.Configuration.GetValue<string>("EventBus:Provider") ?? "InMemory";

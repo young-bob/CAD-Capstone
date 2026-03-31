@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { COLORS } from '../../constants/config';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function AdminLayout() {
     return (

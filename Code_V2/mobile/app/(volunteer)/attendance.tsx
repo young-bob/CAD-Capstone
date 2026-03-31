@@ -6,7 +6,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { volunteerService } from '../../services/volunteers';
 import { attendanceService } from '../../services/attendance';
 import { AttendanceSummary } from '../../types/attendance';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLOR: Record<string, string> = {
     CheckedIn: '#1565C0',

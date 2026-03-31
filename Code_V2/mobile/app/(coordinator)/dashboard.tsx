@@ -5,7 +5,7 @@ import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { organizationService, OrgState } from '../../services/organizations';
 import { OrgStatus } from '../../types/enums';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_CONFIG: Record<string, { color: string; icon: string; message: string }> = {
     [OrgStatus.PendingApproval]: {

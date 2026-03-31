@@ -50,4 +50,12 @@ export const volunteerService = {
         const res = await api.get<AttendanceSummary[]>(`/api/volunteers/${id}/attendance`);
         return res.data;
     },
+
+    followOrg: async (volunteerId: string, orgId: string): Promise<void> => {
+        await api.post(`/api/volunteers/${volunteerId}/follow/${orgId}`);
+    },
+
+    unfollowOrg: async (volunteerId: string, orgId: string): Promise<void> => {
+        await api.delete(`/api/volunteers/${volunteerId}/follow/${orgId}`);
+    },
 };

@@ -2,23 +2,27 @@
  * AIAssistant Component
  *
  * A floating AI chat widget for VSMS. Features:
- * - Floating purple button (bottom-right, fixed position)
- * - Dark-themed slide-up chat panel
+ * - Floating orange button (bottom-right, fixed position)
+ * - Light-themed slide-up chat panel matching VSMS
  * - Role-aware responses (Volunteer / Coordinator / Admin)
- * - Simulated streaming (character-by-character reveal) for demo
- * - Real Anthropic API when VITE_ANTHROPIC_API_KEY is set in .env
+ * - Backend AI chat via /api/ai/chat
+ * - Simulated streaming reveal for better UX
  * - Quick suggestion pills per role
  * - Typing indicator while generating response
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Sparkles } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Trash2, LocateFixed, MapPin, RefreshCw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { aiService, type AiChatMessage, type AiClientLocation } from '../services/ai';
 
 interface Message {
     id: string;
     role: 'user' | 'assistant';
     content: string;
     streaming?: boolean;
+    error?: boolean;
 }
 
 interface Props {
@@ -26,120 +30,32 @@ interface Props {
     currentView?: string;
 }
 
-// ─── Role-aware system prompt ─────────────────────────────────────────────────
-function buildSystemPrompt(role: string, currentView?: string): string {
-    const roleCtx: Record<string, string> = {
-        volunteer: `You are a friendly AI assistant for VSMS (Volunteer Service Management System).
-The user is a VOLUNTEER. Help them with:
-- Finding and applying for volunteer opportunities (status: Pending → Approved/Waitlisted/Rejected)
-- Understanding "Promoted" status: waitlisted volunteers promoted to approved when spots open
-- Geo-based check-in: arrive at the event location, tap "Check In Now", confirm with GPS
-- Impact score: increases with completed events and logged hours
-- Certificate collection: issued automatically after attendance is confirmed by coordinator
-- Managing skills profile: add skills to improve opportunity matching score
-- Opportunity matching: AI scoring based on skill overlap + distance
-Keep answers concise and friendly. Use bullet points when listing steps.`,
-
-        coordinator: `You are a helpful AI assistant for VSMS (Volunteer Service Management System).
-The user is a COORDINATOR managing a volunteer organization. Help them with:
-- Creating opportunities: navigate to "Manage Events", click "+", fill in title/location/shifts
-- Approval policies: AutoApprove (all accepted), ManualApprove (review each), InviteOnly (coordinator invites)
-- Reviewing applications: go to "Applications", approve or reject pending volunteers
-- Issuing certificates: generate from "Cert Templates" after event completion
-- Monitoring attendance: view check-in/check-out records per opportunity
-- Managing members: invite coordinators/members via "Members" page
-- Organization status: PendingApproval → Approved → Suspended if needed
-Keep answers concise and action-oriented.`,
-
-        admin: `You are a helpful AI assistant for VSMS (Volunteer Service Management System).
-The user is a SYSTEM ADMINISTRATOR. Help them with:
-- Approving organizations: go to "Organizations", review pending applications, approve or reject
-- Managing users: "User Control" → ban, unban, reset password, or delete accounts
-- Resolving disputes: "Disputes" → view attendance disputes, resolve with reason
-- Global skills taxonomy: "Skills" → add, edit, or delete skills used across the platform
-- System health: "System Info" → Orleans grain activations, silo health, CPU/memory metrics
-- Grain distribution: shows how actor workloads are spread across server nodes
-Keep answers technical and precise.`,
-    };
-
-    const viewHint = currentView ? `\nThe user is currently on the "${currentView}" page.` : '';
-    return (roleCtx[role] || roleCtx.volunteer) + viewHint;
-}
-
-// ─── Mock response bank (keyword-matched) ────────────────────────────────────
-const MOCK_RESPONSES: Record<string, string[]> = {
-    apply: [
-        `To apply for a volunteer opportunity:\n\n1. Go to **Find Opportunities** in the sidebar\n2. Browse or search for an event that interests you\n3. Click on the opportunity card to view details\n4. Select a shift and click **Apply**\n\nYour application will show as **Pending** until the coordinator reviews it. Good luck! 🙌`,
-    ],
-    'impact score': [
-        `Your **Impact Score** reflects your volunteer contributions:\n\n- **+10 points** for each completed opportunity\n- **+1 point** per volunteer hour logged\n- Displayed on your profile and dashboard\n\nHigher scores improve your opportunity matching rank. Keep volunteering to grow it! ⭐`,
-    ],
-    'check in|checkin|geo|attendance': [
-        `For **Geo Check-In**:\n\n1. Go to **Geo Check-in** in the sidebar\n2. Find your approved shift that's starting\n3. Click **Check In Now** (available 30 min before shift start)\n4. Allow location access when prompted\n5. Confirm your position on the map\n6. Click **Confirm Check-In**\n\nCheck out the same way after your shift ends. Your hours are calculated automatically. 📍`,
-    ],
-    certificate: [
-        `**Certificates** are issued automatically after:\n\n1. You complete a volunteer shift\n2. The coordinator confirms your attendance\n3. The system generates a PDF certificate\n\nTo download yours, go to **Certificates** in the sidebar. You can download and share them anytime. 🏆`,
-    ],
-    skill: [
-        `To manage your **Skills**:\n\n1. Go to **My Skills** in the sidebar\n2. Click **+ Add Skill** to browse available skills\n3. Add skills that match your experience\n\nYour skills are used in **opportunity matching** — the more accurate your skills, the better your recommendations! ✨`,
-    ],
-    create: [
-        `To **create a volunteer event** (opportunity):\n\n1. Go to **Manage Events** in the sidebar\n2. Click the **+** (plus) button\n3. Fill in: title, description, location, and approval policy\n4. Add one or more **shifts** (date, time, capacity)\n5. Click **Publish** when ready\n\nVolunteers can then apply for your event! 📋`,
-    ],
-    'approval polic': [
-        `There are **3 approval policies** for opportunities:\n\n- **AutoApprove**: Applications are accepted instantly (no review needed)\n- **ManualApprove**: You review and approve/reject each application\n- **InviteOnly**: Only volunteers you personally invite can join\n\nChoose based on how much control you want over who participates. 🎯`,
-    ],
-    application: [
-        `To **review volunteer applications**:\n\n1. Go to **Applications** in the sidebar\n2. You'll see all pending applications for your events\n3. Click an application to view volunteer details\n4. Choose **Approve** or **Reject**\n\nApproved volunteers are notified immediately. Waitlisted applicants are promoted automatically when spots open. ✅`,
-    ],
-    organization: [
-        `To **approve or reject an organization**:\n\n1. Go to **Organizations** in the sidebar\n2. You'll see a list of pending applications\n3. Click **Approve** or **Reject** with a reason\n\nApproved organizations can immediately start creating events and inviting volunteers. 🏢`,
-    ],
-    ban: [
-        `To **ban a user**:\n\n1. Go to **User Control** in the sidebar\n2. Search for the user by email or name\n3. Click the user row to expand options\n4. Click **Ban User** and confirm\n\nBanned users cannot log in until you **Unban** them. Use this for policy violations. 🚫`,
-    ],
-    dispute: [
-        `To **resolve an attendance dispute**:\n\n1. Go to **Disputes** in the sidebar\n2. View the dispute details (volunteer name, event, reason)\n3. Review the evidence if provided\n4. Click **Resolve** and enter your decision\n\nThe volunteer and coordinator are notified of the resolution. ⚖️`,
-    ],
-};
-
-function getMockResponse(input: string, role: string): string {
-    const lower = input.toLowerCase();
-
-    for (const [key, responses] of Object.entries(MOCK_RESPONSES)) {
-        const patterns = key.split('|');
-        if (patterns.some(p => lower.includes(p))) {
-            return responses[0];
-        }
-    }
-
-    // Fallback per role
-    const fallbacks: Record<string, string> = {
-        volunteer: `I can help you with:\n\n- **Finding & applying** for opportunities\n- **Geo check-in** process\n- **Impact score** and tracking\n- **Certificate** collection\n- **Skills** management\n\nWhat would you like to know? 😊`,
-        coordinator: `I can help you with:\n\n- **Creating events** and shifts\n- **Approval policies** (Auto, Manual, InviteOnly)\n- **Reviewing applications**\n- **Certificate templates**\n- **Member management**\n\nWhat do you need help with? 💼`,
-        admin: `I can help you with:\n\n- **Approving organizations**\n- **User management** (ban, reset password)\n- **Dispute resolution**\n- **Skills taxonomy**\n- **System health metrics**\n\nWhat would you like to know? 🛡️`,
-    };
-
-    return fallbacks[role] || fallbacks.volunteer;
-}
 
 // ─── Quick suggestions per role ───────────────────────────────────────────────
 const SUGGESTIONS: Record<string, string[]> = {
     volunteer: [
-        'How do I apply for an opportunity?',
-        'What is my impact score?',
-        'How does geo check-in work?',
-        'How do I get a certificate?',
+        'Recommend opportunities based on my skills and current location.',
+        'Show my application statuses (latest first).',
+        'Show my check-in eligible attendance records and guide me to check in.',
+        'If geo check-in fails, guide me to use on-site QR fallback check-in.',
+        'Show my unread notifications and summarize key items.',
+        'Mark all my notifications as read (ask for my confirmation first).',
     ],
     coordinator: [
-        'How do I create an event?',
-        'What are approval policies?',
-        'How do I approve applications?',
+        'Show latest pending applications for my organization.',
+        'Approve an application by applicationId (ask for confirmation first).',
+        'Reject an application by applicationId with a reason (ask for confirmation first).',
+        'Show attendance status and exceptions for an opportunity.',
+        'Generate an on-site QR check-in code for a shift.',
+        'Post an announcement to volunteers in my organization.',
     ],
     admin: [
-        'How do I approve an organization?',
-        'How do I ban a user?',
-        'How do I resolve a dispute?',
+        'Show system runtime overview (silos, activations, skew).',
+        'Show grain distribution grouped by silo and highlight hot spots.',
+        'Show pending organizations and suggest review actions.',
+        'Show pending disputes that need resolution.',
+        'Show user role distribution and ban status summary.',
+        'Ban or unban a user by userId (ask for confirmation first).',
     ],
 };
 
@@ -166,66 +82,6 @@ function simulateStream(
     return () => clearInterval(timer);
 }
 
-/** Real Anthropic API streaming */
-async function anthropicStream(
-    messages: { role: string; content: string }[],
-    systemPrompt: string,
-    apiKey: string,
-    onChunk: (chunk: string) => void,
-    onDone: () => void,
-    onError: (err: string) => void,
-): Promise<void> {
-    try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
-                max_tokens: 1024,
-                stream: true,
-                system: systemPrompt,
-                messages,
-            }),
-        });
-
-        if (!response.ok) {
-            onError(`API error ${response.status}. Falling back to offline mode.`);
-            return;
-        }
-
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') continue;
-                try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-                        onChunk(parsed.delta.text);
-                    }
-                } catch { /* skip malformed */ }
-            }
-        }
-        onDone();
-    } catch {
-        onError('Network error. Falling back to offline mode.');
-    }
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AIAssistant({ userRole, currentView }: Props) {
     const [isOpen, setIsOpen] = useState(false);
@@ -233,6 +89,9 @@ export default function AIAssistant({ userRole, currentView }: Props) {
     const [input, setInput] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
     const [hasOpened, setHasOpened] = useState(false);
+    const [clientLocation, setClientLocation] = useState<AiClientLocation | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
+    const [locationError, setLocationError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const cancelRef = useRef<(() => void) | null>(null);
@@ -254,10 +113,48 @@ export default function AIAssistant({ userRole, currentView }: Props) {
         setHasOpened(true);
     };
 
+    const handleCaptureLocation = () => {
+        if (!('geolocation' in navigator)) {
+            setLocationError('当前浏览器不支持定位。');
+            return;
+        }
+
+        setIsLocating(true);
+        setLocationError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                setClientLocation({
+                    lat: Number(pos.coords.latitude.toFixed(7)),
+                    lon: Number(pos.coords.longitude.toFixed(7)),
+                    accuracyMeters: Number(pos.coords.accuracy.toFixed(1)),
+                    capturedAtUtc: new Date().toISOString(),
+                    source: 'browser_geolocation',
+                });
+                setIsLocating(false);
+            },
+            err => {
+                const msg = err.code === 1
+                    ? '定位权限被拒绝。'
+                    : err.code === 2
+                        ? '无法获取当前位置。'
+                        : '定位超时，请重试。';
+                setLocationError(msg);
+                setIsLocating(false);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 60_000,
+            },
+        );
+    };
+
     const sendMessage = useCallback(async (userText: string) => {
         if (!userText.trim() || isStreaming) return;
 
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: userText.trim() };
+        const userInput = userText.trim();
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: userInput };
         const assistantId = crypto.randomUUID();
         const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true };
 
@@ -279,34 +176,46 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             cancelRef.current = null;
         };
 
-        const apiKey = (import.meta as any).env?.VITE_ANTHROPIC_API_KEY as string | undefined;
+        try {
+            const history: AiChatMessage[] = messages
+                .filter(m => m.role === 'user' || m.role === 'assistant')
+                .slice(-12)
+                .map(m => ({ role: m.role, content: m.content }));
 
-        if (apiKey) {
-            // Real API mode
-            const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-            await anthropicStream(
-                [...history, { role: 'user', content: userText.trim() }],
-                buildSystemPrompt(userRole, currentView),
-                apiKey,
-                onChunk,
-                onDone,
-                (errMsg) => {
-                    // Fall back to mock on API error
-                    const mockText = getMockResponse(userText, userRole) +
-                        `\n\n_⚠️ ${errMsg}_`;
-                    const cancel = simulateStream(mockText, onChunk, onDone);
-                    cancelRef.current = cancel;
-                },
-            );
-        } else {
-            // Mock mode
-            const mockText = getMockResponse(userText, userRole);
-            // Small initial delay to feel more realistic
-            await new Promise(r => setTimeout(r, 400));
-            const cancel = simulateStream(mockText, onChunk, onDone);
+            const res = await aiService.chat({
+                messages: [...history, { role: 'user', content: userInput }],
+                currentView,
+                clientLocation: clientLocation ?? undefined,
+            });
+
+            const text = res.reply?.trim() || 'I could not generate a response.';
+            const cancel = simulateStream(text, onChunk, onDone);
             cancelRef.current = cancel;
+        } catch (error: any) {
+            const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
+            const fallback = [
+                '⚠️ 当前未能从系统获取实时数据。',
+                '',
+                `错误信息：${backendError}`,
+            ].join('\n');
+            setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: fallback, streaming: false, error: true } : m
+            ));
+            setIsStreaming(false);
+            cancelRef.current = null;
         }
-    }, [isStreaming, messages, userRole, currentView]);
+    }, [isStreaming, messages, userRole, currentView, clientLocation]);
+
+    const handleRetry = useCallback((errorMsgId: string) => {
+        // Find the user message right before the error message
+        const idx = messages.findIndex(m => m.id === errorMsgId);
+        if (idx <= 0) return;
+        const lastUserMsg = messages.slice(0, idx).reverse().find(m => m.role === 'user');
+        if (!lastUserMsg) return;
+        // Remove the failed assistant message and re-send
+        setMessages(prev => prev.filter(m => m.id !== errorMsgId));
+        setTimeout(() => sendMessage(lastUserMsg.content), 100);
+    }, [messages, sendMessage]);
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -326,43 +235,36 @@ export default function AIAssistant({ userRole, currentView }: Props) {
         setIsOpen(false);
     };
 
+    const handleClearChat = () => {
+        if (cancelRef.current) { cancelRef.current(); cancelRef.current = null; }
+        setIsStreaming(false);
+        setMessages([]);
+        setInput('');
+    };
+
     const roleBadgeColor: Record<string, string> = {
-        volunteer: 'bg-amber-500/20 text-amber-300',
-        coordinator: 'bg-blue-500/20 text-blue-300',
-        admin: 'bg-rose-500/20 text-rose-300',
+        volunteer: 'bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/60',
+        coordinator: 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/60',
+        admin: 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/60',
     };
 
     const suggestions = SUGGESTIONS[userRole] || SUGGESTIONS.volunteer;
-
-    // Render markdown-ish bold (**text**) in message content
-    function renderContent(text: string) {
-        const parts = text.split(/(\*\*[^*]+\*\*)/g);
-        return parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
-            }
-            // Render newlines
-            return part.split('\n').map((line, j, arr) => (
-                <span key={`${i}-${j}`}>
-                    {line}
-                    {j < arr.length - 1 && <br />}
-                </span>
-            ));
-        });
-    }
+    const locationSummary = clientLocation
+        ? `${clientLocation.lat.toFixed(5)}, ${clientLocation.lon.toFixed(5)} · ±${Math.round(clientLocation.accuracyMeters ?? 0)}m`
+        : 'Not set';
 
     return (
         <>
             {/* ── Floating Button ── */}
             <button
                 onClick={handleOpen}
-                className="fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-purple-500/40 flex items-center justify-center hover:from-violet-500 hover:to-purple-600 transition-all hover:scale-110 active:scale-95"
+                className="fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/40 flex items-center justify-center hover:from-orange-400 hover:to-orange-500 transition-all hover:scale-110 active:scale-95"
                 title="AI Assistant"
                 style={{ display: isOpen ? 'none' : 'flex' }}
             >
                 {/* Pulse ring — only before first open */}
                 {!hasOpened && (
-                    <span className="absolute inset-0 rounded-full bg-purple-500 opacity-30 animate-ping" />
+                    <span className="absolute inset-0 rounded-full bg-orange-500 opacity-30 animate-ping" />
                 )}
                 <Sparkles className="w-6 h-6" />
             </button>
@@ -371,20 +273,19 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             {isOpen && (
                 <div
                     className="fixed bottom-6 right-6 z-[9999] flex flex-col animate-slide-up"
-                    style={{ width: 'calc(min(384px, 100vw - 24px))', maxHeight: '520px' }}
+                    style={{ width: 'min(760px, calc(100vw - 24px))', height: 'min(78vh, 760px)' }}
                 >
-                    <div className="flex flex-col h-full rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-                        style={{ background: '#09090b' }}>
+                    <div className="flex flex-col h-full rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white dark:bg-zinc-900 dark:border-zinc-800">
 
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0 bg-[#fffaf5] dark:bg-zinc-900 dark:border-zinc-800">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
                                     <Bot className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold text-white leading-none">AI Assistant</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">Powered by VSMS</p>
+                                    <p className="text-sm font-bold text-gray-900 dark:text-zinc-100 leading-none">AI Assistant</p>
+                                    <p className="text-xs text-gray-600 dark:text-zinc-400 mt-0.5">Powered by VSMS</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -392,8 +293,16 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                                     {userRole} Mode
                                 </span>
                                 <button
+                                    onClick={handleClearChat}
+                                    disabled={messages.length === 0 && !input.trim()}
+                                    className="p-1.5 text-gray-500 dark:text-zinc-500 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title="Clear chat"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button
                                     onClick={handleClose}
-                                    className="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                    className="p-1.5 text-gray-500 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -401,32 +310,17 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                         </div>
 
                         {/* Messages area */}
-                        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ minHeight: 0 }}>
+                        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-[#fafafa] dark:bg-zinc-950" style={{ minHeight: 0 }}>
                             {/* Welcome message */}
                             {messages.length === 0 && (
-                                <div className="space-y-3">
-                                    <div className="flex gap-2.5">
-                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <Bot className="w-3.5 h-3.5 text-white" />
-                                        </div>
-                                        <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%]">
-                                            <p className="text-sm text-gray-200 leading-relaxed">
-                                                Hi! I'm your VSMS assistant. How can I help you today? 👋
-                                            </p>
-                                        </div>
+                                <div className="flex gap-2.5">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <Bot className="w-3.5 h-3.5 text-white" />
                                     </div>
-
-                                    {/* Quick suggestion pills */}
-                                    <div className="flex flex-wrap gap-2 pl-8">
-                                        {suggestions.map((s, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => sendMessage(s)}
-                                                className="text-xs text-gray-300 bg-gray-800 hover:bg-gray-700 border border-white/10 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
+                                    <div className="bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%]">
+                                        <p className="text-sm text-gray-700 dark:text-zinc-300 leading-relaxed">
+                                            Hi! I'm your VSMS assistant. How can I help you today? 👋
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -435,28 +329,80 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                             {messages.map(msg => (
                                 <div key={msg.id} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     {msg.role === 'assistant' && (
-                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">
                                             <Bot className="w-3.5 h-3.5 text-white" />
                                         </div>
                                     )}
                                     <div
                                         className={`px-4 py-2.5 max-w-[85%] text-sm leading-relaxed ${
                                             msg.role === 'user'
-                                                ? 'bg-violet-600 text-white rounded-2xl rounded-br-sm'
-                                                : 'bg-gray-800 text-gray-200 rounded-2xl rounded-bl-sm'
+                                                ? 'bg-orange-500 text-white rounded-2xl rounded-br-sm'
+                                                : msg.error
+                                                    ? 'bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-800 text-red-700 dark:text-red-300 rounded-2xl rounded-bl-sm'
+                                                    : 'bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-800 dark:text-zinc-200 rounded-2xl rounded-bl-sm'
                                         }`}
                                     >
                                         {msg.role === 'assistant' && msg.streaming && msg.content === '' ? (
                                             /* Typing indicator */
                                             <span className="flex items-center gap-1 h-5">
-                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
-                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
-                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500" />
+                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-zinc-500" />
+                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-zinc-500" />
+                                                <span className="typing-dot w-1.5 h-1.5 rounded-full bg-gray-500 dark:bg-zinc-500" />
                                             </span>
                                         ) : msg.role === 'assistant' ? (
-                                            renderContent(msg.content)
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                    ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                                                    li: ({ children }) => <li>{children}</li>,
+                                                    a: ({ href, children }) => (
+                                                        <a
+                                                            href={href}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-orange-600 dark:text-orange-400 hover:text-orange-500 dark:hover:text-orange-300 underline"
+                                                        >
+                                                            {children}
+                                                        </a>
+                                                    ),
+                                                    code: ({ className, children }) => {
+                                                        const isBlockCode = (className ?? '').includes('language-');
+                                                        return isBlockCode ? (
+                                                            <code className="block w-full overflow-x-auto p-3 rounded-lg bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-800 dark:text-zinc-200 font-mono text-[0.9em] whitespace-pre">
+                                                                {children}
+                                                            </code>
+                                                        ) : (
+                                                            <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-mono text-[0.92em]">
+                                                                {children}
+                                                            </code>
+                                                        );
+                                                    },
+                                                    h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                                                    h2: ({ children }) => <h2 className="text-sm font-semibold mb-2">{children}</h2>,
+                                                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                                                    blockquote: ({ children }) => (
+                                                        <blockquote className="pl-3 border-l-2 border-orange-300 dark:border-orange-700 text-gray-600 dark:text-zinc-400 italic mb-2">
+                                                            {children}
+                                                        </blockquote>
+                                                    ),
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
                                         ) : (
                                             msg.content
+                                        )}
+                                        {/* Retry button for error messages */}
+                                        {msg.error && !isStreaming && (
+                                            <button
+                                                onClick={() => handleRetry(msg.id)}
+                                                className="mt-2 inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60 px-3 py-1.5 rounded-full transition-colors"
+                                            >
+                                                <RefreshCw className="w-3 h-3" />
+                                                Retry
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -464,30 +410,68 @@ export default function AIAssistant({ userRole, currentView }: Props) {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input bar */}
-                        <form
-                            onSubmit={handleSubmit}
-                            className="flex items-end gap-2 px-3 py-3 border-t border-white/10 flex-shrink-0"
-                        >
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Ask anything about VSMS…"
-                                rows={1}
-                                disabled={isStreaming}
-                                className="flex-1 resize-none bg-gray-800 text-white placeholder-gray-500 text-sm px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-violet-500 border border-white/10 disabled:opacity-50"
-                                style={{ maxHeight: '80px', overflowY: 'auto' }}
-                            />
-                            <button
-                                type="submit"
-                                disabled={isStreaming || !input.trim()}
-                                className="p-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                        {/* Input area */}
+                        <div className="border-t border-gray-200 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-900">
+                            <div className="px-3 pt-2 pb-1">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="text-[11px] text-gray-600 dark:text-zinc-400">Quick Prompts · {userRole.toUpperCase()}</div>
+                                    <button
+                                        type="button"
+                                        onClick={handleCaptureLocation}
+                                        disabled={isStreaming || isLocating}
+                                        className="inline-flex items-center gap-1 text-[11px] text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-orange-50 dark:hover:bg-orange-950/30 border border-gray-200 dark:border-zinc-700 hover:border-orange-200 dark:hover:border-orange-800 px-2 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Use current browser location"
+                                    >
+                                        <LocateFixed className="w-3.5 h-3.5" />
+                                        {isLocating ? 'Locating…' : 'Use My Location'}
+                                    </button>
+                                </div>
+                                <div className="mb-2 flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-zinc-400">
+                                    <MapPin className="w-3.5 h-3.5" />
+                                    <span>Location: {locationSummary}</span>
+                                </div>
+                                {locationError && (
+                                    <div className="mb-2 text-[11px] text-rose-600 dark:text-rose-400">{locationError}</div>
+                                )}
+                                <div className="flex flex-wrap gap-2 pb-1">
+                                    {suggestions.map((s, i) => (
+                                        <button
+                                            key={`quick-${i}`}
+                                            type="button"
+                                            onClick={() => sendMessage(s)}
+                                            disabled={isStreaming}
+                                            className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 hover:bg-orange-50 dark:hover:bg-orange-950/30 border border-gray-200 dark:border-zinc-700 hover:border-orange-200 dark:hover:border-orange-800 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <form
+                                onSubmit={handleSubmit}
+                                className="flex items-end gap-2 px-3 pb-3"
                             >
-                                <Send className="w-4 h-4" />
-                            </button>
-                        </form>
+                                <textarea
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Ask anything about VSMS…"
+                                    rows={1}
+                                    disabled={isStreaming}
+                                    className="flex-1 resize-none bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100 placeholder-gray-500 dark:placeholder-zinc-500 text-sm px-3 py-2 rounded-xl outline-none focus:ring-1 focus:ring-orange-500 border border-gray-300 dark:border-zinc-700 disabled:opacity-50"
+                                    style={{ maxHeight: '140px', overflowY: 'auto' }}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isStreaming || !input.trim()}
+                                    className="p-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}

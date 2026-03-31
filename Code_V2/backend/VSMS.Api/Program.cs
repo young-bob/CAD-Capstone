@@ -11,6 +11,7 @@ using VSMS.Api.Features.Files;
 using VSMS.Api.Features.Opportunities;
 using VSMS.Api.Features.Organizations;
 using VSMS.Api.Features.Skills;
+using VSMS.Api.Features.Ai;
 using VSMS.Api.Features.Notifications;
 using VSMS.Api.Features.Volunteers;
 using VSMS.Api.Features.EventTasks;
@@ -70,6 +71,9 @@ app.MapCoordinatorEndpoints();
 app.MapSkillEndpoints();
 app.MapNotificationEndpoints();
 app.MapEventTaskEndpoints();
+app.MapAiToolEndpoints();
+app.MapAiChatEndpoints();
+app.MapMcpEndpoints();
 
 // ==================== Database Init & Admin Seed ====================
 using (var scope = app.Services.CreateScope())

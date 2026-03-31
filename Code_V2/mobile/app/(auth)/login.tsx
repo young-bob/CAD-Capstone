@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, Surface } from 'react-native-paper';
-import { Link, useRouter } from 'expo-router';
+import { TextInput, Button, Text } from 'react-native-paper';
+import { Link } from 'expo-router';
 import { useAuthStore } from '../../stores/authStore';
 import { authService } from '../../services/auth';
 import { COLORS } from '../../constants/config';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -13,7 +14,6 @@ export default function LoginScreen() {
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const setAuth = useAuthStore((s) => s.setAuth);
-    const router = useRouter();
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -27,7 +27,12 @@ export default function LoginScreen() {
             await setAuth(data);
             // AuthGuard in _layout will handle redirect
         } catch (err: any) {
-            setError(err.response?.status === 401 ? 'Invalid credentials' : 'Login failed. Check server connection.');
+            if (err.response?.status === 401) {
+                setError('Invalid credentials');
+            } else {
+                const msg = err.response?.data?.toString() || err.message || 'Network error';
+                setError(`Login failed: ${msg}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -35,65 +40,68 @@ export default function LoginScreen() {
 
     return (
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <View style={styles.inner}>
-                {/* Logo */}
-                <View style={styles.logoContainer}>
-                    <Text style={styles.logoText}>VSMS</Text>
-                    <Text style={styles.subtitle}>Volunteer Service Management</Text>
+            {/* Amber hero header — matches website landing page */}
+            <View style={styles.hero}>
+                <View style={styles.iconCircle}>
+                    <MaterialCommunityIcons name="heart" size={40} color="#fff" />
                 </View>
+                <Text style={styles.heroTitle}>VSMS</Text>
+                <Text style={styles.heroSub}>Volunteer Service Management</Text>
+            </View>
 
-                {/* Form */}
-                <Surface style={styles.card} elevation={2}>
-                    <Text variant="headlineSmall" style={styles.title}>Welcome Back</Text>
+            {/* Login form */}
+            <View style={styles.formWrapper}>
+                <Text variant="headlineSmall" style={styles.title}>Welcome Back</Text>
+                <Text style={styles.subtitle}>Sign in to continue volunteering</Text>
 
-                    {error ? <Text style={styles.error}>{error}</Text> : null}
+                {error ? <Text style={styles.error}>{error}</Text> : null}
 
-                    <TextInput
-                        label="Email"
-                        value={email}
-                        onChangeText={setEmail}
-                        mode="outlined"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        left={<TextInput.Icon icon="email" />}
-                        style={styles.input}
-                        outlineColor={COLORS.border}
-                        activeOutlineColor={COLORS.primary}
-                        textColor={COLORS.text}
-                    />
+                <TextInput
+                    label="Email"
+                    value={email}
+                    onChangeText={setEmail}
+                    mode="outlined"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    left={<TextInput.Icon icon="email-outline" />}
+                    style={styles.input}
+                    outlineColor={COLORS.border}
+                    activeOutlineColor={COLORS.primary}
+                    textColor={COLORS.text}
+                />
 
-                    <TextInput
-                        label="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        mode="outlined"
-                        secureTextEntry={!showPassword}
-                        left={<TextInput.Icon icon="lock" />}
-                        right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(!showPassword)} />}
-                        style={styles.input}
-                        outlineColor={COLORS.border}
-                        activeOutlineColor={COLORS.primary}
-                        textColor={COLORS.text}
-                    />
+                <TextInput
+                    label="Password"
+                    value={password}
+                    onChangeText={setPassword}
+                    mode="outlined"
+                    secureTextEntry={!showPassword}
+                    left={<TextInput.Icon icon="lock-outline" />}
+                    right={<TextInput.Icon icon={showPassword ? 'eye-off-outline' : 'eye-outline'} onPress={() => setShowPassword(!showPassword)} />}
+                    style={styles.input}
+                    outlineColor={COLORS.border}
+                    activeOutlineColor={COLORS.primary}
+                    textColor={COLORS.text}
+                />
 
-                    <Button
-                        mode="contained"
-                        onPress={handleLogin}
-                        loading={loading}
-                        disabled={loading}
-                        style={styles.button}
-                        buttonColor={COLORS.primary}
-                    >
-                        Login
-                    </Button>
+                <Button
+                    mode="contained"
+                    onPress={handleLogin}
+                    loading={loading}
+                    disabled={loading}
+                    style={styles.button}
+                    buttonColor={COLORS.primary}
+                    contentStyle={{ paddingVertical: 4 }}
+                >
+                    Sign In
+                </Button>
 
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>Don't have an account? </Text>
-                        <Link href="/(auth)/register" asChild>
-                            <Text style={styles.link}>Register</Text>
-                        </Link>
-                    </View>
-                </Surface>
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Don't have an account? </Text>
+                    <Link href="/(auth)/register" asChild>
+                        <Text style={styles.link}>Register</Text>
+                    </Link>
+                </View>
             </View>
         </KeyboardAvoidingView>
     );
@@ -101,16 +109,35 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
-    inner: { flex: 1, justifyContent: 'center', padding: 24 },
-    logoContainer: { alignItems: 'center', marginBottom: 40 },
-    logoText: { fontSize: 48, fontWeight: '900', color: COLORS.primary, letterSpacing: 4 },
-    subtitle: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
-    card: { padding: 24, borderRadius: 16, backgroundColor: COLORS.surface },
-    title: { textAlign: 'center', marginBottom: 20, color: COLORS.text },
-    input: { marginBottom: 16, backgroundColor: COLORS.surfaceLight },
-    button: { marginTop: 8, paddingVertical: 4, borderRadius: 8 },
-    error: { color: COLORS.error, textAlign: 'center', marginBottom: 12 },
-    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+
+    hero: {
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        paddingTop: 72,
+        paddingBottom: 40,
+        paddingHorizontal: 24,
+    },
+    iconCircle: {
+        width: 72, height: 72, borderRadius: 36,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        alignItems: 'center', justifyContent: 'center',
+        marginBottom: 14,
+    },
+    heroTitle: { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 3 },
+    heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 4 },
+
+    formWrapper: {
+        flex: 1, padding: 24, paddingTop: 28,
+        backgroundColor: COLORS.background,
+    },
+    title: { color: COLORS.text, fontWeight: '700', marginBottom: 4 },
+    subtitle: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 20 },
+
+    input: { marginBottom: 14, backgroundColor: COLORS.surface },
+    button: { marginTop: 4, borderRadius: 10 },
+    error: { color: COLORS.error, marginBottom: 12, fontSize: 13 },
+
+    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
     footerText: { color: COLORS.textSecondary },
-    link: { color: COLORS.primary, fontWeight: '600' },
+    link: { color: COLORS.primary, fontWeight: '700' },
 });

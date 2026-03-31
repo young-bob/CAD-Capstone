@@ -91,7 +91,7 @@ public class AttendanceRecordGrain(
             state.State.VolunteerId, state.State.OpportunityId);
     }
 
-    public async Task WebCheckIn()
+    public async Task QrCheckIn()
     {
         if (state.State.Status != AttendanceStatus.Pending)
             throw new InvalidOperationException($"Cannot check in with status: {state.State.Status}");
@@ -107,8 +107,8 @@ public class AttendanceRecordGrain(
         }
 
         state.State.VerifiedTime = new TimeRecord { CheckInTime = DateTime.UtcNow };
-        state.State.CheckInSnapshot = new GeoFenceSettings { Latitude = 0, Longitude = 0 }; // Web bypass
-        state.State.ProofPhotoUrl = "web-check-in";
+        state.State.CheckInSnapshot = new GeoFenceSettings { Latitude = 0, Longitude = 0 };
+        state.State.ProofPhotoUrl = "qr-check-in";
         state.State.Status = AttendanceStatus.CheckedIn;
         await state.WriteStateAsync();
 
@@ -125,7 +125,7 @@ public class AttendanceRecordGrain(
         // Set auto-checkout reminder (8 hours)
         await this.RegisterOrUpdateReminder("AutoCheckout", TimeSpan.FromHours(8), TimeSpan.FromHours(8));
 
-        logger.LogInformation("Volunteer {VolunteerId} Web-checked in to {OpportunityId}",
+        logger.LogInformation("Volunteer {VolunteerId} QR-checked in to {OpportunityId}",
             state.State.VolunteerId, state.State.OpportunityId);
     }
 

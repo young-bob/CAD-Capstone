@@ -235,10 +235,10 @@ public static class AdminEndpoints
 
                         runtimeBySilo[key] = new RuntimeStatsSnapshot(
                             key,
-                            Math.Round(Convert.ToDouble(snapshot.CpuUsage), 4),
-                            Convert.ToInt64(snapshot.AvailableMemory),
-                            Convert.ToInt64(snapshot.MemoryUsage),
-                            Convert.ToInt64(snapshot.TotalPhysicalMemory),
+                            Math.Round(Convert.ToDouble(snapshot.EnvironmentStatistics.FilteredCpuUsagePercentage), 4),
+                            Convert.ToInt64(snapshot.EnvironmentStatistics.FilteredAvailableMemoryBytes),
+                            Convert.ToInt64(snapshot.EnvironmentStatistics.FilteredMemoryUsageBytes),
+                            Convert.ToInt64(snapshot.EnvironmentStatistics.MaximumAvailableMemoryBytes),
                             snapshot.IsOverloaded,
                             Convert.ToInt32(snapshot.ClientCount),
                             Convert.ToInt64(snapshot.ReceivedMessages),

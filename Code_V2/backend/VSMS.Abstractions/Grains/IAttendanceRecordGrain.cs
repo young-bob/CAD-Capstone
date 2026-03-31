@@ -6,7 +6,7 @@ public interface IAttendanceRecordGrain : IGrainWithGuidKey
 {
     Task Initialize(Guid volunteerId, Guid applicationId, Guid opportunityId, Guid? shiftId = null);
     Task CheckIn(double lat, double lon, string proofPhotoUrl);
-    Task WebCheckIn();
+    Task QrCheckIn();
     Task CoordinatorCheckIn();
     Task CheckOut(DateTime? timeOut = null);
     Task ManualAdjustment(Guid coordinatorId, DateTime newCheckIn, DateTime newCheckOut, string reason);

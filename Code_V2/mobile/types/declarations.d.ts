@@ -1,1 +1,1 @@
-declare module 'react-native-vector-icons/MaterialCommunityIcons';
+declare module '@expo/vector-icons';
