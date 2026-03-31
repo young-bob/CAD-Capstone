@@ -6,7 +6,7 @@ export const volunteerService = {
         const res = await api.get<VolunteerProfile>(`/api/volunteers/${id}/profile`);
         return res.data;
     },
-    updateProfile: async (id: string, data: { firstName: string; lastName: string; email: string; phone: string; bio: string }): Promise<void> => {
+    updateProfile: async (id: string, data: { firstName: string; lastName: string; email: string; phone: string; bio: string; linkedInUrl?: string }): Promise<void> => {
         await api.put(`/api/volunteers/${id}/profile`, data);
     },
     getApplications: async (id: string): Promise<string[]> => {

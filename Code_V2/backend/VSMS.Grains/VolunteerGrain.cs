@@ -12,16 +12,26 @@ public class VolunteerGrain(
 {
     public Task<VolunteerState> GetProfile() => Task.FromResult(state.State);
 
-    public async Task UpdateProfile(string firstName, string lastName, string email, string phone, string bio)
+    public async Task UpdateProfile(string firstName, string lastName, string email, string phone, string bio, string? linkedInUrl = null)
     {
         state.State.FirstName = firstName;
         state.State.LastName = lastName;
         state.State.Email = email;
         state.State.Phone = phone;
         state.State.Bio = bio;
+        if (linkedInUrl != null)
+            state.State.LinkedInUrl = linkedInUrl;
         state.State.IsInitialized = true;
         await state.WriteStateAsync();
         logger.LogInformation("Volunteer {Id} profile updated", this.GetPrimaryKey());
+    }
+
+    public async Task SetLinkedInVerified(string linkedInUrl)
+    {
+        state.State.LinkedInUrl = linkedInUrl;
+        state.State.LinkedInVerified = true;
+        await state.WriteStateAsync();
+        logger.LogInformation("Volunteer {Id} LinkedIn verified", this.GetPrimaryKey());
     }
 
     public async Task UpdatePrivacySettings(bool isProfilePublic, bool allowEmail, bool allowPush)

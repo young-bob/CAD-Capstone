@@ -83,6 +83,10 @@ services:
       Minio__SecretKey: ${MINIO_SECRET_KEY}
       Minio__BucketName: vsms
       Minio__UseSsl: "false"
+      # ---- LinkedIn OAuth ----
+      LinkedIn__ClientId: ${LINKEDIN_CLIENT_ID}
+      LinkedIn__ClientSecret: ${LINKEDIN_CLIENT_SECRET}
+      LinkedIn__RedirectUri: ${LINKEDIN_REDIRECT_URI}
       # ---- AI Inference (BedrockDirect via IAM role) ----
       AI__Region: ${AI_REGION}
       AI__Model: ${AI_MODEL}

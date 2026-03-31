@@ -4,6 +4,7 @@ using VSMS.Api.Features.Admin;
 using VSMS.Api.Features.Applications;
 using VSMS.Api.Features.Attendance;
 using VSMS.Api.Features.Auth;
+using VSMS.Infrastructure.LinkedIn;
 using VSMS.Api.Features.Certificates;
 using VSMS.Api.Features.Coordinators;
 using VSMS.Api.Features.Files;
@@ -57,6 +58,7 @@ app.UseMiddleware<VSMS.Api.Middleware.BanCheckMiddleware>();
 
 // ==================== Endpoints ====================
 app.MapAuthEndpoints();
+app.MapLinkedInOAuthEndpoints();
 app.MapVolunteerEndpoints();
 app.MapOrganizationEndpoints();
 app.MapOpportunityEndpoints();

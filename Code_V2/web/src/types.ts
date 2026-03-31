@@ -229,6 +229,8 @@ export interface VolunteerProfile {
     followedOrgIds: string[];
     allowEmailNotifications: boolean;
     allowPushNotifications: boolean;
+    linkedInUrl?: string;
+    linkedInVerified?: boolean;
 }
 
 export interface OrgVolunteerSummary {

@@ -1634,6 +1634,10 @@ export function CoordApplications() {
                                             : <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-50 text-amber-600 border border-amber-200">⚠ Waiver Not Signed</span>
                                         }
                                         {vp.isProfilePublic && <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-50 text-blue-600 border border-blue-200">Public Profile</span>}
+                                        {vp.linkedInVerified && vp.linkedInUrl
+                                            ? <a href={vp.linkedInUrl} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-600 text-white border border-blue-700 flex items-center gap-1 hover:bg-blue-700 transition-colors">✓ LinkedIn Verified</a>
+                                            : vp.linkedInVerified && <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-blue-600 text-white border border-blue-700">✓ LinkedIn Verified</span>
+                                        }
                                     </div>
                                     {(vp.credentials?.length ?? 0) > 0 ? (
                                         <div>
