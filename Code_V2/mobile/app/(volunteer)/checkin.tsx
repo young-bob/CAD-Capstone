@@ -88,7 +88,7 @@ export default function CheckInScreen() {
                 applicationService.getForVolunteer(linkedGrainId),
                 attendanceService.getByVolunteer(linkedGrainId),
             ]);
-            const doneStatuses = [AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
+            const doneStatuses = [AttendanceStatus.Pending, AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
             const results: ActiveApp[] = apps
                 .filter(a => a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
                 .map(a => {

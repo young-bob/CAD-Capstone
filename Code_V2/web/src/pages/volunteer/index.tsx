@@ -1371,9 +1371,9 @@ export function VolAttendance() {
                 <div><p className="text-4xl font-extrabold">{totalHours.toFixed(1)} hrs</p><p className="text-orange-100 font-medium mt-1">{records.length} session{records.length !== 1 ? 's' : ''}</p></div>
             </div>
 
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.length === 0 ? <Empty msg="No attendance records yet." /> : (
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.filter(r => r.status !== AttendanceStatus.Pending).length === 0 ? <Empty msg="No attendance records yet." /> : (
                 <div className="space-y-4">
-                    {records.map(r => (
+                    {records.filter(r => r.status !== AttendanceStatus.Pending).map(r => (
                         <div key={r.attendanceId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100">
                             <div className="flex justify-between items-start mb-3">
                                 <p className="font-bold text-stone-800">{r.opportunityTitle}</p>
