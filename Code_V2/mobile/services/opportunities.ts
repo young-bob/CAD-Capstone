@@ -8,10 +8,12 @@ export const opportunityService = {
     },
 
     search: async (query?: string, category?: string): Promise<OpportunitySummary[]> => {
-        const params = new URLSearchParams();
-        if (query) params.append('query', query);
-        if (category) params.append('category', category);
-        const res = await api.get<OpportunitySummary[]>(`/api/opportunities/?${params.toString()}`);
+        const params: Record<string, string> = {};
+        if (query) params.query = query;
+        if (category) params.category = category;
+        params._t = Date.now().toString(); // CACHE BUSTER
+        const config = { params };
+        const res = await api.get<OpportunitySummary[]>('/api/opportunities', config);
         return res.data;
     },
 
