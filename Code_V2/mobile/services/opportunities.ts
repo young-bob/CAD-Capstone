@@ -70,5 +70,34 @@ export const opportunityService = {
         const res = await api.post<{ isValid: boolean }>(`/api/opportunities/${id}/validate-geo`, { lat, lon });
         return res.data.isValid;
     },
-};
 
+    updateInfo: async (id: string, data: { title: string; description: string; category: string; lat?: number; lon?: number; radiusMeters?: number }): Promise<void> => {
+        await api.put(`/api/opportunities/${id}/info`, data);
+    },
+
+    setGeoFence: async (id: string, data: { lat: number; lon: number; radiusMeters: number }): Promise<void> => {
+        await api.post(`/api/opportunities/${id}/geofence`, data);
+    },
+
+    recover: async (id: string): Promise<void> => {
+        await api.post(`/api/opportunities/${id}/recover`);
+    },
+
+    removeShift: async (id: string, shiftId: string): Promise<void> => {
+        await api.delete(`/api/opportunities/${id}/shifts/${shiftId}`);
+    },
+
+    updateShift: async (id: string, shiftId: string, data: { name: string; startTime: string; endTime: string; maxCapacity: number }): Promise<void> => {
+        await api.put(`/api/opportunities/${id}/shifts/${shiftId}`, data);
+    },
+
+    notifyVolunteers: async (id: string, data: { message: string; targetStatus: 'Approved' | 'All' }): Promise<{ sent: number }> => {
+        const res = await api.post<{ sent: number }>(`/api/opportunities/${id}/notify`, data);
+        return res.data;
+    },
+
+    clone: async (id: string): Promise<{ opportunityId: string }> => {
+        const res = await api.post<{ opportunityId: string }>(`/api/opportunities/${id}/clone`);
+        return res.data;
+    },
+};
