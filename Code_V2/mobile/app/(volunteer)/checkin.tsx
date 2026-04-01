@@ -371,6 +371,12 @@ export default function CheckInScreen() {
         scannedRef.current = false;
     };
 
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchApps();
+        setRefreshing(false);
+    }, [fetchApps]);
+
     // QR scanner fullscreen
     if (qrScanning) {
         return (
@@ -459,12 +465,6 @@ export default function CheckInScreen() {
   </script>
 </body>
 </html>`;
-
-    const onRefresh = useCallback(async () => {
-        setRefreshing(true);
-        await fetchApps();
-        setRefreshing(false);
-    }, [fetchApps]);
 
     return (
         <ScrollView
