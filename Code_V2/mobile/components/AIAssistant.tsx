@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         margin: 16,
         right: 0,
-        bottom: 72, // Above standard bottom tabs
+        bottom: 140, // Elevated to avoid overlapping with screen-level standard FABs
         backgroundColor: '#f97316', // Orange matching web gradient
     },
     modalContent: {
