@@ -21,7 +21,7 @@ export interface UserRecord {
 export interface SiloGrainDistribution {
     silo: string;
     totalActivations: number;
-    grainTypes: { type: string; count: number }[];
+    grainTypes: { grainType: string; activations: number }[];
 }
 
 export interface GrainDistributionSummary {

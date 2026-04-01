@@ -104,7 +104,7 @@ export default function SystemScreen() {
                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                                     {silo.grainTypes?.slice(0, 8).map((gt, j) => (
                                         <Chip key={j} compact style={{ backgroundColor: COLORS.surfaceLight }} textStyle={{ color: COLORS.textSecondary, fontSize: 10 }}>
-                                            {(gt?.type || 'Unknown').split('.').pop()}: {gt?.count || 0}
+                                            {(gt?.grainType || 'Unknown').split('.').pop()}: {gt?.activations || 0}
                                         </Chip>
                                     ))}
                                 </View>
