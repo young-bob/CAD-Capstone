@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { COLORS } from '../../constants/config';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AIAssistant from '../../components/AIAssistant';
 
 export default function VolunteerLayout() {
     return (
+        <>
         <Tabs
             screenOptions={{
                 headerStyle: { backgroundColor: COLORS.surface },
@@ -64,5 +66,7 @@ export default function VolunteerLayout() {
             <Tabs.Screen name="opportunity-detail" options={{ title: 'Opportunity', href: null }} />
             <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
         </Tabs>
+            <AIAssistant userRole="volunteer" />
+        </>
     );
 }
