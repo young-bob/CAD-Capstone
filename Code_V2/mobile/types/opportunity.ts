@@ -47,4 +47,18 @@ export interface OpportunitySummary {
     availableSpots: number;
     latitude: number | null;
     longitude: number | null;
+    requiredSkillIds: string[] | null;
+}
+
+export interface OpportunityRecommendation extends OpportunitySummary {
+    matchedSkillCount: number;
+    requiredSkillCount: number;
+    skillMatchRatio: number;
+    distanceKm: number | null;
+    recommendationScore: number;
+}
+
+export interface OpportunityRecommendationResult {
+    volunteerSkillCount: number;
+    opportunities: OpportunityRecommendation[];
 }

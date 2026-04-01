@@ -62,6 +62,7 @@ export default function VolunteerLayout() {
             <Tabs.Screen name="skills" options={{ title: 'Skills', href: null }} />
             <Tabs.Screen name="organizations" options={{ title: 'Organizations', href: null }} />
             <Tabs.Screen name="opportunity-detail" options={{ title: 'Opportunity', href: null }} />
+            <Tabs.Screen name="notifications" options={{ title: 'Notifications', href: null }} />
         </Tabs>
     );
 }
