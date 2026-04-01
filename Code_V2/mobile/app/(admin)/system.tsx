@@ -79,7 +79,7 @@ export default function SystemScreen() {
                     </Surface>
                     <Surface style={styles.statCard} elevation={2}>
                         <MaterialCommunityIcons name="chart-donut" size={28} color={COLORS.secondary} />
-                        <Text variant="headlineMedium" style={styles.statValue}>{(sysInfo.overallBusinessRatio * 100).toFixed(0)}%</Text>
+                        <Text variant="headlineMedium" style={styles.statValue}>{((sysInfo.overallBusinessRatio || 0) * 100).toFixed(0)}%</Text>
                         <Text style={styles.statLabel}>Business</Text>
                     </Surface>
                 </View>
@@ -90,9 +90,9 @@ export default function SystemScreen() {
                 <>
                     <Text variant="titleMedium" style={styles.sectionTitle}>Grain Distribution</Text>
                     <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginBottom: 12 }}>
-                        {grainDist.totalSilos} silos · {grainDist.totalActivations} total activations
+                        {grainDist.totalSilos || 0} silos · {grainDist.totalActivations || 0} total activations
                     </Text>
-                    {grainDist.silos.map((silo, i) => (
+                    {grainDist.silos?.map((silo, i) => (
                         <Card key={i} style={styles.card} mode="outlined">
                             <Card.Content>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -102,7 +102,7 @@ export default function SystemScreen() {
                                     </Chip>
                                 </View>
                                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                                    {silo.grainTypes.slice(0, 8).map((gt, j) => (
+                                    {silo.grainTypes?.slice(0, 8).map((gt, j) => (
                                         <Chip key={j} compact style={{ backgroundColor: COLORS.surfaceLight }} textStyle={{ color: COLORS.textSecondary, fontSize: 10 }}>
                                             {gt.type.split('.').pop()}: {gt.count}
                                         </Chip>
@@ -115,13 +115,13 @@ export default function SystemScreen() {
             )}
 
             {/* Silo Health */}
-            {sysInfo && sysInfo.silos.length > 0 && (
+            {sysInfo && (sysInfo.silos?.length || 0) > 0 && (
                 <>
                     <Text variant="titleMedium" style={styles.sectionTitle}>Silo Health</Text>
-                    {sysInfo.silos.map((silo, i) => {
+                    {sysInfo.silos?.map((silo, i) => {
                         const alive = silo.isAlive;
-                        const cpu = silo.runtime?.cpuUsage ?? 0;
-                        const mem = silo.runtime?.memoryUsageRatio ?? 0;
+                        const cpu = Number(silo.runtime?.cpuUsage) || 0;
+                        const mem = Number(silo.runtime?.memoryUsageRatio) || 0;
                         const overloaded = silo.runtime?.isOverloaded ?? false;
 
                         return (
