@@ -11,6 +11,7 @@ public interface IAttendanceRecordGrain : IGrainWithGuidKey
     Task CheckOut(DateTime? timeOut = null);
     Task ManualAdjustment(Guid coordinatorId, DateTime newCheckIn, DateTime newCheckOut, string reason);
     Task RaiseDispute(string reason, string evidenceUrl);
+    Task RaiseNoShowDispute(string reason, string evidenceUrl);
     Task MarkDisputeUnderReview(Guid coordinatorId);
     Task ResolveDispute(Guid resolverId, string resolution, double adjustedHours);
     Task Confirm(Guid supervisorId, int rating);

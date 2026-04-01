@@ -201,6 +201,24 @@ public class AttendanceRecordGrain(
             this.GetPrimaryKey(), state.State.Status, newCheckOut, state.State.VerifiedTime.TotalHours));
     }
 
+    public async Task RaiseNoShowDispute(string reason, string evidenceUrl)
+    {
+        if (state.State.Status != AttendanceStatus.Pending)
+            throw new InvalidOperationException("NoShow dispute can only be raised on a Pending attendance record.");
+        state.State.DisputeLog = new DisputeInfo
+        {
+            RaisedByVolunteerId = state.State.VolunteerId,
+            Reason = reason,
+            EvidenceUrl = evidenceUrl,
+            Status = DisputeStatus.Open
+        };
+        state.State.Status = AttendanceStatus.Disputed;
+        await state.WriteStateAsync();
+
+        var volProfile = await grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId).GetProfile();
+        logger.LogInformation("NoShow dispute raised by volunteer {VolunteerId} on attendance {AttendanceId}", state.State.VolunteerId, this.GetPrimaryKey());
+    }
+
     public async Task RaiseDispute(string reason, string evidenceUrl)
     {
         if (state.State.Status != AttendanceStatus.CheckedOut)

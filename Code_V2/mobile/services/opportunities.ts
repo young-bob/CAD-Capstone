@@ -11,9 +11,11 @@ export const opportunityService = {
         const params: Record<string, string> = {};
         if (query) params.query = query;
         if (category) params.category = category;
-        params._t = Date.now().toString(); // CACHE BUSTER
-        const config = { params };
-        const res = await api.get<OpportunitySummary[]>('/api/opportunities', config);
+        params._t = Date.now().toString();
+        const res = await api.get<OpportunitySummary[]>('/api/opportunities', {
+            params,
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        });
         return res.data;
     },
 

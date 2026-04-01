@@ -45,6 +45,9 @@ export const attendanceService = {
     dispute: async (id: string, data: { reason: string; evidenceUrl: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/dispute`, data);
     },
+    noShowDispute: async (id: string, data: { reason: string; evidenceUrl: string }): Promise<void> => {
+        await api.post(`/api/attendance/${id}/noshow-dispute`, data);
+    },
     confirm: async (id: string, data: { supervisorId: string; rating: number }): Promise<void> => {
         await api.post(`/api/attendance/${id}/confirm`, data);
     },

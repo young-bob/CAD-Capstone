@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, RefreshControl } from 'react-native';
 import { Button, Text, Surface, Card, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ExpoLocation from 'expo-location';
@@ -28,6 +28,7 @@ interface ActiveApp {
 export default function CheckInScreen() {
     const { linkedGrainId } = useAuthStore();
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [activeApps, setActiveApps] = useState<ActiveApp[]>([]);
     const [selectedApp, setSelectedApp] = useState<ActiveApp | null>(null);
     const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -459,8 +460,18 @@ export default function CheckInScreen() {
 </body>
 </html>`;
 
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchApps();
+        setRefreshing(false);
+    }, [fetchApps]);
+
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        >
             {/* ── Leaflet Map ── */}
             <Surface style={styles.mapSurface} elevation={1}>
                 <View style={styles.mapHeader}>

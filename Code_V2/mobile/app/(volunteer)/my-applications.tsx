@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, SectionList, StyleSheet, RefreshControl, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { View, SectionList, StyleSheet, RefreshControl, Alert, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
 import { Card, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
 import { applicationService } from '../../services/applications';
 import { opportunityService } from '../../services/opportunities';
+import { attendanceService } from '../../services/attendance';
 import { ApplicationStatus } from '../../types/enums';
 import { ApplicationSummary } from '../../types/application';
+import { AttendanceSummary } from '../../types/attendance';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -31,14 +33,23 @@ export default function MyApplicationsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [applications, setApplications] = useState<ApplicationSummary[]>([]);
+    const [attendance, setAttendance] = useState<AttendanceSummary[]>([]);
     const [activeTab, setActiveTab] = useState<TabKey>('Upcoming');
+    const [disputeAttendanceId, setDisputeAttendanceId] = useState<string | null>(null);
+    const [disputeReason, setDisputeReason] = useState('');
+    const [disputeEvidence, setDisputeEvidence] = useState('');
+    const [disputeLoading, setDisputeLoading] = useState(false);
     const { linkedGrainId } = useAuthStore();
 
     const fetchApplications = useCallback(async () => {
         try {
             if (!linkedGrainId) { setLoading(false); return; }
-            const results = await applicationService.getForVolunteer(linkedGrainId);
+            const [results, attendanceRecords] = await Promise.all([
+                applicationService.getForVolunteer(linkedGrainId),
+                attendanceService.getByVolunteer(linkedGrainId),
+            ]);
             setApplications(results);
+            setAttendance(attendanceRecords);
         } catch (err: any) {
             console.log('Fetch error:', err.message);
         } finally {
@@ -78,6 +89,22 @@ export default function MyApplicationsScreen() {
             await fetchApplications();
         } catch (err: any) {
             Alert.alert('Error', err.response?.data?.toString() || 'Failed to accept');
+        }
+    };
+
+    const handleRaiseDispute = async () => {
+        if (!disputeAttendanceId || !disputeReason.trim()) return;
+        setDisputeLoading(true);
+        try {
+            await attendanceService.noShowDispute(disputeAttendanceId, { reason: disputeReason, evidenceUrl: disputeEvidence });
+            Alert.alert('Submitted', 'Your dispute has been submitted for admin review.');
+            setDisputeAttendanceId(null);
+            setDisputeReason('');
+            setDisputeEvidence('');
+        } catch (err: any) {
+            Alert.alert('Error', err.response?.data?.toString() || 'Failed to submit dispute');
+        } finally {
+            setDisputeLoading(false);
         }
     };
 
@@ -126,7 +153,10 @@ export default function MyApplicationsScreen() {
                 keyExtractor={(item) => item.applicationId}
                 contentContainerStyle={styles.list}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-                renderItem={({ item }) => (
+                renderItem={({ item }) => {
+                    const rec = attendance.find(r => r.opportunityId === item.opportunityId);
+                    const isNoShow = item.status === ApplicationStatus.NoShow;
+                    return (
                     <Card style={styles.card} mode="outlined">
                         <Card.Content>
                             {item.organizationName ? (
@@ -148,6 +178,21 @@ export default function MyApplicationsScreen() {
                                 <MaterialCommunityIcons name="calendar-outline" size={13} color={COLORS.textSecondary} />
                                 <Text style={styles.meta}>Applied: {new Date(item.appliedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
                             </View>
+                            {rec?.checkInTime && (
+                                <View style={styles.metaRow}>
+                                    <MaterialCommunityIcons name="login" size={13} color={COLORS.success} />
+                                    <Text style={styles.meta}>
+                                        Check-in: {new Date(rec.checkInTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {rec.checkOutTime ? `  ·  Check-out: ${new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                                    </Text>
+                                </View>
+                            )}
+                            {isNoShow && !rec?.checkInTime && (
+                                <View style={styles.metaRow}>
+                                    <MaterialCommunityIcons name="alert-circle-outline" size={13} color={COLORS.error} />
+                                    <Text style={[styles.meta, { color: COLORS.error }]}>No check-in record found</Text>
+                                </View>
+                            )}
                             <Chip compact
                                 style={[styles.chip, { backgroundColor: (STATUS_COLORS[item.status] || COLORS.textSecondary) + '20' }]}
                                 textStyle={[styles.chipText, { color: STATUS_COLORS[item.status] || COLORS.textSecondary }]}
@@ -160,9 +205,15 @@ export default function MyApplicationsScreen() {
                             {item.status === ApplicationStatus.Promoted && (
                                 <Button compact mode="contained" buttonColor={COLORS.success} onPress={() => handleAccept(item.applicationId)}>Accept Invitation</Button>
                             )}
+                            {isNoShow && rec?.attendanceId && (
+                                <Button compact textColor={COLORS.warning} onPress={() => { setDisputeAttendanceId(rec.attendanceId); setDisputeReason(''); setDisputeEvidence(''); }}>
+                                    ⚠️ Raise Dispute
+                                </Button>
+                            )}
                         </Card.Actions>
                     </Card>
-                )}
+                    );
+                }}
                 ListEmptyComponent={
                     <View style={styles.empty}>
                         <MaterialCommunityIcons name="clipboard-text-outline" size={56} color={COLORS.textSecondary} />
@@ -172,6 +223,39 @@ export default function MyApplicationsScreen() {
                     </View>
                 }
             />
+
+            {/* Dispute Modal */}
+            <Modal visible={!!disputeAttendanceId} transparent animationType="fade" onRequestClose={() => setDisputeAttendanceId(null)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <Text variant="titleMedium" style={styles.modalTitle}>Raise Dispute</Text>
+                        <Text style={styles.modalHint}>Describe why you believe the NoShow mark is incorrect.</Text>
+                        <TextInput
+                            value={disputeReason}
+                            onChangeText={setDisputeReason}
+                            placeholder="Reason (required)"
+                            multiline
+                            numberOfLines={3}
+                            style={styles.textInput}
+                            placeholderTextColor={COLORS.textSecondary}
+                        />
+                        <TextInput
+                            value={disputeEvidence}
+                            onChangeText={setDisputeEvidence}
+                            placeholder="Evidence URL (optional)"
+                            style={[styles.textInput, { marginTop: 8 }]}
+                            placeholderTextColor={COLORS.textSecondary}
+                        />
+                        <View style={styles.modalActions}>
+                            <Button compact textColor={COLORS.textSecondary} onPress={() => setDisputeAttendanceId(null)}>Cancel</Button>
+                            <Button compact mode="contained" buttonColor={COLORS.warning} loading={disputeLoading}
+                                disabled={!disputeReason.trim() || disputeLoading} onPress={handleRaiseDispute}>
+                                Submit
+                            </Button>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -201,4 +285,10 @@ const styles = StyleSheet.create({
     emptyTitle: { color: COLORS.text, fontWeight: 'bold', fontSize: 18, marginTop: 12 },
     emptyText: { color: COLORS.textSecondary, marginTop: 4 },
     emptyHint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 8, fontStyle: 'italic' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalBox: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 },
+    modalTitle: { color: COLORS.text, fontWeight: '700', marginBottom: 8 },
+    modalHint: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 12 },
+    textInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 10, fontSize: 13, color: COLORS.text, backgroundColor: COLORS.surfaceLight, textAlignVertical: 'top' },
+    modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
 });

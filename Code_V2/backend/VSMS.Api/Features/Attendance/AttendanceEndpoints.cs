@@ -176,6 +176,16 @@ public static class AttendanceEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/{id:guid}/noshow-dispute", async (Guid id, DisputeRequest req, HttpContext http, IGrainFactory grains) =>
+        {
+            var grain = grains.GetGrain<IAttendanceRecordGrain>(id);
+            var state = await grain.GetState();
+            if (!http.IsSelfByGrainId(state.VolunteerId))
+                return Results.Forbid();
+            await grain.RaiseNoShowDispute(req.Reason, req.EvidenceUrl);
+            return Results.NoContent();
+        });
+
         group.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmRequest req, HttpContext http, AppDbContext db, IGrainFactory grains) =>
         {
             var grain = grains.GetGrain<IAttendanceRecordGrain>(id);

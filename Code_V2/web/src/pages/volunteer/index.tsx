@@ -1079,6 +1079,10 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const [actionId, setActionId] = useState<string | null>(null);
     const [confirmWithdrawApp, setConfirmWithdrawApp] = useState<ApplicationSummary | null>(null);
     const [followedOrgIds, setFollowedOrgIds] = useState<Set<string>>(new Set());
+    const [appAttendance, setAppAttendance] = useState<AttendanceSummary[]>([]);
+    const [disputeAppId, setDisputeAppId] = useState<string | null>(null);
+    const [appDisputeReason, setAppDisputeReason] = useState('');
+    const [appDisputeEvidence, setAppDisputeEvidence] = useState('');
     const [dismissedOrgs, setDismissedOrgs] = useState<Set<string>>(() => {
         const keys = Object.keys(localStorage).filter(k => k.startsWith('vsms_dismiss_follow_'));
         return new Set(keys.map(k => k.replace('vsms_dismiss_follow_', '')));
@@ -1088,11 +1092,13 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
         if (!auth.linkedGrainId) return;
         setLoading(true); setError('');
         try {
-            const [data, profile] = await Promise.all([
+            const [data, profile, attendance] = await Promise.all([
                 applicationService.getForVolunteer(auth.linkedGrainId),
                 volunteerService.getProfile(auth.linkedGrainId),
+                attendanceService.getByVolunteer(auth.linkedGrainId),
             ]);
             setApps(data);
+            setAppAttendance(attendance);
             setFollowedOrgIds(new Set(profile.followedOrgIds ?? []));
         } catch (err: any) {
             setError(getErr(err, 'Failed to load applications'));
@@ -1169,6 +1175,20 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
         NoShow: 'bg-rose-100 text-rose-700',
     };
 
+    const handleAppDispute = async () => {
+        if (!disputeAppId || !appDisputeReason.trim()) return;
+        try {
+            await attendanceService.noShowDispute(disputeAppId, { reason: appDisputeReason, evidenceUrl: appDisputeEvidence });
+            showToast('Dispute submitted for admin review.');
+        } catch (err: any) {
+            showToast(getErr(err, 'Failed to submit dispute'));
+        } finally {
+            setDisputeAppId(null);
+            setAppDisputeReason('');
+            setAppDisputeEvidence('');
+        }
+    };
+
     const canWithdraw = (status: string) => ['Pending', 'Waitlisted', 'Approved', 'Promoted'].includes(status);
 
     const groups = {
@@ -1182,7 +1202,10 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const visibleTab: TabKey = tabs.includes(activeTab) ? activeTab : (tabs[0] ?? 'Upcoming');
     const visibleApps = groups[visibleTab] ?? [];
 
-    const renderCard = (a: ApplicationSummary) => (
+    const renderCard = (a: ApplicationSummary) => {
+        const rec = appAttendance.find(r => r.opportunityId === a.opportunityId);
+        const isNoShow = a.status === 'NoShow';
+        return (
         <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -1205,28 +1228,52 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                         <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                         <p className="text-xs text-stone-400">Applied: {new Date(a.appliedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                     </div>
+                    {rec?.checkInTime && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <p className="text-xs text-stone-500">
+                                Check-in: <span className="font-medium">{new Date(rec.checkInTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                {rec.checkOutTime && <> · Check-out: <span className="font-medium">{new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></>}
+                            </p>
+                        </div>
+                    )}
+                    {isNoShow && !rec?.checkInTime && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <p className="text-xs text-rose-500 font-medium">No check-in record found</p>
+                        </div>
+                    )}
                     {actionId === a.applicationId && (
                         <p className="text-xs text-orange-600 font-semibold mt-2">Processing your request...</p>
                     )}
                 </div>
-                <div className="flex items-center gap-3 shrink-0 sm:pt-1">
+                <div className="flex flex-col items-end gap-2 shrink-0 sm:pt-1">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
-                    {a.status === 'Promoted' && (
-                        <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
-                            className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
-                            {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Accept Invitation
-                        </button>
-                    )}
-                    {canWithdraw(a.status) && (
-                        <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
-                            className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
-                            {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {a.status === 'Promoted' && (
+                            <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
+                                className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-xl text-sm hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-1">
+                                {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Accept Invitation
+                            </button>
+                        )}
+                        {canWithdraw(a.status) && (
+                            <button onClick={() => setConfirmWithdrawApp(a)} disabled={actionId === a.applicationId}
+                                className="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 disabled:opacity-50 flex items-center gap-1">
+                                {actionId === a.applicationId && <Loader2 className="w-3 h-3 animate-spin" />} Withdraw
+                            </button>
+                        )}
+                        {isNoShow && rec?.attendanceId && (
+                            <button onClick={() => { setDisputeAppId(rec.attendanceId); setAppDisputeReason(''); setAppDisputeEvidence(''); }}
+                                className="px-4 py-2 bg-amber-50 text-amber-600 font-bold rounded-xl text-sm hover:bg-amber-100 border border-amber-200 flex items-center gap-1">
+                                ⚠️ Raise Dispute
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -1240,6 +1287,34 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                 onCancel={() => setConfirmWithdrawApp(null)}
                 onConfirm={handleWithdrawConfirm}
             />
+            {disputeAppId && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl space-y-4">
+                        <h2 className="text-lg font-bold text-stone-800">Raise Dispute</h2>
+                        <p className="text-sm text-stone-500">Describe why you believe this NoShow mark is incorrect.</p>
+                        <textarea
+                            value={appDisputeReason}
+                            onChange={e => setAppDisputeReason(e.target.value)}
+                            placeholder="Reason (required)"
+                            rows={3}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <input
+                            value={appDisputeEvidence}
+                            onChange={e => setAppDisputeEvidence(e.target.value)}
+                            placeholder="Evidence URL (optional)"
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setDisputeAppId(null)} className="px-4 py-2 text-stone-500 font-bold hover:bg-stone-100 rounded-xl text-sm">Cancel</button>
+                            <button onClick={handleAppDispute} disabled={!appDisputeReason.trim()}
+                                className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-sm hover:bg-amber-600 disabled:opacity-50">
+                                Submit Dispute
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Follow prompts for accepted orgs not yet followed */}
             {!loading && (() => {
                 const seen = new Set<string>();

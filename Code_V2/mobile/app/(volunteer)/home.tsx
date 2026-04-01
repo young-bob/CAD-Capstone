@@ -38,7 +38,8 @@ export default function HomeScreen() {
     const [opportunities, setOpportunities] = useState<OpportunitySummary[]>([]);
     const { linkedGrainId } = useAuthStore();
 
-    const fetchOpportunities = useCallback(async () => {
+    const fetchOpportunities = useCallback(async (isRefresh = false) => {
+        if (!isRefresh) setLoading(true);
         try {
             if (!linkedGrainId) { setLoading(false); return; }
             const results = await opportunityService.search();
@@ -54,7 +55,7 @@ export default function HomeScreen() {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await fetchOpportunities();
+        await fetchOpportunities(true);
         setRefreshing(false);
     }, [fetchOpportunities]);
 
