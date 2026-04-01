@@ -53,6 +53,10 @@ function simulateStream(text: string, onChunk: (chunk: string) => void, onDone: 
     return () => clearInterval(timer);
 }
 
+function generateId() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
 export default function AIAssistant({ userRole, currentView }: Props) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -121,8 +125,8 @@ export default function AIAssistant({ userRole, currentView }: Props) {
         if (!userText.trim() || isStreaming) return;
 
         const userInput = userText.trim();
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: userInput };
-        const assistantId = crypto.randomUUID();
+        const userMsg: Message = { id: generateId(), role: 'user', content: userInput };
+        const assistantId = generateId();
         const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', streaming: true };
 
         setMessages(prev => [...prev, userMsg, assistantMsg]);
