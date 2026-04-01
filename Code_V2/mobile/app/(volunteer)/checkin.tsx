@@ -10,9 +10,10 @@ import { volunteerService } from '../../services/volunteers';
 import { applicationService } from '../../services/applications';
 import { attendanceService } from '../../services/attendance';
 import { opportunityService } from '../../services/opportunities';
-import { ApplicationStatus } from '../../types/enums';
+import { ApplicationStatus, AttendanceStatus } from '../../types/enums';
 import { GeoFenceSettings } from '../../types/opportunity';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { uuid } from 'expo-modules-core';
 
 interface ActiveApp {
     id: string;
@@ -21,6 +22,7 @@ interface ActiveApp {
     shiftId: string;
     shiftStartTime?: string | null;
     attendanceId: string | null;
+    attendanceStatus: string | null;
 }
 
 export default function CheckInScreen() {
@@ -86,6 +88,7 @@ export default function CheckInScreen() {
                 applicationService.getForVolunteer(linkedGrainId),
                 attendanceService.getByVolunteer(linkedGrainId),
             ]);
+            const doneStatuses = [AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
             const results: ActiveApp[] = apps
                 .filter(a => a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
                 .map(a => {
@@ -97,8 +100,10 @@ export default function CheckInScreen() {
                         shiftId: a.shiftId,
                         shiftStartTime: a.shiftStartTime,
                         attendanceId: rec?.attendanceId ?? null,
+                        attendanceStatus: rec?.status ?? null,
                     };
-                });
+                })
+                .filter(a => !a.attendanceStatus || !doneStatuses.includes(a.attendanceStatus as AttendanceStatus));
             setActiveApps(results);
         } catch { /* */ } finally {
             setLoading(false);
@@ -232,37 +237,54 @@ export default function CheckInScreen() {
             }
             const [opportunityId, shiftId] = parts;
             const apps = await applicationService.getForVolunteer(linkedGrainId);
-            const match = apps.find(
+            let match = apps.find(
                 a => a.opportunityId === opportunityId && a.shiftId === shiftId &&
                     (a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
             );
+
+            // No approved application — apply to this shift on the spot
             if (!match) {
-                Alert.alert('No Match', "You don't have an approved application for this shift.", [
-                    { text: 'OK', onPress: () => { scannedRef.current = false; } },
-                ]);
-                return;
+                setActionLoading(true);
+                const { applicationId } = await opportunityService.apply(opportunityId, {
+                    volunteerId: linkedGrainId,
+                    shiftId,
+                    idempotencyKey: uuid.v4(),
+                });
+                await fetchApps();
+                const refreshedApps = await applicationService.getForVolunteer(linkedGrainId);
+                match = refreshedApps.find(a => a.applicationId === applicationId);
+                if (!match) {
+                    Alert.alert('Applied', 'You have been added to this shift. Check in will be available once approved by the coordinator.');
+                    scannedRef.current = false;
+                    setActionLoading(false);
+                    return;
+                }
             }
 
-            const matchedApp = activeApps.find(a => a.id === match.applicationId);
+            setActionLoading(true);
+            const matchedApp = activeApps.find(a => a.id === match!.applicationId)
+                ?? (await (async () => { await fetchApps(); return activeApps.find(a => a.id === match!.applicationId); })());
             const existingAttendanceId = matchedApp?.attendanceId;
             if (!existingAttendanceId) {
                 Alert.alert('Not Ready', 'No attendance record found for this shift. Please contact your coordinator.', [
                     { text: 'OK', onPress: () => { scannedRef.current = false; } },
                 ]);
+                setActionLoading(false);
                 return;
             }
-            setActionLoading(true);
             await attendanceService.checkIn(existingAttendanceId, { lat: 0, lon: 0, proofPhotoUrl: '' });
             setAttendanceId(existingAttendanceId);
             setSelectedApp({
-                id: match.applicationId,
-                oppId: match.opportunityId,
-                oppTitle: `${match.opportunityTitle} (${match.shiftName})`,
-                shiftId: match.shiftId,
+                id: match!.applicationId,
+                oppId: match!.opportunityId,
+                oppTitle: `${match!.opportunityTitle} (${match!.shiftName})`,
+                shiftId: match!.shiftId,
+                shiftStartTime: match!.shiftStartTime,
                 attendanceId: existingAttendanceId,
+                attendanceStatus: AttendanceStatus.CheckedIn,
             });
             setCheckedIn(true);
-            Alert.alert('Checked In!', `Successfully checked in to "${match.opportunityTitle}".`);
+            Alert.alert('Checked In!', `Successfully checked in to "${match!.opportunityTitle}".`);
         } catch (err: any) {
             Alert.alert('Check-In Failed', err.response?.data?.toString() || 'An error occurred.');
             scannedRef.current = false;
@@ -289,7 +311,7 @@ export default function CheckInScreen() {
         try {
             await attendanceService.checkOut(attendanceId);
             Alert.alert('Checked Out', 'Would you like to leave feedback?', [
-                { text: 'Skip', onPress: resetState },
+                { text: 'Skip', onPress: () => { resetState(); fetchApps(); } },
                 { text: 'Leave Feedback', onPress: () => setShowFeedback(true) },
             ]);
         } catch (err: any) {
@@ -314,6 +336,7 @@ export default function CheckInScreen() {
         } finally {
             setShowFeedback(false);
             resetState();
+            fetchApps();
             setActionLoading(false);
         }
     };
@@ -515,7 +538,7 @@ export default function CheckInScreen() {
                         {/* Step 1: Select Event */}
                         <Text style={styles.stepTitle}>Select Event</Text>
                         {activeApps.length === 0 ? (
-                            <Text style={styles.hint}>No approved applications. Get approved for an event first.</Text>
+                            <Text style={styles.hint}>No upcoming shifts. Use the QR code scanner below to check in at the venue.</Text>
                         ) : (
                             activeApps.map((app) => (
                                 <Card
@@ -579,7 +602,7 @@ export default function CheckInScreen() {
                                         textColor={COLORS.secondary}
                                         style={[styles.mainButton, { borderColor: COLORS.secondary }]}
                                         icon="qrcode-scan"
-                                        disabled={!selectedApp || actionLoading}
+                                        disabled={actionLoading}
                                     >
                                         Scan QR Code
                                     </Button>
