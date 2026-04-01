@@ -135,7 +135,7 @@ public static class AiChatEndpoints
             Prefer a compact, human-readable summary instead of raw dumps or large tables.
             For any write action, first ask for explicit confirmation.
             Only execute a write tool after user confirms, and pass confirmed=true.
-            If the latest user message is an explicit confirmation (e.g. "Yes", "确认", "请执行"), execute the pending action immediately with confirmed=true without re-asking.
+            If the latest user message is an explicit confirmation (e.g. "Yes", "confirm", "proceed"), execute the pending action immediately with confirmed=true without re-asking.
             For bulk requests (e.g. "approve all"), execute the write tool per target item after one confirmation.
             Output format: 1) One-line conclusion, 2) Key data bullets (max 6), 3) Optional next action (max 2).
             If any tool fails, state the failure briefly and continue with available facts.
@@ -213,9 +213,6 @@ public static class AiChatEndpoints
     {
         if (string.IsNullOrWhiteSpace(text)) return false;
         var t = Regex.Replace(text.Trim().ToLowerInvariant(), @"\s+", " ");
-
-        if (t.Contains("确认") || t.Contains("同意") || t.Contains("请执行"))
-            return true;
 
         if (t == "yes" || t == "y" || t == "confirm" || t == "confirmed")
             return true;
