@@ -338,7 +338,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
         { label: 'Total Hours', numVal: profile?.totalHours ?? 0, decimals: 1, unit: 'hrs', icon: Clock, gradient: 'from-blue-500 to-cyan-400', glow: 'hover:shadow-blue-500/20', target: 'attendance' as ViewName },
         { label: 'Completed', numVal: profile?.completedOpportunities ?? 0, decimals: 0, unit: 'events', icon: CheckCircle2, gradient: 'from-emerald-500 to-teal-400', glow: 'hover:shadow-emerald-500/20', target: 'attendance' as ViewName },
         { label: 'Credentials', numVal: profile?.credentials?.length ?? 0, decimals: 0, unit: 'docs', icon: Award, gradient: 'from-amber-400 to-orange-500', glow: 'hover:shadow-amber-500/20', target: 'profile' as ViewName },
-        { label: 'Applications', numVal: apps.length, decimals: 0, unit: 'total', icon: BadgeCheck, gradient: 'from-violet-500 to-purple-500', glow: 'hover:shadow-violet-500/20', target: 'applications' as ViewName },
+        { label: 'Applications', numVal: apps.filter(a => ['Approved', 'Pending', 'Promoted', 'Waitlisted'].includes(a.status) && (!a.shiftEndTime || new Date(a.shiftEndTime).getTime() >= Date.now())).length, decimals: 0, unit: 'active', icon: BadgeCheck, gradient: 'from-violet-500 to-purple-500', glow: 'hover:shadow-violet-500/20', target: 'applications' as ViewName },
     ];
 
     if (loading) return <SkeletonDashboard />;
@@ -1191,10 +1191,14 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
 
     const canWithdraw = (status: string) => ['Pending', 'Waitlisted', 'Approved', 'Promoted'].includes(status);
 
+    const now = Date.now();
+    const isShiftPast = (a: ApplicationSummary) => !!a.shiftEndTime && new Date(a.shiftEndTime).getTime() < now;
+    const activeStatuses = ['Approved', 'Pending', 'Promoted'];
+    const terminalStatuses = ['Completed', 'Rejected', 'Withdrawn', 'NoShow'];
     const groups = {
-        Upcoming: apps.filter(a => ['Approved', 'Pending', 'Promoted'].includes(a.status)),
+        Upcoming: apps.filter(a => activeStatuses.includes(a.status) && !isShiftPast(a)),
         Waitlisted: apps.filter(a => a.status === 'Waitlisted'),
-        Past: apps.filter(a => ['Completed', 'Rejected', 'Withdrawn', 'NoShow'].includes(a.status)),
+        Past: apps.filter(a => terminalStatuses.includes(a.status) || (activeStatuses.includes(a.status) && isShiftPast(a))),
     };
     type TabKey = keyof typeof groups;
     const tabs: TabKey[] = (['Upcoming', 'Waitlisted', 'Past'] as TabKey[]).filter(t => groups[t].length > 0);

@@ -95,9 +95,9 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
                 ];
             } else if (userRole === 'volunteer' && auth.linkedGrainId) {
                 const apps = await applicationService.getForVolunteer(auth.linkedGrainId);
-                const actionable = ['Approved', 'Rejected', 'Waitlisted', 'Promoted'];
+                const actionable = ['Approved'];
                 notifs = (Array.isArray(apps) ? apps : [])
-                    .filter(a => actionable.includes(a.status))
+                    .filter(a => actionable.includes(a.status) && new Date(a.shiftEndTime) >= new Date())
                     .map(a => ({
                         id: `app-${a.applicationId}`,
                         title: `Application ${a.status}`,
@@ -217,7 +217,7 @@ export default function AppHeader({ userRole, onOpenSearch, onNavigate, theme, o
             >
                 <Search className="w-4 h-4 shrink-0" />
                 <span className="flex-1">Search or press</span>
-                <kbd className="text-xs bg-white border border-stone-200 rounded px-1.5 py-0.5 text-stone-400 font-mono">⌘K</kbd>
+                <kbd className="text-xs bg-white border border-stone-200 rounded px-1.5 py-0.5 text-stone-400 font-mono">⌘/Ctrl + K</kbd>
             </button>
 
             {/* ── Right: theme toggle + notifications + avatar ── */}
