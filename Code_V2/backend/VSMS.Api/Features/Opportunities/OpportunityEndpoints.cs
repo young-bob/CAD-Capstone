@@ -161,6 +161,7 @@ public static class OpportunityEndpoints
                 return Results.Forbid();
             var grain = grains.GetGrain<IOpportunityGrain>(id);
             await grain.AddShift(req.Name, req.StartTime, req.EndTime, req.MaxCapacity);
+            await SyncLatestShiftEndTime(db, id, grain);
             return Results.NoContent();
         });
 
@@ -170,6 +171,7 @@ public static class OpportunityEndpoints
                 return Results.Forbid();
             var grain = grains.GetGrain<IOpportunityGrain>(id);
             await grain.UpdateShift(shiftId, req.Name, req.StartTime, req.EndTime, req.MaxCapacity);
+            await SyncLatestShiftEndTime(db, id, grain);
             return Results.NoContent();
         });
 
@@ -179,6 +181,7 @@ public static class OpportunityEndpoints
                 return Results.Forbid();
             var grain = grains.GetGrain<IOpportunityGrain>(id);
             await grain.RemoveShift(shiftId);
+            await SyncLatestShiftEndTime(db, id, grain);
             return Results.NoContent();
         });
 
@@ -344,4 +347,15 @@ public static class OpportunityEndpoints
     }
 
     private static double ToRadians(double degrees) => degrees * (Math.PI / 180.0);
+
+    private static async Task SyncLatestShiftEndTime(AppDbContext db, Guid opportunityId, IOpportunityGrain grain)
+    {
+        var opp = await db.OpportunityReadModels.FindAsync(opportunityId);
+        if (opp == null) return;
+        var state = await grain.GetState();
+        opp.LatestShiftEndTime = state.Shifts.Count > 0
+            ? state.Shifts.Max(s => s.EndTime)
+            : (DateTime?)null;
+        await db.SaveChangesAsync();
+    }
 }

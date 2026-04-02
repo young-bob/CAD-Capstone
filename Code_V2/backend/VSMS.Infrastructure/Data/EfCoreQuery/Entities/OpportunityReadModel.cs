@@ -33,4 +33,10 @@ public class OpportunityReadModel
     /// Stored as JSON for fast contains/intersection queries.
     /// </summary>
     public List<Guid> RequiredSkillIds { get; set; } = [];
+
+    /// <summary>
+    /// The latest EndTime across all shifts. Null if no shifts have been added.
+    /// Used to hide opportunities where all shifts are in the past.
+    /// </summary>
+    public DateTime? LatestShiftEndTime { get; set; }
 }

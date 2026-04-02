@@ -80,9 +80,11 @@ public class EfCoreOpportunityQueryService(AppDbContext dbContext) : IOpportunit
     public async Task<List<OpportunitySummary>> SearchPublishedAsync(string? query = null, string? category = null, int skip = 0, int take = 500)
     {
         var (safeSkip, safeTake) = QueryPaging.Normalize(skip, take);
+        var now = DateTime.UtcNow;
         var q = dbContext.OpportunityReadModels
             .AsNoTracking()
-            .Where(o => o.Status == VSMS.Abstractions.Enums.OpportunityStatus.Published);
+            .Where(o => o.Status == VSMS.Abstractions.Enums.OpportunityStatus.Published)
+            .Where(o => o.LatestShiftEndTime == null || o.LatestShiftEndTime > now);
 
         if (!string.IsNullOrWhiteSpace(query))
         {
