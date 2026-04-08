@@ -121,6 +121,11 @@ export default function HomeScreen() {
                     query: search || undefined, category: selectedCategory || undefined, take: 500,
                 });
                 setOpportunities(result.opportunities);
+                // Inject map data immediately with distances — don't wait for re-render cycle
+                if (mapReady.current) {
+                    const withCoords = result.opportunities.filter(o => o.latitude != null && o.longitude != null);
+                    mapRef.current?.injectJavaScript(buildInjectScript(withCoords, c));
+                }
             } else {
                 const data = await opportunityService.search(search || undefined, selectedCategory || undefined);
                 setOpportunities(data.map(asRecommendation));
@@ -150,15 +155,20 @@ export default function HomeScreen() {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status !== 'granted') { setLocationStatus('denied'); return; }
 
+                let initialFetchDone = false;
                 locationSub.current = await Location.watchPositionAsync(
                     { accuracy: Location.Accuracy.High, distanceInterval: 5 },
                     (loc) => {
                         const c = { lat: loc.coords.latitude, lon: loc.coords.longitude };
                         setCoords(c);
                         setLocationStatus('ready');
-                        // Inject user location into map immediately
                         if (mapReady.current) {
                             mapRef.current?.injectJavaScript(`updateUser(${c.lat},${c.lon}); true;`);
+                        }
+                        // Re-fetch with coords on first GPS fix so distances appear in popups
+                        if (!initialFetchDone) {
+                            initialFetchDone = true;
+                            fetchOpportunities(c);
                         }
                     }
                 );
