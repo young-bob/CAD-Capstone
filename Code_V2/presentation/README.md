@@ -125,6 +125,18 @@ The presentation desktop has two groups of cards at the bottom:
 | **Storytelling** | ⚡ The Problem, 👩‍⚕️ Sarah, 👨‍💼 Mike, 🏗️ Architecture | Narrative HTML slides |
 | **Live Demos** | 📱 Volunteer Portal, 📊 Coordinator, 🛡️ Admin, 📲 Mobile App | Live webviews + device cast |
 
+### Pre-Presentation Setup
+
+Before starting the presentation, you **must pre-login** to each portal with the corresponding role account. Each portal uses an isolated browser session (`persist:*` partition), so all three can stay logged in simultaneously.
+
+| Portal | Role Account | Description |
+|--------|-------------|-------------|
+| **Volunteer Portal** | Volunteer account | Browse and sign up for available shifts |
+| **Coordinator Portal** | Coordinator account | Manage events, assign volunteers, review attendance |
+| **Admin Portal** | Admin account | System administration, user management, reports |
+
+> **Important:** If you skip this step, each portal will show the login page during the live demo, which wastes valuable presentation time. Log in to all three portals first, then close and reopen the app — sessions will persist.
+
 ### Mobile Casting Workflow
 
 1. Connect your Android device via USB cable
