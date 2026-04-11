@@ -1,0 +1,47 @@
+{
+  "name": "vsms-presentation-os",
+  "version": "1.0.0",
+  "description": "VSMS Interactive Electron Presentation with scrcpy support.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.vsms.presentation",
+    "productName": "VSMS Presentation",
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "vendor/mac",
+        "to": "vendor/mac",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "vendor/win",
+        "to": "vendor/win",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dir",
+      "icon": null
+    },
+    "win": {
+      "target": "dir",
+      "icon": null
+    }
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}

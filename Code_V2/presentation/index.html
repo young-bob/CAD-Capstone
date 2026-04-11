@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VSMS - Desktop Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/style.css">
+</head>
+
+<body>
+
+    <!-- Modern macOS Desktop Background -->
+    <div class="ambient-bg"></div>
+
+    <!-- Top URL Bar -->
+    <div class="top-url-bar">
+        <span class="url-icon">🌐</span>
+        <span class="url-text">https://www.vsms.foo</span>
+    </div>
+
+    <main id="desktop">
+
+        <!-- Massive Gradient Watermark Typography on the Desktop Wallpaper -->
+        <h1 class="desktop-watermark">VSMS</h1>
+
+        <!-- ==============================================
+             WINDOW 1: THE PROBLEM (HTML Slide)
+             ============================================== -->
+        <div class="magic-window" id="win-problem">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">Why VSMS?</div>
+                </div>
+                <div class="slide-content">
+                    <h2>The 3 Gaps We Identified</h2>
+                    <p class="subtitle">Every volunteer and every organization faces these problems today.</p>
+
+                    <!-- Cartoon Banner -->
+                    <img src="./assets/images/problem_gaps.png"
+                        style="width: 100%; max-height: 280px; object-fit: contain; border-radius: 12px; margin-bottom: 28px;"
+                        alt="Problem illustration">
+
+                    <div class="gap-cards">
+                        <div class="gap-card">
+                            <div class="gap-icon">🔍</div>
+                            <h3>Gap 1 — Hard to Find Opportunities</h3>
+                            <p>Volunteering information is scattered across dozens of websites, social media pages, and
+                                bulletin boards. The search cost is enormous — especially for students who need specific
+                                hours.</p>
+                        </div>
+                        <div class="gap-card">
+                            <div class="gap-icon">📋</div>
+                            <h3>Gap 2 — Manual Paperwork Chaos</h3>
+                            <p>Organizations manage volunteers using spreadsheets, paper sign-in sheets, and email
+                                threads. Coordinators are overwhelmed, and volunteers have a frustrating experience.</p>
+                        </div>
+                        <div class="gap-card">
+                            <div class="gap-icon">🚫</div>
+                            <h3>Gap 3 — No Proof, No Trust</h3>
+                            <p>It's easy to fake volunteer hours. There's no standardized verification system, and
+                                getting a certificate requires weeks of back-and-forth emails.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 2: SARAH'S JOURNEY (HTML Slide)
+             ============================================== -->
+        <div class="magic-window" id="win-sarah">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">User Story 1 — The Volunteer</div>
+                </div>
+                <div class="slide-content">
+                    <div class="story-header">
+                        <img src="./assets/images/sarah_confused.png"
+                            style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 3px solid rgba(245,158,11,0.3);"
+                            alt="Sarah">
+                        <p class="story-quote">"Meet Sarah — a first-year PSW student who needs 120 volunteer hours to
+                            graduate. She doesn't know where to start."</p>
+                    </div>
+
+                    <!-- Cartoon Journey Comic Strip -->
+                    <img src="./assets/images/sarah_journey.png"
+                        style="width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px; margin-bottom: 24px;"
+                        alt="Sarah's journey">
+
+                    <div class="journey-steps">
+                        <div class="journey-step">
+                            <div class="step-num">1</div>
+                            <div class="step-text">
+                                <h4>Finds opportunities via Map & AI matching</h4>
+                                <p>Sarah opens VSMS, browses a live map of nearby shifts, and gets AI-powered
+                                    recommendations based on her skills and schedule. → Solves Gap 1</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">2</div>
+                            <div class="step-text">
+                                <h4>Applies to a shift, tracks hours on dashboard</h4>
+                                <p>She taps "Apply", gets instant confirmation, and her dashboard updates with upcoming
+                                    shifts and total hours logged. → Solves Gap 2</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">3</div>
+                            <div class="step-text">
+                                <h4>GPS check-in on site, generates certificate instantly</h4>
+                                <p>On the day of the event, Sarah checks in via GPS geofencing. After completing her
+                                    shift, a verified certificate is generated immediately. → Solves Gap 3</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 3: VOLUNTEER PORTAL (Live Webview)
+             ============================================== -->
+        <div class="magic-window" id="win-volunteer">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">VSMS Volunteer Portal</div>
+                </div>
+                <div class="window-body">
+                    <!-- ELECTRON WEBVIEW (Isolated Session) -->
+                    <webview src="https://www.vsms.foo" partition="persist:volunteer"
+                        style="width:100%; height:100%; border:none;"></webview>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 4: MOBILE APP (Scrcpy Cast)
+             ============================================== -->
+        <div class="magic-window" id="win-mobile">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title" style="color: #60a5fa">Mobile Device</div>
+                </div>
+                <div class="window-body"
+                    style="flex: 1; position: relative; overflow: hidden; background: #000; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                    <video id="mobile-cast-stream" autoplay muted
+                        style="position: absolute; top: -38px; left: 0; width: 100%; height: calc(100% + 38px); object-fit: contain;"></video>
+                    <div id="mobile-cast-loader"
+                        style="position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); pointer-events: none; text-align: center; z-index: 5;">
+                        <div style="font-size: 2rem; margin-bottom: 10px; animation: pulse 1.5s infinite;">📲</div>
+                        <p style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">Intercepting ADB Native Stream...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 5: MIKE'S DASHBOARD INTRO (HTML Slide)
+             ============================================== -->
+        <div class="magic-window" id="win-mike">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">User Story 2 — The Coordinator</div>
+                </div>
+                <div class="slide-content">
+                    <div class="story-header">
+                        <img src="./assets/images/mike_overwhelmed.png"
+                            style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 3px solid rgba(96,165,250,0.3);"
+                            alt="Mike">
+                        <p class="story-quote">"Meet Mike — a coordinator at a food bank who manages 50 volunteers using
+                            spreadsheets and WhatsApp groups. He's drowning in admin work."</p>
+                    </div>
+
+                    <!-- Cartoon Journey Comic Strip -->
+                    <img src="./assets/images/mike_journey.png"
+                        style="width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px; margin-bottom: 24px;"
+                        alt="Mike's journey">
+
+                    <div class="journey-steps">
+                        <div class="journey-step">
+                            <div class="step-num">1</div>
+                            <div class="step-text">
+                                <h4>Posts a shift in seconds</h4>
+                                <p>Mike creates a new event with date, location, and required skills. It's live
+                                    instantly — no more emailing volunteer lists. → Solves Gap 2</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">2</div>
+                            <div class="step-text">
+                                <h4>Volunteers find him automatically</h4>
+                                <p>VSMS's map and AI matching push his shift to nearby, qualified volunteers.
+                                    Applications pour in without him lifting a finger. → Solves Gap 1</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">3</div>
+                            <div class="step-text">
+                                <h4>GPS-verified check-ins & instant attendance reports</h4>
+                                <p>Mike sees real-time GPS-verified attendance in his dashboard. One click exports a
+                                    full attendance report — no manual counting. → Solves Gap 3</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 6: COORDINATOR SYSTEM (Live Webview)
+             ============================================== -->
+        <div class="magic-window" id="win-coordinator">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">VSMS Coordinator Portal</div>
+                </div>
+                <div class="window-body">
+                    <!-- ELECTRON WEBVIEW (Isolated Session) -->
+                    <webview src="https://www.vsms.foo/dashboard" partition="persist:coordinator"
+                        style="width:100%; height:100%; border:none;"></webview>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
+             WINDOW 7: ARCHITECTURE (HTML Slide)
+             ============================================== -->
+        <div class="magic-window" id="win-arch">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">Technical Architecture</div>
+                </div>
+                <div class="slide-content">
+                    <h2>What Powers VSMS</h2>
+                    <p class="subtitle">The demo already proved it works — here's how.</p>
+
+                    <div class="tech-grid">
+                        <div class="tech-card">
+                            <div class="tech-icon">📱</div>
+                            <h3>Mobile App</h3>
+                            <p>React Native + Expo — cross-platform iOS & Android with native GPS, camera, and push
+                                notification access.</p>
+                        </div>
+                        <div class="tech-card">
+                            <div class="tech-icon">🌐</div>
+                            <h3>Web Application</h3>
+                            <p>React — responsive SPA for coordinators and admins with real-time dashboards and data
+                                visualization.</p>
+                        </div>
+                        <div class="tech-card">
+                            <div class="tech-icon">⚙️</div>
+                            <h3>Backend — .NET + Orleans</h3>
+                            <p>High-performance actor model with Microsoft Orleans for scalable, stateful session
+                                management and real-time event processing.</p>
+                        </div>
+                        <div class="tech-card">
+                            <div class="tech-icon">🛡️</div>
+                            <h3>Key Features</h3>
+                            <p>GPS Geofencing check-in, AI-powered volunteer matching, photo-based attendance
+                                verification, and instant PDF certificate generation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ==============================================
+             WINDOW 8: ADMIN PORTAL (Live Webview)
+             ============================================== -->
+        <div class="magic-window" id="win-admin">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">VSMS Admin Portal</div>
+                </div>
+                <div class="window-body">
+                    <webview src="https://www.vsms.foo/certificates" partition="persist:admin"
+                        style="width:100%; height:100%; border:none;"></webview>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ==============================================
+             DESKTOP CARD GRID — Split by Function
+             ============================================== -->
+        <div class="desktop-grid">
+
+            <!-- LEFT GROUP: Storytelling -->
+            <div class="card-group">
+                <div class="group-label">Storytelling</div>
+                <div class="group-cards">
+                    <div class="desktop-card" data-target="win-problem">
+                        <div class="card-icon grad-danger">⚡</div>
+                        <div class="card-label">The Problem</div>
+                        <div class="card-sub">3 gaps we identified</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-sarah">
+                        <div class="card-icon grad-pink">👩‍⚕️</div>
+                        <div class="card-label">Sarah's Journey</div>
+                        <div class="card-sub">Volunteer story</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-mike">
+                        <div class="card-icon grad-teal">👨‍💼</div>
+                        <div class="card-label">Mike's Workflow</div>
+                        <div class="card-sub">Coordinator story</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-arch">
+                        <div class="card-icon grad-slate">🏗️</div>
+                        <div class="card-label">Architecture</div>
+                        <div class="card-sub">Tech stack</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT GROUP: Live Demos -->
+            <div class="card-group">
+                <div class="group-label">Live Demos</div>
+                <div class="group-cards">
+                    <div class="desktop-card" data-target="win-volunteer">
+                        <div class="card-icon grad-brand">📱</div>
+                        <div class="card-label">Volunteer Portal</div>
+                        <div class="card-sub">Volunteer role</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-coordinator">
+                        <div class="card-icon grad-accent">📊</div>
+                        <div class="card-label">Coordinator Portal</div>
+                        <div class="card-sub">Coordinator role</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-admin">
+                        <div class="card-icon grad-success">🛡️</div>
+                        <div class="card-label">Admin Portal</div>
+                        <div class="card-sub">Admin role</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-mobile" id="btn-scrcpy">
+                        <div class="card-icon grad-blue">📲</div>
+                        <div class="card-label">Mobile App</div>
+                        <div class="card-sub">Real device</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script src="./assets/script.js"></script>
+</body>
+
+</html>
