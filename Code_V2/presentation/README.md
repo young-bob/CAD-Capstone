@@ -14,6 +14,14 @@ A cinematic, story-driven presentation engine built with **Electron** for the VS
 
 ---
 
+## Screenshots
+
+| Desktop Home | Mobile Device Casting |
+|:---:|:---:|
+| ![Desktop Home](screenshorts/Screenshot-2026-04-11-at-01.57.14.png) | ![Mobile Casting](screenshorts/Screenshot-2026-04-11-at-01.58.21.png) |
+
+---
+
 ## Prerequisites
 
 - **Node.js** ≥ 18
