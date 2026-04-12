@@ -9,6 +9,8 @@ import { UserRole } from '../../types/enums';
 
 export default function RegisterScreen() {
     const [email, setEmail] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [role, setRole] = useState<UserRole>('Volunteer');
@@ -17,7 +19,7 @@ export default function RegisterScreen() {
     const setAuth = useAuthStore((s) => s.setAuth);
 
     const handleRegister = async () => {
-        if (!email || !password) {
+        if (!email || !password || !firstName.trim() || !lastName.trim()) {
             setError('Please fill in all fields');
             return;
         }
@@ -32,7 +34,7 @@ export default function RegisterScreen() {
         setLoading(true);
         setError('');
         try {
-            const data = await authService.register({ email, password, role });
+            const data = await authService.register({ email, password, firstName: firstName.trim(), lastName: lastName.trim(), role });
             await setAuth(data);
         } catch (err: any) {
             setError(err.response?.status === 409 ? 'Email already registered' : 'Registration failed');
@@ -79,6 +81,33 @@ export default function RegisterScreen() {
                         activeOutlineColor={COLORS.primary}
                         textColor={COLORS.text}
                     />
+
+                    <View style={styles.nameRow}>
+                        <TextInput
+                            label="First Name"
+                            value={firstName}
+                            onChangeText={setFirstName}
+                            mode="outlined"
+                            autoCapitalize="words"
+                            left={<TextInput.Icon icon="account" />}
+                            style={[styles.input, styles.nameInput]}
+                            outlineColor={COLORS.border}
+                            activeOutlineColor={COLORS.primary}
+                            textColor={COLORS.text}
+                        />
+                        <TextInput
+                            label="Last Name"
+                            value={lastName}
+                            onChangeText={setLastName}
+                            mode="outlined"
+                            autoCapitalize="words"
+                            left={<TextInput.Icon icon="account" />}
+                            style={[styles.input, styles.nameInput]}
+                            outlineColor={COLORS.border}
+                            activeOutlineColor={COLORS.primary}
+                            textColor={COLORS.text}
+                        />
+                    </View>
 
                     <TextInput
                         label="Password"
@@ -140,6 +169,8 @@ const styles = StyleSheet.create({
     label: { color: COLORS.textSecondary, marginBottom: 8 },
     segmented: { marginBottom: 16 },
     input: { marginBottom: 16, backgroundColor: COLORS.surfaceLight },
+    nameRow: { flexDirection: 'row', gap: 8 },
+    nameInput: { flex: 1 },
     button: { marginTop: 8, paddingVertical: 4, borderRadius: 8 },
     error: { color: COLORS.error, textAlign: 'center', marginBottom: 12 },
     footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },

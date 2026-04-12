@@ -27,6 +27,11 @@ const defaults = {
   ongoingOpportunityRate: 0.15,
   seedSkills: true,
   seedCertificates: true,
+  seedWaivers: true,
+  seedBackgroundChecks: true,
+  seedFollows: true,
+  seedAnnouncements: true,
+  coordinatorCheckinRate: 0.3,
   incremental: false,
   runTag: "",
 };
@@ -172,6 +177,11 @@ Options:
 
   --seed-skills <true|false>          Seed skill catalog + assign skills (default: ${defaults.seedSkills})
   --seed-certificates <true|false>    Seed certificate presets (default: ${defaults.seedCertificates})
+  --seed-waivers <true|false>         Sign waivers for volunteers (default: ${defaults.seedWaivers})
+  --seed-background-checks <true|false> Set background check status (default: ${defaults.seedBackgroundChecks})
+  --seed-follows <true|false>         Volunteers follow random organizations (default: ${defaults.seedFollows})
+  --seed-announcements <true|false>   Post announcements from coordinators (default: ${defaults.seedAnnouncements})
+  --coordinator-checkin-rate <0..1>   Ratio of attendance using coordinator check-in (default: ${defaults.coordinatorCheckinRate})
   --incremental <true|false>          Reuse users from data/debug-seed/latest.json and top-up to target counts (default: ${defaults.incremental})
   --run-tag <text>                    Optional tag in generated account emails
   --help                              Show this help
@@ -211,6 +221,11 @@ const cfg = {
   ongoingOpportunityRate: clamp(asFloat(argMap["ongoing-opportunity-rate"], defaults.ongoingOpportunityRate), 0, 1),
   seedSkills: asBool(argMap["seed-skills"], defaults.seedSkills),
   seedCertificates: asBool(argMap["seed-certificates"], defaults.seedCertificates),
+  seedWaivers: asBool(argMap["seed-waivers"], defaults.seedWaivers),
+  seedBackgroundChecks: asBool(argMap["seed-background-checks"], defaults.seedBackgroundChecks),
+  seedFollows: asBool(argMap["seed-follows"], defaults.seedFollows),
+  seedAnnouncements: asBool(argMap["seed-announcements"], defaults.seedAnnouncements),
+  coordinatorCheckinRate: clamp(asFloat(argMap["coordinator-checkin-rate"], defaults.coordinatorCheckinRate), 0, 1),
   incremental: asBool(argMap.incremental, defaults.incremental),
   runTag: String(argMap["run-tag"] ?? defaults.runTag).trim(),
 };
@@ -236,10 +251,15 @@ const counters = {
   approvedApplications: 0,
   rejectedApplications: 0,
   attendanceCheckedInOut: 0,
+  coordinatorCheckins: 0,
   disputesRaised: 0,
   disputesResolved: 0,
   skillsAssigned: 0,
   requiredSkillsSet: 0,
+  waiversSigned: 0,
+  backgroundChecksSet: 0,
+  volunteerFollows: 0,
+  announcementsPosted: 0,
   warnings: 0,
 };
 
@@ -329,9 +349,9 @@ async function loginAdmin() {
   return normalizeAuth(res.data);
 }
 
-async function registerOrLogin(email, role, password) {
+async function registerOrLogin(email, role, password, firstName = "Seeded", lastName = "User") {
   const reg = await api("POST", "/api/auth/register", {
-    body: { email, password, role },
+    body: { email, password, firstName, lastName, role },
     expected: [201, 409],
   });
   if (reg.status === 201) return normalizeAuth(reg.data);
@@ -351,7 +371,8 @@ async function maybeSeedCertificates(admin) {
     });
     info("Certificate presets checked/seeded.");
   } catch (err) {
-    warn(`Failed seeding certificate presets: ${err.message}`);
+    // Endpoint may not exist in newer versions — safe to skip
+    info(`Certificate seed-presets endpoint not available (${err.status ?? 'N/A'}), skipping.`);
   }
 }
 
@@ -385,8 +406,57 @@ const personLastNames = [
 ];
 
 const regionNames = [
-  "Downtown", "North York", "Scarborough", "Etobicoke", "Mississauga", "Brampton", "Markham", "Waterloo",
+  "Waterloo", "Kitchener", "Cambridge", "Guelph", "Conestoga", "Uptown", "Belmont Village", "Hespeler",
 ];
+
+// Real Waterloo Region landmarks with precise coordinates
+const waterlooLocations = [
+  // Kitchener
+  { name: "Kitchener City Hall", lat: 43.4516, lon: -80.4925 },
+  { name: "Victoria Park - Kitchener", lat: 43.4490, lon: -80.4871 },
+  { name: "Kitchener Market", lat: 43.4513, lon: -80.4860 },
+  { name: "THEMUSEUM - Kitchener", lat: 43.4520, lon: -80.4925 },
+  { name: "Breithaupt Centre", lat: 43.4571, lon: -80.4918 },
+  { name: "Centre In The Square", lat: 43.4525, lon: -80.4900 },
+  { name: "Kitchener Public Library", lat: 43.4530, lon: -80.4880 },
+  { name: "Grand River Hospital", lat: 43.4494, lon: -80.5020 },
+  { name: "Fairview Park Mall", lat: 43.4253, lon: -80.4493 },
+  { name: "Bingemans Centre", lat: 43.4370, lon: -80.4443 },
+  { name: "Rockway Community Centre", lat: 43.4410, lon: -80.4750 },
+  { name: "Forest Heights Community Centre", lat: 43.4350, lon: -80.4670 },
+  { name: "Stanley Park Community Centre", lat: 43.4610, lon: -80.4730 },
+  { name: "Chandler Mowat Community Centre", lat: 43.4680, lon: -80.4850 },
+  // Waterloo
+  { name: "Waterloo Public Square", lat: 43.4643, lon: -80.5204 },
+  { name: "Waterloo Memorial Rec Complex", lat: 43.4611, lon: -80.5192 },
+  { name: "Conestoga Mall", lat: 43.4972, lon: -80.5290 },
+  { name: "RIM Park", lat: 43.5085, lon: -80.5353 },
+  { name: "University of Waterloo", lat: 43.4723, lon: -80.5449 },
+  { name: "Wilfrid Laurier University", lat: 43.4738, lon: -80.5275 },
+  { name: "Waterloo Town Square", lat: 43.4635, lon: -80.5220 },
+  { name: "Albert McCormick Community Centre", lat: 43.4555, lon: -80.5340 },
+  // Conestoga College
+  { name: "Conestoga College - Doon", lat: 43.3895, lon: -80.4041 },
+  { name: "Conestoga College - Waterloo", lat: 43.4795, lon: -80.5181 },
+  // Cambridge
+  { name: "Cambridge Idea Exchange", lat: 43.3601, lon: -80.3133 },
+  { name: "Cambridge Centre Mall", lat: 43.3876, lon: -80.3412 },
+  { name: "Hespeler Community Centre", lat: 43.4120, lon: -80.3120 },
+  { name: "Preston Memorial Auditorium", lat: 43.3960, lon: -80.3540 },
+  // Other
+  { name: "Waterloo Region Museum", lat: 43.3834, lon: -80.3985 },
+  { name: "St. Jacobs Farmers Market", lat: 43.5224, lon: -80.5565 },
+];
+
+function pickLocation() {
+  const loc = choose(waterlooLocations);
+  // Add small jitter ±0.002 (~200m) for realism
+  return {
+    lat: loc.lat + (Math.random() - 0.5) * 0.004,
+    lon: loc.lon + (Math.random() - 0.5) * 0.004,
+    name: loc.name,
+  };
+}
 
 const orgPrefixWords = [
   "Harbor", "Maple", "Riverbend", "Northstar", "Sunrise", "Greenway", "Unity", "Bridgepoint", "Silverline", "Lakeside",
@@ -419,30 +489,36 @@ const opportunityTitleTemplates = {
     "Family Support Drop-in",
     "Weekend Community Kitchen",
     "Newcomer Welcome Session",
+    "Community Food Drive",
+    "Winter Clothing Collection",
   ],
   Environment: [
-    "Riverside Cleanup Day",
+    "Grand River Cleanup Day",
     "Urban Tree Care Project",
     "Recycling Education Booth",
-    "Park Revitalization Shift",
+    "Laurel Creek Trail Restoration",
+    "Victoria Park Revitalization",
   ],
   Education: [
     "After-school Homework Club",
     "Adult Digital Literacy Lab",
     "Career Readiness Workshop",
     "Community Tutoring Night",
+    "Conestoga Skills Bootcamp",
   ],
   Health: [
     "Seniors Wellness Check-in",
     "Community Health Outreach",
     "Blood Pressure Screening Support",
     "Mental Wellness Resource Day",
+    "Grand River Hospital Volunteer Day",
   ],
   Technology: [
     "Tech Help Desk for Seniors",
     "Device Setup Assistance Clinic",
     "Digital Skills Coaching Session",
     "Nonprofit Data Cleanup Sprint",
+    "Code for Waterloo Hackathon",
   ],
 };
 
@@ -466,7 +542,7 @@ function buildIdentity(role, sequence) {
   return {
     firstName,
     lastName,
-    email: `${localPart}@vsms.local`,
+    email: `${localPart}@vsms.foo`,
   };
 }
 
@@ -487,10 +563,11 @@ function buildOrganizationName(index, coordinator) {
 function buildOpportunityDraft(category, orgName) {
   const templates = opportunityTitleTemplates[category] ?? opportunityTitleTemplates.Community;
   const baseTitle = choose(templates);
-  const region = choose(regionNames);
+  const location = pickLocation();
   return {
-    title: `${baseTitle} - ${region}`,
-    description: `${orgName} is organizing ${baseTitle.toLowerCase()} to support local residents. Volunteers will assist with participant engagement, logistics, and on-site coordination.`,
+    title: `${baseTitle} - ${location.name}`,
+    description: `${orgName} is organizing ${baseTitle.toLowerCase()} at ${location.name} to support local residents in the Waterloo Region. Volunteers will assist with participant engagement, logistics, and on-site coordination.`,
+    location,
   };
 }
 
@@ -511,10 +588,10 @@ async function seedSkills(admin) {
   const list = await api("GET", "/api/skills", { expected: [200] });
   memory.skillCatalog = Array.isArray(list.data)
     ? list.data.map((s) => ({
-        id: get(s, "id", "Id"),
-        name: get(s, "name", "Name"),
-        category: get(s, "category", "Category"),
-      }))
+      id: get(s, "id", "Id"),
+      name: get(s, "name", "Name"),
+      category: get(s, "category", "Category"),
+    }))
     : [];
   info(`Skill catalog ready: ${memory.skillCatalog.length} skills.`);
 }
@@ -605,7 +682,7 @@ async function createCoordinators() {
     const seedIndex = memory.coordinators.length;
     const identity = buildIdentity("Coordinator", seedIndex);
     const email = identity.email;
-    const auth = await registerOrLogin(email, "Coordinator", cfg.userPassword);
+    const auth = await registerOrLogin(email, "Coordinator", cfg.userPassword, identity.firstName, identity.lastName);
     memory.coordinators.push({
       ...auth,
       email,
@@ -627,7 +704,7 @@ async function createVolunteers() {
     const seedIndex = memory.volunteers.length;
     const identity = buildIdentity("Volunteer", seedIndex);
     const email = identity.email;
-    const auth = await registerOrLogin(email, "Volunteer", cfg.userPassword);
+    const auth = await registerOrLogin(email, "Volunteer", cfg.userPassword, identity.firstName, identity.lastName);
     const firstName = identity.firstName;
     const lastName = identity.lastName;
     try {
@@ -655,6 +732,92 @@ async function createVolunteers() {
       skillIds: [],
     });
     counters.volunteers += 1;
+  }
+}
+
+async function signWaivers() {
+  if (!cfg.seedWaivers) return;
+  info("Signing waivers for volunteers...");
+  for (const volunteer of memory.volunteers) {
+    try {
+      await api("POST", `/api/volunteers/${volunteer.linkedGrainId}/waiver`, {
+        token: volunteer.token,
+        expected: [200],
+      });
+      counters.waiversSigned += 1;
+    } catch (err) {
+      warn(`Failed signing waiver for ${volunteer.email}: ${err.message}`);
+    }
+  }
+}
+
+async function setBackgroundChecks(admin) {
+  if (!cfg.seedBackgroundChecks) return;
+  info("Setting background check statuses...");
+  const statuses = ["Cleared", "Cleared", "Cleared", "Pending"];
+  for (const volunteer of memory.volunteers) {
+    try {
+      const status = choose(statuses);
+      await api("POST", `/api/volunteers/${volunteer.linkedGrainId}/background-check`, {
+        token: admin.token,
+        body: { status },
+        expected: [204],
+      });
+      counters.backgroundChecksSet += 1;
+    } catch (err) {
+      warn(`Failed setting background check for ${volunteer.email}: ${err.message}`);
+    }
+  }
+}
+
+async function followOrganizations() {
+  if (!cfg.seedFollows || memory.organizations.length === 0) return;
+  info("Volunteers following organizations...");
+  for (const volunteer of memory.volunteers) {
+    const orgCount = 1 + Math.floor(Math.random() * Math.min(2, memory.organizations.length));
+    const orgs = sampleWithoutReplacement(memory.organizations, orgCount);
+    for (const org of orgs) {
+      try {
+        await api("POST", `/api/volunteers/${volunteer.linkedGrainId}/follow/${org.orgId}`, {
+          token: volunteer.token,
+          expected: [204],
+        });
+        counters.volunteerFollows += 1;
+      } catch (err) {
+        warn(`Failed follow org ${org.orgId} for ${volunteer.email}: ${err.message}`);
+      }
+    }
+  }
+}
+
+const announcementTemplates = [
+  "We're excited to announce new volunteer opportunities this month!",
+  "Thank you to all volunteers who participated in last week's event.",
+  "Reminder: Upcoming training session for all registered volunteers.",
+  "Congratulations to our top volunteers this quarter!",
+  "New partnership announcement — more opportunities coming soon.",
+  "Holiday schedule update: please check the calendar for changes.",
+];
+
+async function postAnnouncements() {
+  if (!cfg.seedAnnouncements) return;
+  info("Posting organization announcements...");
+  for (const org of memory.organizations) {
+    const coordinator = memory.coordinators.find((c) => c.organizationId === org.orgId);
+    if (!coordinator) continue;
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      try {
+        await api("POST", `/api/organizations/${org.orgId}/announcements`, {
+          token: coordinator.token,
+          body: { text: choose(announcementTemplates) },
+          expected: [204],
+        });
+        counters.announcementsPosted += 1;
+      } catch (err) {
+        warn(`Failed posting announcement for org ${org.orgId}: ${err.message}`);
+      }
+    }
   }
 }
 
@@ -716,7 +879,7 @@ async function createOrganizations(admin) {
           description: `${orgName} provides regular volunteer-led services for residents across programs and seasonal events.`,
           creatorUserId: c.userId,
           creatorEmail: c.email,
-          proofUrl: "",
+          proofUrl: "https://www.vsms.foo/proof/org-registration",
         },
         expected: [201],
       });
@@ -848,6 +1011,21 @@ async function createOpportunities() {
       const opportunityId = get(create.data, "opportunityId", "OpportunityId");
       counters.opportunities += 1;
 
+      // Set geofence with the opportunity's location (500m radius)
+      try {
+        await withRetry(() => api("POST", `/api/opportunities/${opportunityId}/geofence`, {
+          token: coordinator.token,
+          body: {
+            lat: draft.location.lat,
+            lon: draft.location.lon,
+            radiusMeters: 500,
+          },
+          expected: [204],
+        }));
+      } catch (err) {
+        warn(`Failed setting geofence on opp ${opportunityId}: ${err.message}`);
+      }
+
       for (let s = 0; s < cfg.shiftsPerOpportunity; s += 1) {
         const window = buildShiftWindow(oppGlobalIndex, s, phase);
         await withRetry(() => api("POST", `/api/opportunities/${opportunityId}/shifts`, {
@@ -891,6 +1069,8 @@ async function createOpportunities() {
         coordinatorUserId: coordinator.userId,
         coordinatorEmail: coordinator.email,
         coordinatorToken: coordinator.token,
+        coordinatorGrainId: coordinator.linkedGrainId,
+        location: draft.location,
         phase,
         shifts,
       };
@@ -899,7 +1079,7 @@ async function createOpportunities() {
       if (cfg.seedSkills && memory.skillCatalog.length > 0) {
         const required = sampleWithoutReplacement(memory.skillCatalog, Math.min(2, memory.skillCatalog.length)).map((s) => s.id);
         try {
-          await withRetry(() => api("PUT", `/api/opportunities/${opportunityId}/required-skills`, {
+          await withRetry(() => api("PUT", `/api/opportunities/${opportunityId}/skills`, {
             token: coordinator.token,
             body: { skillIds: required },
             expected: [204],
@@ -962,6 +1142,8 @@ async function createApplications() {
           volunteerToken: volunteer.token,
           opportunityPhase: opp.phase,
           coordinatorToken: opp.coordinatorToken,
+          coordinatorGrainId: opp.coordinatorGrainId,
+          location: opp.location,
           status: "Pending",
         });
         counters.applications += 1;
@@ -1059,24 +1241,72 @@ async function runAttendanceFlows(admin) {
         continue;
       }
 
-      const checkIn = await api("POST", `/api/attendance/${attendanceId}/web-checkin`, {
-        token: app.volunteerToken,
-        expected: [204, 400],
-      });
-      if (checkIn.status !== 204) {
-        const detail = get(checkIn.data, "detail", "Detail", "error", "Error", "message", "Message")
-          || (typeof checkIn.data === "string" ? checkIn.data : "Check-in rejected");
-        warn(`Attendance ${attendanceId} check-in skipped (${detail}).`);
-        continue;
+      // Decide: volunteer self-checkin vs coordinator-checkin
+      const useCoordinatorCheckin = Math.random() < cfg.coordinatorCheckinRate;
+
+      if (useCoordinatorCheckin) {
+        // Coordinator-assisted check-in (no geo/photo needed)
+        const coordCheckIn = await api("POST", `/api/attendance/${attendanceId}/coordinator-checkin`, {
+          token: app.coordinatorToken,
+          expected: [204, 400],
+        });
+        if (coordCheckIn.status !== 204) {
+          const detail = get(coordCheckIn.data, "detail", "Detail", "error", "Error", "message", "Message")
+            || (typeof coordCheckIn.data === "string" ? coordCheckIn.data : "Coordinator check-in rejected");
+          warn(`Attendance ${attendanceId} coordinator check-in skipped (${detail}).`);
+          continue;
+        }
+        counters.coordinatorCheckins += 1;
+      } else {
+        // Volunteer self-checkin with location data
+        // Use the opportunity's geofence location + small jitter (±100m) to stay within 500m radius
+        const checkinLat = app.location.lat + (Math.random() - 0.5) * 0.002;
+        const checkinLon = app.location.lon + (Math.random() - 0.5) * 0.002;
+        const checkIn = await api("POST", `/api/attendance/${attendanceId}/checkin`, {
+          token: app.volunteerToken,
+          body: {
+            lat: checkinLat,
+            lon: checkinLon,
+            proofPhotoUrl: `https://www.vsms.foo/photos/checkin-${attendanceId}.jpg`,
+          },
+          expected: [204, 400],
+        });
+        if (checkIn.status !== 204) {
+          const detail = get(checkIn.data, "detail", "Detail", "error", "Error", "message", "Message")
+            || (typeof checkIn.data === "string" ? checkIn.data : "Check-in rejected");
+          warn(`Attendance ${attendanceId} check-in skipped (${detail}).`);
+          continue;
+        }
       }
 
       await api("POST", `/api/attendance/${attendanceId}/checkout`, {
         token: app.volunteerToken,
         expected: [204],
       });
+
+      // Backdate check-in/out to produce realistic hours (1.5 – 6h)
+      const durationHours = 1.5 + Math.random() * 4.5;
+      const fakeCheckOut = new Date();
+      const fakeCheckIn = new Date(fakeCheckOut.getTime() - durationHours * 60 * 60 * 1000);
+      try {
+        await api("POST", `/api/attendance/${attendanceId}/adjust`, {
+          token: app.coordinatorToken,
+          body: {
+            coordinatorId: app.coordinatorGrainId,
+            newCheckIn: fakeCheckIn.toISOString(),
+            newCheckOut: fakeCheckOut.toISOString(),
+            reason: "Seed: adjust to realistic duration",
+          },
+          expected: [204],
+        });
+      } catch {
+        // Non-critical: hours stay at 0 if adjust fails
+      }
+
       counters.attendanceCheckedInOut += 1;
       successes += 1;
 
+      // Dispute must happen BEFORE confirm (requires CheckedOut status)
       if (Math.random() < cfg.disputeRate) {
         await api("POST", `/api/attendance/${attendanceId}/dispute`, {
           token: app.volunteerToken,
@@ -1097,6 +1327,21 @@ async function runAttendanceFlows(admin) {
           expected: [204],
         });
         counters.disputesResolved += 1;
+      } else {
+        // Confirm attendance so VolunteerGrain.TotalHours gets updated
+        // (only Confirm triggers AddCompletedHours + IncrementCompletedOpportunities)
+        try {
+          await api("POST", `/api/attendance/${attendanceId}/confirm`, {
+            token: app.coordinatorToken,
+            body: {
+              supervisorId: app.coordinatorGrainId,
+              rating: 3 + Math.floor(Math.random() * 3), // 3-5 stars
+            },
+            expected: [204],
+          });
+        } catch {
+          // Non-critical if confirm fails
+        }
       }
     } catch (err) {
       warn(`Attendance flow failed for app ${app.applicationId}: ${err.message}`);
@@ -1134,6 +1379,11 @@ async function writeOutput() {
       ongoingOpportunityRate: cfg.ongoingOpportunityRate,
       seedSkills: cfg.seedSkills,
       seedCertificates: cfg.seedCertificates,
+      seedWaivers: cfg.seedWaivers,
+      seedBackgroundChecks: cfg.seedBackgroundChecks,
+      seedFollows: cfg.seedFollows,
+      seedAnnouncements: cfg.seedAnnouncements,
+      coordinatorCheckinRate: cfg.coordinatorCheckinRate,
       incremental: cfg.incremental,
     },
     defaultUserPassword: cfg.userPassword,
@@ -1184,8 +1434,12 @@ async function main() {
   await createCoordinators();
   await createVolunteers();
   await assignVolunteerSkills();
+  await signWaivers();
+  await setBackgroundChecks(admin);
   await createOrganizations(admin);
+  await followOrganizations();
   await createOpportunities();
+  await postAnnouncements();
   await createApplications();
   await processApplications();
   await runAttendanceFlows(admin);

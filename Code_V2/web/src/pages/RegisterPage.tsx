@@ -29,6 +29,8 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 export default function RegisterPage({ onBack, onGoLogin }: Props) {
     const auth = useAuth();
     const [email, setEmail] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +61,7 @@ export default function RegisterPage({ onBack, onGoLogin }: Props) {
 
         setLoading(true);
         try {
-            await auth.register({ email, password, role });
+            await auth.register({ email, password, role, firstName: firstName.trim(), lastName: lastName.trim() });
         } catch (err: any) {
             const d = err.response?.data;
             const msg = d?.message || (typeof d === 'string' ? d : d?.detail || d?.title || d?.error) || 'Registration failed. Please try again.';
@@ -167,6 +169,32 @@ export default function RegisterPage({ onBack, onGoLogin }: Props) {
                                 className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all placeholder:text-stone-300"
                                 required
                             />
+                        </div>
+
+                        {/* Name fields */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label className="block text-sm font-semibold text-stone-700 mb-1.5">First Name</label>
+                                <input
+                                    type="text"
+                                    value={firstName}
+                                    onChange={e => setFirstName(e.target.value)}
+                                    placeholder="John"
+                                    className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all placeholder:text-stone-300"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-stone-700 mb-1.5">Last Name</label>
+                                <input
+                                    type="text"
+                                    value={lastName}
+                                    onChange={e => setLastName(e.target.value)}
+                                    placeholder="Doe"
+                                    className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50/80 text-stone-800 focus:ring-2 focus:ring-orange-400 focus:border-transparent outline-none transition-all placeholder:text-stone-300"
+                                    required
+                                />
+                            </div>
                         </div>
 
                         {/* Role selector cards with preview */}
