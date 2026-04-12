@@ -18,6 +18,34 @@ using VSMS.Api.Features.EventTasks;
 using VSMS.Api.Middleware;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 
+// Load .env file — walk up from the binary until we find one
+static string? FindEnvFile(string start)
+{
+    var dir = new DirectoryInfo(start);
+    while (dir != null)
+    {
+        var path = Path.Combine(dir.FullName, ".env");
+        if (File.Exists(path)) return path;
+        dir = dir.Parent;
+    }
+    return null;
+}
+var envFile = FindEnvFile(AppContext.BaseDirectory);
+if (envFile != null)
+{
+    foreach (var line in File.ReadAllLines(envFile))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith('#')) continue;
+        var idx = line.IndexOf('=');
+        if (idx < 1) continue;
+        var key = line[..idx].Trim();
+        var val = line[(idx + 1)..].Trim();
+        // Map EMAIL_FROM → Email:From for ASP.NET Core configuration
+        if (key == "EMAIL_FROM") key = "Email:From";
+        Environment.SetEnvironmentVariable(key, val);
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ==================== Service Registrations ====================
