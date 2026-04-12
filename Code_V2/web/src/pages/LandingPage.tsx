@@ -355,43 +355,42 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                                     </div>,
 
                                     /* ── Card 3: AI Assistant ── */
-                                    <div key="ai" className="absolute inset-0 rounded-2xl p-5 flex flex-col overflow-hidden"
-                                        style={{ background: 'linear-gradient(145deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)' }}>
-                                        {/* Header */}
-                                        <div className="flex items-center gap-2.5 mb-4">
-                                            <div className="w-8 h-8 rounded-xl bg-violet-500/30 flex items-center justify-center">
-                                                <Star className="w-4 h-4 text-violet-300 fill-violet-300/50" />
+                                    <div key="ai" className="absolute inset-0 rounded-2xl flex flex-col overflow-hidden bg-white">
+                                        {/* Header bar */}
+                                        <div className="flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-orange-500 to-orange-600 flex-shrink-0">
+                                            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                                                <Star className="w-4 h-4 text-white fill-white/70" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-violet-300/70">VSMS</p>
+                                                <p className="text-[10px] text-orange-100">VSMS</p>
                                                 <p className="text-sm font-bold text-white">AI Assistant</p>
                                             </div>
                                             <div className="ml-auto flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                <span className="text-[10px] text-emerald-400 font-medium">Online</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                                                <span className="text-[10px] text-orange-100 font-medium">Online</span>
                                             </div>
                                         </div>
                                         {/* Chat bubbles */}
-                                        <div className="flex flex-col gap-2.5 flex-1">
-                                            <div className="self-end bg-violet-500/40 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
-                                                <p className="text-xs text-violet-100">What events match my skills?</p>
+                                        <div className="flex flex-col gap-2.5 flex-1 p-4">
+                                            <div className="self-end bg-orange-500 rounded-2xl rounded-tr-sm px-3 py-2 max-w-[80%]">
+                                                <p className="text-xs text-white">What events match my skills?</p>
                                             </div>
-                                            <div className="self-start bg-white/10 rounded-2xl rounded-tl-sm px-3 py-2.5 max-w-[88%]">
-                                                <p className="text-xs text-white/90 leading-relaxed">I found <span className="font-bold text-violet-300">3 great matches</span> near you — Beach Cleanup (98%), Food Bank (91%), and Tree Planting (87%). Want me to apply for you?</p>
+                                            <div className="self-start bg-gray-100 rounded-2xl rounded-tl-sm px-3 py-2.5 max-w-[88%]">
+                                                <p className="text-xs text-gray-800 leading-relaxed">I found <span className="font-bold text-orange-500">3 great matches</span> near you — Beach Cleanup (98%), Food Bank (91%)…</p>
                                             </div>
-                                            <div className="self-end bg-violet-500/40 rounded-2xl rounded-tr-sm px-3 py-2">
-                                                <p className="text-xs text-violet-100">Yes, apply to the top 2!</p>
+                                            <div className="self-end bg-orange-500 rounded-2xl rounded-tr-sm px-3 py-2">
+                                                <p className="text-xs text-white">Apply to the top 2!</p>
                                             </div>
-                                            <div className="self-start bg-white/10 rounded-2xl rounded-tl-sm px-3 py-2">
-                                                <p className="text-xs text-white/90">Done! ✅ Applications submitted.</p>
+                                            <div className="self-start bg-gray-100 rounded-2xl rounded-tl-sm px-3 py-2">
+                                                <p className="text-xs text-gray-800">Done! ✅ Applications submitted.</p>
                                             </div>
                                         </div>
                                         {/* Footer */}
-                                        <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
-                                            <div className="flex-1 bg-white/10 rounded-xl px-3 py-2">
-                                                <p className="text-[10px] text-white/40">Ask anything about volunteering…</p>
+                                        <div className="px-4 pb-4 pt-2 border-t border-gray-100 flex items-center gap-2">
+                                            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                                                <p className="text-[10px] text-gray-400">Ask anything about volunteering…</p>
                                             </div>
-                                            <div className="w-7 h-7 rounded-xl bg-violet-500 flex items-center justify-center shrink-0">
+                                            <div className="w-7 h-7 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-center shrink-0">
                                                 <ChevronRight className="w-3.5 h-3.5 text-white" />
                                             </div>
                                         </div>
