@@ -1,0 +1,13 @@
+# ---- Phase 1: Basic Infrastructure ----
+region   = "ca-central-1"
+ami_id   = "ami-0431110c89be170a4"   # Debian 13 ARM64
+key_name = "Capstone"
+
+# ---- Phase 2: Full Mesh Peering ----
+# Accept from boyang:
+# peering_id_from_boyang = "pcx-xxx"   # from: cd boyang && terraform output peering_id_to_chunxi
+# Initiate to brad + marieth:
+# brad_account_id    = "491243661019"
+# brad_vpc_id        = ""              # from: cd brad && terraform output vpc_id
+# marieth_account_id = "568598294678"
+# marieth_vpc_id     = ""              # from: cd marieth && terraform output vpc_id

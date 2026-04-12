@@ -1,0 +1,9 @@
+# ---- Phase 1: Basic Infrastructure ----
+region   = "ca-central-1"
+ami_id   = "ami-0431110c89be170a4"   # Debian 13 ARM64
+key_name = "Capstone"
+
+# ---- Phase 2: Full Mesh Peering (accept all 3) ----
+# peering_id_from_boyang = "pcx-xxx"   # from: cd boyang && terraform output peering_id_to_marieth
+# peering_id_from_chunxi = "pcx-yyy"   # from: cd chunxi && terraform output peering_id_to_marieth
+# peering_id_from_brad   = "pcx-zzz"   # from: cd brad   && terraform output peering_id_to_marieth
