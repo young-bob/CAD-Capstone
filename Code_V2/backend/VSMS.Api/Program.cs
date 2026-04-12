@@ -44,7 +44,15 @@ if (envFile != null)
         if (key == "EMAIL_FROM") key = "Email:From";
         Environment.SetEnvironmentVariable(key, val);
     }
+    Console.WriteLine($"[Startup] Loaded .env from: {envFile}");
 }
+else
+{
+    Console.WriteLine("[Startup] No .env file found — using system environment variables only");
+}
+Console.WriteLine($"[Startup] RESEND_API set: {!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEND_API"))}");
+Console.WriteLine($"[Startup] Email:From = {Environment.GetEnvironmentVariable("Email:From") ?? "(not set, using default)"}");
+
 
 var builder = WebApplication.CreateBuilder(args);
 

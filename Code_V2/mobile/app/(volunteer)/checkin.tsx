@@ -25,6 +25,25 @@ interface ActiveApp {
     attendanceStatus: string | null;
 }
 
+const CHECKIN_ELIGIBLE_STATUSES = [
+    ApplicationStatus.Approved,
+    ApplicationStatus.Promoted,
+    ApplicationStatus.Completed,
+];
+
+function findAttendanceForApplication(
+    attendanceRecords: Awaited<ReturnType<typeof attendanceService.getByVolunteer>>,
+    app: { opportunityId: string; shiftStartTime?: string | null }
+) {
+    return attendanceRecords.find((record) => {
+        if (record.opportunityId !== app.opportunityId) return false;
+        if (app.shiftStartTime && record.shiftStartTime) {
+            return record.shiftStartTime === app.shiftStartTime;
+        }
+        return true;
+    });
+}
+
 export default function CheckInScreen() {
     const { linkedGrainId } = useAuthStore();
     const [loading, setLoading] = useState(true);
@@ -91,9 +110,9 @@ export default function CheckInScreen() {
             ]);
             const doneStatuses = [AttendanceStatus.Pending, AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
             const results: ActiveApp[] = apps
-                .filter(a => a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
+                .filter(a => CHECKIN_ELIGIBLE_STATUSES.includes(a.status))
                 .map(a => {
-                    const rec = attendanceRecords.find(r => r.opportunityId === a.opportunityId);
+                    const rec = findAttendanceForApplication(attendanceRecords, a);
                     return {
                         id: a.applicationId,
                         oppId: a.opportunityId,
@@ -240,7 +259,7 @@ export default function CheckInScreen() {
             const apps = await applicationService.getForVolunteer(linkedGrainId);
             let match = apps.find(
                 a => a.opportunityId === opportunityId && a.shiftId === shiftId &&
-                    (a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
+                    CHECKIN_ELIGIBLE_STATUSES.includes(a.status)
             );
 
             // No approved application — apply to this shift on the spot
