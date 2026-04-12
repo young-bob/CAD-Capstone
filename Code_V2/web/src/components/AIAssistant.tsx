@@ -115,7 +115,7 @@ export default function AIAssistant({ userRole, currentView }: Props) {
 
     const handleCaptureLocation = () => {
         if (!('geolocation' in navigator)) {
-            setLocationError('当前浏览器不支持定位。');
+            setLocationError('Geolocation is not supported by this browser.');
             return;
         }
 
@@ -135,10 +135,10 @@ export default function AIAssistant({ userRole, currentView }: Props) {
             },
             err => {
                 const msg = err.code === 1
-                    ? '定位权限被拒绝。'
+                    ? 'Location permission denied.'
                     : err.code === 2
-                        ? '无法获取当前位置。'
-                        : '定位超时，请重试。';
+                        ? 'Unable to determine your location.'
+                        : 'Location request timed out. Please try again.';
                 setLocationError(msg);
                 setIsLocating(false);
             },
@@ -194,9 +194,9 @@ export default function AIAssistant({ userRole, currentView }: Props) {
         } catch (error: any) {
             const backendError = error?.response?.data?.error || error?.message || 'AI service unavailable.';
             const fallback = [
-                '⚠️ 当前未能从系统获取实时数据。',
+                '⚠️ Failed to retrieve real-time data from the system.',
                 '',
-                `错误信息：${backendError}`,
+                `Error: ${backendError}`,
             ].join('\n');
             setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: fallback, streaming: false, error: true } : m

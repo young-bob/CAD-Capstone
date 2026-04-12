@@ -1691,36 +1691,58 @@ export function VolCertificates() {
 
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : templates.length === 0
                 ? <Empty msg="No certificate templates available yet. Ask your coordinator to create one." />
-                : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {templates.map(t => {
-                            const style = getTemplateStyle(t);
-                            return (
-                                <div key={t.id} className="bg-white rounded-3xl p-5 shadow-sm border border-stone-100 hover:shadow-lg transition-shadow flex flex-col">
-                                    <CertMiniThumb t={t} />
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${style === 'award' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                                            {style === 'award' ? 'Certificate' : 'Hours Log'}
-                                        </span>
-                                        {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded-full">System</span>}
-                                    </div>
-                                    <h3 className="font-bold text-stone-800 mt-1">{t.name}</h3>
-                                    {t.organizationName && <p className="text-xs text-stone-400 mt-0.5">{t.organizationName}</p>}
-                                    <p className="text-sm text-stone-500 mt-2 mb-4 flex-1">{t.description}</p>
-                                    <button
-                                        onClick={() => openDownloadConfirm(t)}
-                                        disabled={generating === t.id}
-                                        className="w-full py-2.5 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
-                                        style={{ background: `linear-gradient(90deg,${t.primaryColor || '#F59E0B'},${t.accentColor || '#EA580C'})` }}
-                                    >
-                                        {generating === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                                        {generating === t.id ? 'Preparing…' : 'Download Certificate'}
-                                    </button>
+                : (() => {
+                    const hasEligibleRecords = attendance.some(a =>
+                        a.status === AttendanceStatus.Confirmed || a.status === AttendanceStatus.CheckedOut
+                    );
+                    return (
+                    <div className="space-y-6">
+                        {!hasEligibleRecords && (
+                            <div className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                                <div className="p-2.5 bg-amber-100 rounded-xl"><Award className="w-5 h-5 text-amber-600" /></div>
+                                <div>
+                                    <p className="font-bold text-amber-800 text-sm">Complete a volunteer event to unlock certificates</p>
+                                    <p className="text-xs text-amber-600 mt-0.5">Certificates become available after your attendance is confirmed by a coordinator.</p>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {templates.map(t => {
+                                const style = getTemplateStyle(t);
+                                return (
+                                    <div key={t.id} className={`bg-white rounded-3xl p-5 shadow-sm border transition-shadow flex flex-col ${hasEligibleRecords ? 'border-stone-100 hover:shadow-lg' : 'border-stone-100 opacity-60'}`}>
+                                        <CertMiniThumb t={t} />
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${style === 'award' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {style === 'award' ? 'Certificate' : 'Hours Log'}
+                                            </span>
+                                            {t.isSystemPreset && <span className="px-2 py-0.5 bg-stone-100 text-stone-500 text-xs font-bold rounded-full">System</span>}
+                                        </div>
+                                        <h3 className="font-bold text-stone-800 mt-1">{t.name}</h3>
+                                        {t.organizationName && <p className="text-xs text-stone-400 mt-0.5">{t.organizationName}</p>}
+                                        <p className="text-sm text-stone-500 mt-2 mb-4 flex-1">{t.description}</p>
+                                        {hasEligibleRecords ? (
+                                            <button
+                                                onClick={() => openDownloadConfirm(t)}
+                                                disabled={generating === t.id}
+                                                className="w-full py-2.5 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+                                                style={{ background: `linear-gradient(90deg,${t.primaryColor || '#F59E0B'},${t.accentColor || '#EA580C'})` }}
+                                            >
+                                                {generating === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                                {generating === t.id ? 'Preparing…' : 'Download Certificate'}
+                                            </button>
+                                        ) : (
+                                            <div className="w-full py-2.5 bg-stone-100 text-stone-400 font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-not-allowed">
+                                                🔒 Locked
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                )}
+                    );
+                })()}
 
             {pendingTemplate && (
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
