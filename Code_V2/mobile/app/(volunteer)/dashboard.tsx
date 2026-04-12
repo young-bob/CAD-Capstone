@@ -134,7 +134,7 @@ export default function DashboardScreen() {
             <View style={styles.statsRow}>
                 <StatCard icon="clock-check-outline" value={(profile?.totalHours ?? 0).toFixed(1)} label="Hours" color={COLORS.primary} />
                 <StatCard icon="check-decagram" value={profile?.completedOpportunities ?? 0} label="Completed" color={COLORS.success} />
-                <StatCard icon="star-four-points" value={(profile?.impactScore ?? 0).toFixed(1)} label="Score" color={COLORS.warning} />
+                <StatCard icon="star-four-points" value={(profile?.impactScore ?? 0).toFixed(2)} label="Score" color={COLORS.warning} />
             </View>
 
             {/* Quick Actions */}

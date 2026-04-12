@@ -49,7 +49,10 @@ export default function ImpactRing({ score, maxScore = 1000, size = 120, strokeW
         </svg>
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-black text-stone-800 leading-none">{score.toLocaleString()}</span>
+          <span className="text-2xl font-black text-stone-800 leading-none">{score.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}</span>
           <span className="text-xs text-white-400 font-medium mt-0.5">{label}</span>
         </div>
       </div>

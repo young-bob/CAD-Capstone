@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { View, SectionList, StyleSheet, RefreshControl, Alert, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
 import { Card, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { COLORS } from '../../constants/config';
@@ -26,7 +26,7 @@ type TabKey = 'Upcoming' | 'Waitlisted' | 'Past';
 
 function formatTimeRange(start: string, end: string): string {
     const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-    return `${new Date(start).toLocaleTimeString([], opts)} – ${new Date(end).toLocaleTimeString([], opts)}`;
+    return `${new Date(start).toLocaleTimeString([], opts)} 鈥?${new Date(end).toLocaleTimeString([], opts)}`;
 }
 
 function findAttendanceForApplication(
@@ -79,7 +79,7 @@ export default function MyApplicationsScreen() {
     }, [fetchApplications]);
 
     const handleWithdraw = async (app: ApplicationSummary) => {
-        Alert.alert('Withdraw', `Withdraw from "${app.opportunityTitle} — ${app.shiftName}"?`, [
+        Alert.alert('Withdraw', `Withdraw from "${app.opportunityTitle} 鈥?${app.shiftName}"?`, [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Withdraw', style: 'destructive', onPress: async () => {
@@ -125,6 +125,7 @@ export default function MyApplicationsScreen() {
     const isShiftPast = (app: ApplicationSummary) => !!app.shiftEndTime && new Date(app.shiftEndTime).getTime() < now;
     const activeStatuses = ['Approved', 'Pending', 'Promoted'];
     const terminalStatuses = ['Completed', 'Rejected', 'Withdrawn', 'NoShow'];
+    const noShowEligibleStatuses = [ApplicationStatus.Approved, ApplicationStatus.Promoted];
     const groups: Record<TabKey, ApplicationSummary[]> = {
         Upcoming: applications.filter(a => activeStatuses.includes(a.status) && !isShiftPast(a)),
         Waitlisted: applications.filter(a => a.status === 'Waitlisted'),
@@ -172,7 +173,14 @@ export default function MyApplicationsScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 renderItem={({ item }) => {
                     const rec = findAttendanceForApplication(attendance, item);
-                    const isNoShow = item.status === ApplicationStatus.NoShow;
+                    const derivedNoShow =
+                        item.status !== ApplicationStatus.NoShow &&
+                        noShowEligibleStatuses.includes(item.status as ApplicationStatus) &&
+                        isShiftPast(item) &&
+                        !rec?.checkInTime &&
+                        !rec?.checkOutTime;
+                    const displayStatus = derivedNoShow ? ApplicationStatus.NoShow : item.status;
+                    const isNoShow = displayStatus === ApplicationStatus.NoShow;
                     return (
                     <Card style={styles.card} mode="outlined">
                         <Card.Content>
@@ -186,9 +194,9 @@ export default function MyApplicationsScreen() {
                             <View style={styles.metaRow}>
                                 <MaterialCommunityIcons name="clock-outline" size={13} color={COLORS.textSecondary} />
                                 <Text style={styles.meta}>
-                                    {item.shiftName ? `${item.shiftName} · ` : ''}
+                                    {item.shiftName ? `${item.shiftName} 路 ` : ''}
                                     {item.shiftStartTime ? new Date(item.shiftStartTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-                                    {item.shiftStartTime && item.shiftEndTime ? `  ·  ${formatTimeRange(item.shiftStartTime, item.shiftEndTime)}` : ''}
+                                    {item.shiftStartTime && item.shiftEndTime ? `  路  ${formatTimeRange(item.shiftStartTime, item.shiftEndTime)}` : ''}
                                 </Text>
                             </View>
                             <View style={styles.metaRow}>
@@ -200,7 +208,7 @@ export default function MyApplicationsScreen() {
                                     <MaterialCommunityIcons name="login" size={13} color={COLORS.success} />
                                     <Text style={styles.meta}>
                                         Check-in: {new Date(rec.checkInTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                        {rec.checkOutTime ? `  ·  Check-out: ${new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                                        {rec.checkOutTime ? `  路  Check-out: ${new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
                                     </Text>
                                 </View>
                             )}
@@ -211,9 +219,9 @@ export default function MyApplicationsScreen() {
                                 </View>
                             )}
                             <Chip compact
-                                style={[styles.chip, { backgroundColor: (STATUS_COLORS[item.status] || COLORS.textSecondary) + '20' }]}
-                                textStyle={[styles.chipText, { color: STATUS_COLORS[item.status] || COLORS.textSecondary }]}
-                            >{item.status}</Chip>
+                                style={[styles.chip, { backgroundColor: (STATUS_COLORS[displayStatus] || COLORS.textSecondary) + '20' }]}
+                                textStyle={[styles.chipText, { color: STATUS_COLORS[displayStatus] || COLORS.textSecondary }]}
+                            >{displayStatus}</Chip>
                         </Card.Content>
                         <Card.Actions>
                             {[ApplicationStatus.Pending, ApplicationStatus.Waitlisted, ApplicationStatus.Approved, ApplicationStatus.Promoted].includes(item.status as ApplicationStatus) && (
@@ -223,8 +231,15 @@ export default function MyApplicationsScreen() {
                                 <Button compact mode="contained" buttonColor={COLORS.success} onPress={() => handleAccept(item.applicationId)}>Accept Invitation</Button>
                             )}
                             {isNoShow && rec?.attendanceId && (
-                                <Button compact textColor={COLORS.warning} onPress={() => { setDisputeAttendanceId(rec.attendanceId); setDisputeReason(''); setDisputeEvidence(''); }}>
-                                    ⚠️ Raise Dispute
+                                <Button
+                                    compact
+                                    mode="outlined"
+                                    icon="alert-circle-outline"
+                                    textColor={COLORS.warning}
+                                    style={styles.disputeButton}
+                                    onPress={() => { setDisputeAttendanceId(rec.attendanceId); setDisputeReason(''); setDisputeEvidence(''); }}
+                                >
+                                    Raise Dispute
                                 </Button>
                             )}
                         </Card.Actions>
@@ -303,6 +318,7 @@ const styles = StyleSheet.create({
     emptyText: { color: COLORS.textSecondary, marginTop: 4 },
     emptyHint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 8, fontStyle: 'italic' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    disputeButton: { borderColor: COLORS.warning + '80' },
     modalBox: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 },
     modalTitle: { color: COLORS.text, fontWeight: '700', marginBottom: 8 },
     modalHint: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 12 },

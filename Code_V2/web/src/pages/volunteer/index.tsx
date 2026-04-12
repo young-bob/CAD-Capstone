@@ -367,7 +367,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
                 <div className="relative flex flex-col sm:flex-row items-center gap-8">
                     {/* Impact ring */}
                     <div className="shrink-0">
-                        <ImpactRing score={profile?.impactScore ?? 0} maxScore={1000} size={130} />
+                        <ImpactRing score={Number((profile?.impactScore ?? 0).toFixed(2))} maxScore={1000} size={130} />
                         <p className="text-xs text-white/70 dark:text-zinc-500 text-center mt-2">of 1,000 pts</p>
                     </div>
                     {/* Greeting */}
@@ -1208,6 +1208,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const isShiftPast = (a: ApplicationSummary) => !!a.shiftEndTime && new Date(a.shiftEndTime).getTime() < now;
     const activeStatuses = ['Approved', 'Pending', 'Promoted'];
     const terminalStatuses = ['Completed', 'Rejected', 'Withdrawn', 'NoShow'];
+    const noShowEligibleStatuses = ['Approved', 'Promoted'];
     const groups = {
         Upcoming: apps.filter(a => activeStatuses.includes(a.status) && !isShiftPast(a)),
         Waitlisted: apps.filter(a => a.status === 'Waitlisted'),
@@ -1221,7 +1222,14 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
 
     const renderCard = (a: ApplicationSummary) => {
         const rec = findAttendanceForApplication(appAttendance, a);
-        const isNoShow = a.status === 'NoShow';
+        const derivedNoShow =
+            a.status !== 'NoShow' &&
+            noShowEligibleStatuses.includes(a.status) &&
+            isShiftPast(a) &&
+            !rec?.checkInTime &&
+            !rec?.checkOutTime;
+        const displayStatus = derivedNoShow ? 'NoShow' : a.status;
+        const isNoShow = displayStatus === 'NoShow';
         return (
         <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -1265,7 +1273,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                     )}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0 sm:pt-1">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[a.status] || 'bg-stone-100 text-stone-600'}`}>{a.status}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[displayStatus] || 'bg-stone-100 text-stone-600'}`}>{displayStatus}</span>
                     <div className="flex items-center gap-2">
                         {a.status === 'Promoted' && (
                             <button onClick={() => handleAccept(a)} disabled={actionId === a.applicationId}
