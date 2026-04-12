@@ -1458,7 +1458,8 @@ export function VolAttendance() {
         Disputed: 'bg-rose-100 text-rose-700', Resolved: 'bg-stone-100 text-stone-600', NoShow: 'bg-rose-100 text-rose-700',
     };
 
-    const totalHours = records.reduce((sum, r) => sum + (r.totalHours ?? 0), 0);
+    const confirmedHours = records.filter(r => r.status === AttendanceStatus.Confirmed).reduce((sum, r) => sum + (r.totalHours ?? 0), 0);
+    const pendingHours = records.filter(r => r.status === AttendanceStatus.CheckedOut || r.status === AttendanceStatus.CheckedIn).reduce((sum, r) => sum + (r.totalHours ?? 0), 0);
 
     return (
         <div className="max-w-6xl mx-auto space-y-8">
@@ -1468,7 +1469,16 @@ export function VolAttendance() {
             {/* Summary */}
             <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl p-8 text-white flex items-center gap-6 shadow-lg shadow-orange-500/20">
                 <Clock className="w-12 h-12 opacity-80" />
-                <div><p className="text-4xl font-extrabold">{totalHours.toFixed(1)} hrs</p><p className="text-orange-100 font-medium mt-1">{records.length} session{records.length !== 1 ? 's' : ''}</p></div>
+                <div className="flex-1">
+                    <p className="text-4xl font-extrabold">{confirmedHours.toFixed(1)} hrs</p>
+                    <p className="text-orange-100 font-medium mt-1">{records.length} session{records.length !== 1 ? 's' : ''} · confirmed</p>
+                </div>
+                {pendingHours > 0 && (
+                    <div className="bg-white/20 rounded-2xl px-5 py-3 text-center">
+                        <p className="text-xl font-extrabold">{pendingHours.toFixed(1)} hrs</p>
+                        <p className="text-orange-100 text-xs font-medium mt-0.5">pending confirmation</p>
+                    </div>
+                )}
             </div>
 
             {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.filter(r => r.status !== AttendanceStatus.Pending).length === 0 ? <Empty msg="No attendance records yet." /> : (
