@@ -23,7 +23,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       # ---- Database ----
-      ConnectionStrings__PostgreSQL: "Host=${DB_HOST};Port=5432;Database=vsms;Username=vsms;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__PostgreSQL: "Host=${DB_HOST};Port=5432;Database=vsms;Username=vsms;Password=${POSTGRES_PASSWORD};Max Pool Size=50;"
       # ---- JWT ----
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: VSMS.Api
