@@ -150,7 +150,7 @@ AI__DefaultMaxTokens=2048
 
 ## 🧪 Seed Debug Data (System/Flow Testing)
 
-To quickly generate realistic data for end-to-end feature and process debugging (users, organizations, opportunities, shifts, applications, approvals, attendance, and disputes), run:
+To quickly generate realistic data for end-to-end feature and process debugging (users, organizations, opportunities, shifts, applications, approvals, attendance, disputes, waivers, background checks, and more), run:
 
 ```bash
 node tools/seed-debug-data.mjs --base-url http://localhost:8080
@@ -192,6 +192,7 @@ node tools/seed-debug-data.mjs \
   --reject-rate 0.2 \
   --attendance-flows 25 \
   --checkin-ready-rate 0.85 \
+  --coordinator-checkin-rate 0.3 \
   --run-tag month-window
 ```
 
@@ -199,6 +200,11 @@ Notes:
 - Uses the default admin account: `admin@vsms.com / Admin@123` (override with `--admin-email` and `--admin-password`).
 - `--long-running true` spreads opportunities/shifts across past/ongoing/future timeline and uses realistic names for people, organizations, and events.
 - `--checkin-ready-rate` biases generated shifts/applications toward records that can be checked in immediately (and attendance flow will auto-promote pending ready applications when needed).
+- `--coordinator-checkin-rate` controls the ratio of attendance check-ins done by the coordinator (vs volunteer self-checkin with geo location). Default: `0.3`.
+- `--seed-waivers true` signs waivers for all seeded volunteers (default: `true`).
+- `--seed-background-checks true` sets background check status for volunteers (default: `true`, 75% Cleared / 25% Pending).
+- `--seed-follows true` volunteers follow 1–2 random organizations (default: `true`).
+- `--seed-announcements true` posts 1–2 announcements per organization (default: `true`).
 - `--incremental true` will reuse accounts from `data/debug-seed/latest.json` (same base URL) and only top up to requested coordinator/volunteer counts.
 - Generated account credentials and IDs are saved to:
   - `data/debug-seed/latest.json`

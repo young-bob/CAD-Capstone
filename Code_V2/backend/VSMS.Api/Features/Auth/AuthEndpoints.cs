@@ -37,6 +37,9 @@ public static class AuthEndpoints
 
             var grainId = Guid.NewGuid();
 
+            var firstName = req.FirstName.Trim();
+            var lastName = req.LastName.Trim();
+
             // Create child profile entity and initialize the grain actor
             if (req.Role == "Volunteer")
             {
@@ -44,7 +47,7 @@ public static class AuthEndpoints
                 await db.SaveChangesAsync();
 
                 var grain = grains.GetGrain<IVolunteerGrain>(grainId);
-                await grain.UpdateProfile(string.Empty, string.Empty, req.Email, string.Empty, string.Empty);
+                await grain.UpdateProfile(firstName, lastName, req.Email, string.Empty, string.Empty);
             }
             else // Coordinator
             {
@@ -52,7 +55,7 @@ public static class AuthEndpoints
                 await db.SaveChangesAsync();
 
                 var grain = grains.GetGrain<ICoordinatorGrain>(grainId);
-                await grain.Initialize(string.Empty, string.Empty, req.Email, string.Empty, Guid.Empty);
+                await grain.Initialize(firstName, lastName, req.Email, string.Empty, Guid.Empty);
             }
 
             var token = GenerateToken(user, jwt, grainId);
@@ -126,5 +129,20 @@ public static class AuthEndpoints
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-}
 
+    /// <summary>
+    /// Extracts a name part from an email prefix.
+    /// e.g., "john.doe@example.com" → index 0 = "John", index 1 = "Doe"
+    /// "janedoe@example.com" → index 0 = "Janedoe", index 1 = ""
+    /// </summary>
+    private static string ExtractNameFromEmail(string email, int partIndex)
+    {
+        var prefix = email.Split('@')[0];
+        var parts = prefix.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
+        if (partIndex >= parts.Length) return string.Empty;
+        var raw = parts[partIndex];
+        return raw.Length > 0
+            ? char.ToUpperInvariant(raw[0]) + raw[1..]
+            : raw;
+    }
+}
