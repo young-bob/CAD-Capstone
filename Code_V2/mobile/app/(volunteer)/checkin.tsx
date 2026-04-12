@@ -21,6 +21,7 @@ interface ActiveApp {
     oppTitle: string;
     shiftId: string;
     shiftStartTime?: string | null;
+    shiftEndTime?: string | null;
     attendanceId: string | null;
     attendanceStatus: string | null;
 }
@@ -42,6 +43,10 @@ function findAttendanceForApplication(
         }
         return true;
     });
+}
+
+function isShiftPast(shiftEndTime?: string | null) {
+    return !!shiftEndTime && new Date(shiftEndTime).getTime() < Date.now();
 }
 
 export default function CheckInScreen() {
@@ -108,9 +113,9 @@ export default function CheckInScreen() {
                 applicationService.getForVolunteer(linkedGrainId),
                 attendanceService.getByVolunteer(linkedGrainId),
             ]);
-            const doneStatuses = [AttendanceStatus.Pending, AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
+            const doneStatuses = [AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
             const results: ActiveApp[] = apps
-                .filter(a => CHECKIN_ELIGIBLE_STATUSES.includes(a.status))
+                .filter(a => CHECKIN_ELIGIBLE_STATUSES.includes(a.status) && !isShiftPast(a.shiftEndTime))
                 .map(a => {
                     const rec = findAttendanceForApplication(attendanceRecords, a);
                     return {
@@ -119,6 +124,7 @@ export default function CheckInScreen() {
                         oppTitle: `${a.opportunityTitle} (${a.shiftName})`,
                         shiftId: a.shiftId,
                         shiftStartTime: a.shiftStartTime,
+                        shiftEndTime: a.shiftEndTime,
                         attendanceId: rec?.attendanceId ?? null,
                         attendanceStatus: rec?.status ?? null,
                     };

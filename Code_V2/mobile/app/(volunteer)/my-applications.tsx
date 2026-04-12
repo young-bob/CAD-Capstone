@@ -29,6 +29,19 @@ function formatTimeRange(start: string, end: string): string {
     return `${new Date(start).toLocaleTimeString([], opts)} – ${new Date(end).toLocaleTimeString([], opts)}`;
 }
 
+function findAttendanceForApplication(
+    attendanceRecords: AttendanceSummary[],
+    app: Pick<ApplicationSummary, 'opportunityId' | 'shiftStartTime'>
+) {
+    return attendanceRecords.find((record) => {
+        if (record.opportunityId !== app.opportunityId) return false;
+        if (app.shiftStartTime && record.shiftStartTime) {
+            return record.shiftStartTime === app.shiftStartTime;
+        }
+        return true;
+    });
+}
+
 export default function MyApplicationsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -108,10 +121,14 @@ export default function MyApplicationsScreen() {
         }
     };
 
+    const now = Date.now();
+    const isShiftPast = (app: ApplicationSummary) => !!app.shiftEndTime && new Date(app.shiftEndTime).getTime() < now;
+    const activeStatuses = ['Approved', 'Pending', 'Promoted'];
+    const terminalStatuses = ['Completed', 'Rejected', 'Withdrawn', 'NoShow'];
     const groups: Record<TabKey, ApplicationSummary[]> = {
-        Upcoming: applications.filter(a => ['Approved', 'Pending', 'Promoted'].includes(a.status)),
+        Upcoming: applications.filter(a => activeStatuses.includes(a.status) && !isShiftPast(a)),
         Waitlisted: applications.filter(a => a.status === 'Waitlisted'),
-        Past: applications.filter(a => ['Completed', 'Rejected', 'Withdrawn', 'NoShow'].includes(a.status)),
+        Past: applications.filter(a => terminalStatuses.includes(a.status) || (activeStatuses.includes(a.status) && isShiftPast(a))),
     };
     const tabs: TabKey[] = (['Upcoming', 'Waitlisted', 'Past'] as TabKey[]).filter(t => groups[t].length > 0);
     const visibleTab: TabKey = tabs.includes(activeTab) ? activeTab : (tabs[0] ?? 'Upcoming');
@@ -154,7 +171,7 @@ export default function MyApplicationsScreen() {
                 contentContainerStyle={styles.list}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 renderItem={({ item }) => {
-                    const rec = attendance.find(r => r.opportunityId === item.opportunityId);
+                    const rec = findAttendanceForApplication(attendance, item);
                     const isNoShow = item.status === ApplicationStatus.NoShow;
                     return (
                     <Card style={styles.card} mode="outlined">

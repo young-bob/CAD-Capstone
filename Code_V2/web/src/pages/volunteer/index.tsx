@@ -63,6 +63,19 @@ function formatTimeRange(start: string, end: string): string {
 }
 
 // ─── GPS Check-In Button ──────────────────────────────────────
+function findAttendanceForApplication(
+    attendanceRecords: AttendanceSummary[],
+    app: Pick<ApplicationSummary, 'opportunityId' | 'shiftStartTime'>
+) {
+    return attendanceRecords.find((record) => {
+        if (record.opportunityId !== app.opportunityId) return false;
+        if (app.shiftStartTime && record.shiftStartTime) {
+            return record.shiftStartTime === app.shiftStartTime;
+        }
+        return true;
+    });
+}
+
 function GpsCheckInButton({ attendanceId, opportunityId, shiftStartTime, onDone }: {
     attendanceId: string; opportunityId: string; shiftStartTime?: string | null; onDone: () => void
 }) {
@@ -1207,7 +1220,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     const visibleApps = groups[visibleTab] ?? [];
 
     const renderCard = (a: ApplicationSummary) => {
-        const rec = appAttendance.find(r => r.opportunityId === a.opportunityId);
+        const rec = findAttendanceForApplication(appAttendance, a);
         const isNoShow = a.status === 'NoShow';
         return (
         <div key={a.applicationId} className={`bg-white rounded-2xl p-5 shadow-sm border transition-all ${actionId === a.applicationId ? 'border-orange-200 opacity-70' : 'border-stone-100'}`}>

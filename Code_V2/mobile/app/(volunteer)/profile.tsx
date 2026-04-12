@@ -476,7 +476,7 @@ export default function ProfileScreen() {
                             </Text>
                             <View style={styles.certPreviewStats}>
                                 <View style={styles.certStat}>
-                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{profile?.totalHours ?? 0}h</Text>
+                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{(profile?.totalHours ?? 0).toFixed(1)}h</Text>
                                     <Text style={styles.certStatLabel}>Total Hours</Text>
                                 </View>
                                 <View style={styles.certStat}>

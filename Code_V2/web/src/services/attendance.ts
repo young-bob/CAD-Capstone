@@ -14,7 +14,7 @@ export const attendanceService = {
         const res = await api.get<AttendanceSummary[]>(`/api/attendance/opportunity/${opportunityId}`);
         return res.data;
     },
-    init: async (id: string, data: { volunteerId: string; applicationId: string; opportunityId: string }): Promise<void> => {
+    init: async (id: string, data: { volunteerId: string; applicationId: string; opportunityId: string; shiftId?: string }): Promise<void> => {
         await api.post(`/api/attendance/${id}/init`, data);
     },
     checkIn: async (id: string, data: { lat: number; lon: number; proofPhotoUrl: string }): Promise<void> => {
