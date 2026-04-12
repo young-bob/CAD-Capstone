@@ -2640,7 +2640,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
         setActionId(app.volunteerId + '_init');
         try {
             const attId = crypto.randomUUID();
-            await attendanceService.init(attId, { volunteerId: app.volunteerId, applicationId: app.applicationId, opportunityId: app.opportunityId });
+            await attendanceService.init(attId, { volunteerId: app.volunteerId, applicationId: app.applicationId, opportunityId: app.opportunityId, shiftId: app.shiftId });
             await attendanceService.coordinatorCheckIn(attId);
             showToast(`${app.volunteerName || 'Volunteer'} checked in ✅`);
             setTimeout(() => load(), 600);

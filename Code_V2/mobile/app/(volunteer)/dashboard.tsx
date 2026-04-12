@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Surface, Card, Chip, ActivityIndicator, Button, Badge } from 'react-native-paper';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { COLORS } from '../../constants/config';
 import { useAuthStore } from '../../stores/authStore';
+import * as SecureStore from 'expo-secure-store';
 import { volunteerService, VolunteerProfile } from '../../services/volunteers';
 import { notificationService } from '../../services/notifications';
+import { applicationService } from '../../services/applications';
 import { AttendanceSummary } from '../../types/attendance';
 import { AttendanceStatus } from '../../types/enums';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -62,13 +64,20 @@ export default function DashboardScreen() {
     const load = useCallback(async () => {
         if (!linkedGrainId) { setLoading(false); return; }
         try {
-            const [p, attendance, notifCount] = await Promise.all([
+            const [p, attendance, notifCount, apps, readRaw] = await Promise.all([
                 volunteerService.getProfile(linkedGrainId),
                 volunteerService.getAttendance(linkedGrainId),
                 notificationService.getUnreadCount().catch(() => 0),
+                applicationService.getForVolunteer(linkedGrainId).catch(() => []),
+                SecureStore.getItemAsync('app_notif_read_ids').catch(() => null),
             ]);
             setProfile(p);
-            setUnreadCount(notifCount);
+            const readIds: Set<string> = readRaw ? new Set(JSON.parse(readRaw)) : new Set();
+            const appNotifCount = apps.filter((a: any) =>
+                ['Approved', 'Rejected', 'Waitlisted', 'Promoted'].includes(a.status) &&
+                !readIds.has(`app-${a.applicationId}`)
+            ).length;
+            setUnreadCount(notifCount + appNotifCount);
             setAttendanceHistory(
                 attendance
                     .sort((a, b) => {
@@ -86,6 +95,7 @@ export default function DashboardScreen() {
     }, [linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useFocusEffect(useCallback(() => { load(); }, [load]));
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -122,9 +132,9 @@ export default function DashboardScreen() {
             {/* Impact Stats */}
             <Text style={styles.sectionTitle}>Your Impact</Text>
             <View style={styles.statsRow}>
-                <StatCard icon="clock-check-outline" value={profile?.totalHours ?? 0} label="Hours" color={COLORS.primary} />
+                <StatCard icon="clock-check-outline" value={(profile?.totalHours ?? 0).toFixed(1)} label="Hours" color={COLORS.primary} />
                 <StatCard icon="check-decagram" value={profile?.completedOpportunities ?? 0} label="Completed" color={COLORS.success} />
-                <StatCard icon="star-four-points" value={profile?.impactScore ?? 0} label="Score" color={COLORS.warning} />
+                <StatCard icon="star-four-points" value={(profile?.impactScore ?? 0).toFixed(1)} label="Score" color={COLORS.warning} />
             </View>
 
             {/* Quick Actions */}

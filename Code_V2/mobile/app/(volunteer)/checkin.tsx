@@ -21,8 +21,32 @@ interface ActiveApp {
     oppTitle: string;
     shiftId: string;
     shiftStartTime?: string | null;
+    shiftEndTime?: string | null;
     attendanceId: string | null;
     attendanceStatus: string | null;
+}
+
+const CHECKIN_ELIGIBLE_STATUSES = [
+    ApplicationStatus.Approved,
+    ApplicationStatus.Promoted,
+    ApplicationStatus.Completed,
+];
+
+function findAttendanceForApplication(
+    attendanceRecords: Awaited<ReturnType<typeof attendanceService.getByVolunteer>>,
+    app: { opportunityId: string; shiftStartTime?: string | null }
+) {
+    return attendanceRecords.find((record) => {
+        if (record.opportunityId !== app.opportunityId) return false;
+        if (app.shiftStartTime && record.shiftStartTime) {
+            return record.shiftStartTime === app.shiftStartTime;
+        }
+        return true;
+    });
+}
+
+function isShiftPast(shiftEndTime?: string | null) {
+    return !!shiftEndTime && new Date(shiftEndTime).getTime() < Date.now();
 }
 
 export default function CheckInScreen() {
@@ -89,17 +113,18 @@ export default function CheckInScreen() {
                 applicationService.getForVolunteer(linkedGrainId),
                 attendanceService.getByVolunteer(linkedGrainId),
             ]);
-            const doneStatuses = [AttendanceStatus.Pending, AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
+            const doneStatuses = [AttendanceStatus.CheckedOut, AttendanceStatus.Confirmed, AttendanceStatus.Resolved];
             const results: ActiveApp[] = apps
-                .filter(a => a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
+                .filter(a => CHECKIN_ELIGIBLE_STATUSES.includes(a.status) && !isShiftPast(a.shiftEndTime))
                 .map(a => {
-                    const rec = attendanceRecords.find(r => r.opportunityId === a.opportunityId);
+                    const rec = findAttendanceForApplication(attendanceRecords, a);
                     return {
                         id: a.applicationId,
                         oppId: a.opportunityId,
                         oppTitle: `${a.opportunityTitle} (${a.shiftName})`,
                         shiftId: a.shiftId,
                         shiftStartTime: a.shiftStartTime,
+                        shiftEndTime: a.shiftEndTime,
                         attendanceId: rec?.attendanceId ?? null,
                         attendanceStatus: rec?.status ?? null,
                     };
@@ -240,7 +265,7 @@ export default function CheckInScreen() {
             const apps = await applicationService.getForVolunteer(linkedGrainId);
             let match = apps.find(
                 a => a.opportunityId === opportunityId && a.shiftId === shiftId &&
-                    (a.status === ApplicationStatus.Approved || a.status === ApplicationStatus.Completed)
+                    CHECKIN_ELIGIBLE_STATUSES.includes(a.status)
             );
 
             // No approved application — apply to this shift on the spot

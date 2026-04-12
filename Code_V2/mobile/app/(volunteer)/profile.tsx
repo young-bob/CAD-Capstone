@@ -54,6 +54,8 @@ export default function ProfileScreen() {
             const data = await volunteerService.getProfile(linkedGrainId);
             setProfile(data);
             setPrivPublic(data.isProfilePublic ?? true);
+            setPrivEmail(data.allowEmailNotifications ?? true);
+            setPrivPush(data.allowPushNotifications ?? true);
         } catch (err: any) {
             console.log('Profile fetch error:', err.message);
         } finally {
@@ -283,7 +285,7 @@ export default function ProfileScreen() {
                             size={20}
                             color={profile?.backgroundCheckStatus === 'Verified' ? COLORS.success
                                 : profile?.backgroundCheckStatus === 'Pending' ? COLORS.warning
-                                : COLORS.textSecondary}
+                                    : COLORS.textSecondary}
                         />
                         <View style={{ flex: 1, marginLeft: 12 }}>
                             <Text style={{ color: COLORS.text, fontSize: 14 }}>Background Check</Text>
@@ -296,12 +298,12 @@ export default function ProfileScreen() {
                             style={{
                                 backgroundColor: profile?.backgroundCheckStatus === 'Verified' ? COLORS.success + '18'
                                     : profile?.backgroundCheckStatus === 'Pending' ? COLORS.warning + '18'
-                                    : COLORS.surfaceLight
+                                        : COLORS.surfaceLight
                             }}
                             textStyle={{
                                 color: profile?.backgroundCheckStatus === 'Verified' ? COLORS.success
                                     : profile?.backgroundCheckStatus === 'Pending' ? COLORS.warning
-                                    : COLORS.textSecondary,
+                                        : COLORS.textSecondary,
                                 fontSize: 11,
                             }}
                         >
@@ -310,25 +312,6 @@ export default function ProfileScreen() {
                     </View>
                 </Card.Content>
             </Card>
-
-            {/* Impact Stats */}
-            <View style={styles.statsRow}>
-                <Surface style={styles.statCard} elevation={1}>
-                    <MaterialCommunityIcons name="clock-check-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.statValue}>{profile?.totalHours ?? 0}</Text>
-                    <Text style={styles.statLabel}>Hours</Text>
-                </Surface>
-                <Surface style={styles.statCard} elevation={1}>
-                    <MaterialCommunityIcons name="check-decagram" size={24} color={COLORS.success} />
-                    <Text style={[styles.statValue, { color: COLORS.success }]}>{profile?.completedOpportunities ?? 0}</Text>
-                    <Text style={styles.statLabel}>Completed</Text>
-                </Surface>
-                <Surface style={styles.statCard} elevation={1}>
-                    <MaterialCommunityIcons name="star-four-points" size={24} color={COLORS.warning} />
-                    <Text style={[styles.statValue, { color: COLORS.warning }]}>{profile?.impactScore ?? 0}</Text>
-                    <Text style={styles.statLabel}>Score</Text>
-                </Surface>
-            </View>
 
             {/* Actions */}
             <Card style={styles.actionsCard} mode="outlined">
@@ -345,7 +328,7 @@ export default function ProfileScreen() {
                     <Divider style={styles.divider} />
                     <ActionRow icon="domain" label="Browse Organizations" onPress={() => router.push('/(volunteer)/organizations')} />
                     <Divider style={styles.divider} />
-                    <ActionRow icon="bell-outline" label="Notifications" onPress={() => router.push('/(volunteer)/notifications')} />
+                    <ActionRow icon="bell-outline" label="Notification Settings" onPress={openNotifications} />
                     <Divider style={styles.divider} />
                     <ActionRow icon="lock-outline" label="Privacy Settings" onPress={openPrivacy} />
                 </Card.Content>
@@ -493,7 +476,7 @@ export default function ProfileScreen() {
                             </Text>
                             <View style={styles.certPreviewStats}>
                                 <View style={styles.certStat}>
-                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{profile?.totalHours ?? 0}h</Text>
+                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{(profile?.totalHours ?? 0).toFixed(1)}h</Text>
                                     <Text style={styles.certStatLabel}>Total Hours</Text>
                                 </View>
                                 <View style={styles.certStat}>

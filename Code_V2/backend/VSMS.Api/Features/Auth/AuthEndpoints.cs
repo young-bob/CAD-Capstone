@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using VSMS.Abstractions.Grains;
+using VSMS.Abstractions.Services;
 using VSMS.Infrastructure.Data.EfCoreQuery;
 using VSMS.Infrastructure.Data.EfCoreQuery.Entities;
 
@@ -15,7 +16,7 @@ public static class AuthEndpoints
     {
         var auth = app.MapGroup("/api/auth").WithTags("Auth");
 
-        auth.MapPost("/register", async (RegisterRequest req, AppDbContext db, JwtSettings jwt, IGrainFactory grains) =>
+        auth.MapPost("/register", async (RegisterRequest req, AppDbContext db, JwtSettings jwt, IGrainFactory grains, IEmailService email) =>
         {
             // Only Volunteer and Coordinator can self-register
             var allowedRoles = new[] { "Volunteer", "Coordinator" };
@@ -58,6 +59,22 @@ public static class AuthEndpoints
             }
 
             var token = GenerateToken(user, jwt, grainId);
+
+            // Send welcome email — fire-and-forget so a mail failure never blocks registration
+            _ = email.SendAsync(
+                to: user.Email,
+                subject: "Welcome to VSMS!",
+                body: $"""
+                    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+                        <h2 style="color:#f59e0b">Welcome to VSMS 🎉</h2>
+                        <p>Hi there,</p>
+                        <p>Your <strong>{user.Role}</strong> account has been created successfully.</p>
+                        <p>You can now log in and start exploring volunteer opportunities.</p>
+                        <hr style="border:none;border-top:1px solid #e7e5e4;margin:24px 0"/>
+                        <p style="color:#57534e;font-size:13px">If you didn't sign up for VSMS, you can safely ignore this email.</p>
+                    </div>
+                    """);
+
             return Results.Created($"/api/auth/{user.Id}",
                 new AuthResponse(token, user.Email, user.Role, user.Id, grainId));
         }).AllowAnonymous();
