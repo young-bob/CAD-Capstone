@@ -324,7 +324,7 @@ export default function ProfileScreen() {
                     <Divider style={styles.divider} />
                     <ActionRow icon="star-circle-outline" label="My Skills" onPress={() => router.push('/(volunteer)/skills')} />
                     <Divider style={styles.divider} />
-                    <ActionRow icon="history" label="Attendance History" onPress={() => router.push('/(volunteer)/attendance')} />
+                    <ActionRow icon="history" label="Attendance" onPress={() => router.push('/(volunteer)/attendance')} />
                     <Divider style={styles.divider} />
                     <ActionRow icon="domain" label="Browse Organizations" onPress={() => router.push('/(volunteer)/organizations')} />
                     <Divider style={styles.divider} />

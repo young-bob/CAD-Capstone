@@ -60,7 +60,7 @@ export default function VolunteerLayout() {
                 }}
             />
             {/* Hidden screens — accessible via router.push but not shown in tab bar */}
-            <Tabs.Screen name="attendance" options={{ title: 'History', href: null }} />
+            <Tabs.Screen name="attendance" options={{ title: 'Attendance', href: null }} />
             <Tabs.Screen name="skills" options={{ title: 'Skills', href: null }} />
             <Tabs.Screen name="organizations" options={{ title: 'Organizations', href: null }} />
             <Tabs.Screen name="opportunity-detail" options={{ title: 'Opportunity', href: null }} />
