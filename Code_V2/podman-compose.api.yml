@@ -49,6 +49,9 @@ services:
       AI__TimeoutSeconds: ${AI_TIMEOUT_SECONDS}
       AI__DefaultTemperature: ${AI_DEFAULT_TEMPERATURE}
       AI__DefaultMaxTokens: ${AI_DEFAULT_MAX_TOKENS}
+      # ---- Email (Resend) ----
+      RESEND_API: ${RESEND_API:-}
+      Email__From: ${EMAIL_FROM:-VSMS <noreply@vsms.foo>}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/swagger/v1/swagger.json"]
       interval: 10s
