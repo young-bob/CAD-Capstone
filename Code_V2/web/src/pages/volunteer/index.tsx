@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Clock, CheckCircle2, Award, Calendar, CalendarDays, User, MapPin, Search, Download, BadgeCheck, Camera, Loader2, AlertCircle, ChevronRight, Zap, TrendingUp, Heart, Building2, ExternalLink, Mail, Bell, X, CheckCheck } from 'lucide-react';
 import EventCalendar from '../../components/EventCalendar';
@@ -235,9 +236,9 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     const [showNotifs, setShowNotifs] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) return;
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [p, a, at] = await Promise.all([
                 volunteerService.getProfile(auth.linkedGrainId),
@@ -257,6 +258,7 @@ export function VolDashboard({ onNavigate }: DashboardProps) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const loadNotifications = useCallback(async () => {
         setNotifLoading(true);
@@ -711,8 +713,8 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
         });
     };
 
-    const load = useCallback(async (q?: string) => {
-        setLoading(true); setError('');
+    const load = useCallback(async (q?: string, silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             if (smartMatch && auth.userId) {
                 const ranked = await opportunityService.recommendForVolunteer({
@@ -734,6 +736,7 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     }, [auth.userId, coords?.lat, coords?.lon, smartMatch, selectedCategory]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     useEffect(() => {
         if (!smartMatch) return;
@@ -1101,9 +1104,9 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
         return new Set(keys.map(k => k.replace('vsms_dismiss_follow_', '')));
     });
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) return;
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [data, profile, attendance] = await Promise.all([
                 applicationService.getForVolunteer(auth.linkedGrainId),
@@ -1119,6 +1122,7 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (message: string, actions?: { label: string; onClick: () => void; tone?: 'default' | 'primary' | 'danger' }[]) => {
@@ -1423,9 +1427,9 @@ export function VolAttendance() {
     const [disputeEvidence, setDisputeEvidence] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) return;
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await attendanceService.getByVolunteer(auth.linkedGrainId);
             setRecords(data);
@@ -1434,6 +1438,7 @@ export function VolAttendance() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -1564,8 +1569,8 @@ export function VolCertificates() {
 
     const SEEN_KEY = `vsms_seen_certs_${auth.email ?? ''}`;
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [tpls, prof, att] = await Promise.all([
                 certificateService.getTemplates(),
@@ -1575,16 +1580,19 @@ export function VolCertificates() {
             setTemplates(tpls);
             if (prof) setProfile(prof);
             setAttendance(Array.isArray(att) ? att : []);
-            const seen = new Set<string>(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]'));
-            const newOnes = tpls.filter(t => !seen.has(t.id));
-            if (newOnes.length > 0 && seen.size > 0) setShowConfetti(true);
-            tpls.forEach(t => seen.add(t.id));
-            localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+            if (!silent) {
+                const seen = new Set<string>(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]'));
+                const newOnes = tpls.filter(t => !seen.has(t.id));
+                if (newOnes.length > 0 && seen.size > 0) setShowConfetti(true);
+                tpls.forEach(t => seen.add(t.id));
+                localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+            }
         } catch (err: any) { setError(getErr(err, 'Failed to load certificates')); }
         finally { setLoading(false); }
     }, [SEEN_KEY, auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -2034,9 +2042,9 @@ export function VolSkills() {
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.userId) return;
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [all, mine] = await Promise.all([
                 skillService.getAll(),
@@ -2050,6 +2058,7 @@ export function VolSkills() {
     }, [auth.userId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const toggle = async (skill: Skill) => {
         if (!auth.userId) return;
@@ -2139,8 +2148,8 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [oppData, appData, skillsData, mySkillsData, profileData] = await Promise.all([
                 opportunityService.getById(oppId),
@@ -2156,7 +2165,6 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
             if (profileData && oppData.organizationId) {
                 setIsFollowing((profileData.followedOrgIds || []).includes(oppData.organizationId));
             }
-            // Keep optimistic temp applications until projection/read model catches up.
             setMyApps(prev => {
                 const serverShiftIds = new Set(serverApps.map(a => a.shiftId));
                 const optimisticOnly = prev.filter(a => a.applicationId.startsWith('temp-') && !serverShiftIds.has(a.shiftId));
@@ -2168,6 +2176,7 @@ export function VolOpportunityDetail({ oppId, onBack }: VolOppDetailProps) {
     }, [oppId, auth.linkedGrainId, auth.userId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 

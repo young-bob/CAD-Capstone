@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { Users, Building, AlertTriangle, Calendar, User, Loader2, AlertCircle, Plus, Trash2, Pencil, X, Search, KeyRound, RefreshCw, ExternalLink, Server, Gauge, ShieldCheck, Download, Copy } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
 import { useCountUp } from '../../hooks/useCountUp';
@@ -38,8 +39,8 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [u, o, d, all] = await Promise.all([
                 adminService.getUsers(),
@@ -57,6 +58,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     if (loading) return <Spinner />;
     if (error) return <ErrorBox msg={error} onRetry={load} />;
@@ -211,9 +213,8 @@ export function AdminSystemInfo() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const res = await adminService.getSystemInfo();
             setData(res);
@@ -225,6 +226,7 @@ export function AdminSystemInfo() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load, 10_000); // System info refreshes faster
 
     if (loading) return <Spinner />;
     if (error) return <ErrorBox msg={error} onRetry={load} />;
@@ -599,8 +601,8 @@ export function AdminOrgs() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [allOrgs, users] = await Promise.all([
                 adminService.getAllOrganizations(),
@@ -614,6 +616,7 @@ export function AdminOrgs() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     useEffect(() => {
         try {
@@ -1146,8 +1149,8 @@ export function AdminSkills() {
     const [createCatSearch, setCreateCatSearch] = useState('');
     const [editCatSearch, setEditCatSearch] = useState('');
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await skillService.getAll();
             setSkills(data || []);
@@ -1157,6 +1160,7 @@ export function AdminSkills() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -1434,8 +1438,8 @@ export function AdminDisputes() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await attendanceService.getPendingDisputes();
             setDisputes(data || []);
@@ -1445,6 +1449,7 @@ export function AdminDisputes() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     const handleResolve = async (attendanceId: string) => {
         try {
@@ -1508,8 +1513,8 @@ export function AdminUsers() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await adminService.getUsers();
             setUsers(data || []);
@@ -1519,6 +1524,7 @@ export function AdminUsers() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     useEffect(() => {
         try {

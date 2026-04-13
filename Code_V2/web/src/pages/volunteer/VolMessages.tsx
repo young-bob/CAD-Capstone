@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { Bell, CheckCheck, Loader2, MessageSquare, RefreshCw, CornerDownLeft, Send, X } from 'lucide-react';
 import { notificationService } from '../../services/notifications';
 import { useAuth } from '../../hooks/useAuth';
@@ -33,8 +34,8 @@ export default function VolMessages() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const data = await notificationService.getMyNotifications(100);
             setNotifications(data);
@@ -46,6 +47,7 @@ export default function VolMessages() {
     }, []);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load, 10_000); // Messages refresh faster (10s)
 
     // Load this volunteer's replies from shared localStorage
     // Use linkedGrainId (volunteer grain ID) so coordinator can read them by the same key

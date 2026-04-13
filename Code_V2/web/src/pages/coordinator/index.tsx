@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Briefcase, Clock, Award, Users, Plus, Loader2, AlertCircle, ChevronLeft, Star, X, CheckCircle2, XCircle, Pencil, Trash2, ExternalLink, Download, CalendarDays, Bell, ShieldCheck, Square, CheckSquare, BookOpen, Bookmark, Heart, Globe, Mail, Tag, Megaphone, Sparkles, Copy, RefreshCw, User, AlertTriangle, Phone, Upload, ClipboardList, UserCheck, Check } from 'lucide-react';
 import { downloadCsv } from '../../utils/exportCsv';
@@ -174,9 +175,9 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const o = await organizationService.getById(auth.linkedGrainId);
             setOrg(o); setOrgNotFound(false);
@@ -198,6 +199,7 @@ export function CoordDashboard({ onNavigate }: CoordDashboardProps) {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const handleCreateOrg = async () => {
@@ -814,22 +816,22 @@ export function CoordManageEvents({ onViewDetail }: CoordManageEventsProps) {
         return () => clearTimeout(t);
     }, [createForm, showCreate, DRAFT_KEY]);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await organizationService.getOpportunities(auth.linkedGrainId);
             setOpps(data || []);
         } catch (err: any) {
             setError(getErr(err, 'Failed to load events'));
         } finally { setLoading(false); }
-        // Fetch org name for Social Post modal
         if (!orgName) {
             organizationService.getById(auth.linkedGrainId).then(o => setOrgName(o.name)).catch(() => {});
         }
     }, [auth.linkedGrainId, orgName]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     // Load templates when create form opens
@@ -1243,9 +1245,9 @@ export function CoordApplications() {
     const [volunteerProfiles, setVolunteerProfiles] = useState<Map<string, VolunteerProfile>>(new Map());
     const [showCredOnly, setShowCredOnly] = useState(false);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await organizationService.getApplications(auth.linkedGrainId);
             const incoming = data || [];
@@ -1268,6 +1270,7 @@ export function CoordApplications() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
 
     useEffect(() => {
         if (apps.length === 0) return;
@@ -1717,9 +1720,9 @@ export function CoordMembers() {
     const [toast, setToast] = useState('');
     const { visible: pagedMembers, hasMore: membersHasMore, sentinelRef: membersSentinel } = useInfiniteList(org?.members ?? []);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (silent = false) => {
         if (!auth.linkedGrainId) { setLoading(false); return; }
-        setLoading(true); setError('');
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await organizationService.getById(auth.linkedGrainId);
             setOrg(data);
@@ -1729,6 +1732,7 @@ export function CoordMembers() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -2010,8 +2014,8 @@ export function CoordCertTemplates() {
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const data = await certificateService.getTemplates(auth.linkedGrainId || undefined);
             setTemplates(data || []);
@@ -2021,6 +2025,7 @@ export function CoordCertTemplates() {
     }, [auth.linkedGrainId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const handleCreate = async () => {
@@ -2383,8 +2388,8 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
     const [taskOrg, setTaskOrg] = useState<OrgState | null>(null);
 
-    const load = useCallback(async () => {
-        setLoading(true); setError('');
+    const load = useCallback(async (silent = false) => {
+        if (!silent) { setLoading(true); setError(''); }
         try {
             const [d, a, att] = await Promise.all([
                 opportunityService.getById(oppId),
@@ -2397,6 +2402,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     }, [oppId]);
 
     useEffect(() => { load(); }, [load]);
+    useAutoRefresh(load);
     const refreshSoon = () => setTimeout(() => { void load(); }, 900);
 
     const loadTasks = async () => {
