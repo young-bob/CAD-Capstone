@@ -11,12 +11,15 @@ import { useEffect, useRef } from 'react';
  * @param fetchFn  — the data-loading function: (silent: boolean) => void
  * @param intervalMs — polling interval in ms (default 15 000 = 15 s)
  */
-export function useAutoRefresh(fetchFn: (silent: boolean) => void, intervalMs = 15_000) {
+export function useAutoRefresh(fetchFn: (silent: boolean) => void, intervalMs = 5_000) {
     const savedFn = useRef(fetchFn);
     useEffect(() => { savedFn.current = fetchFn; }, [fetchFn]);
 
     useEffect(() => {
-        const tick = () => savedFn.current(true);
+        const tick = () => {
+            if (import.meta.env.DEV) console.log('[useAutoRefresh] tick', new Date().toLocaleTimeString());
+            savedFn.current(true);
+        };
         const id = setInterval(tick, intervalMs);
 
         const onVisibility = () => {
