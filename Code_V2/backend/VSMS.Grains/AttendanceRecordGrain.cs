@@ -303,11 +303,11 @@ public class AttendanceRecordGrain(
         state.State.Status = AttendanceStatus.Confirmed;
         await state.WriteStateAsync();
 
-        await eventBus.PublishAsync(new AttendanceStatusChangedEvent(
-            this.GetPrimaryKey(), AttendanceStatus.Confirmed, state.State.VerifiedTime?.CheckOutTime, state.State.VerifiedTime?.TotalHours ?? 0));
-
-        // Update volunteer impact score
+        // Use adjusted hours if a dispute was resolved, otherwise use verified time
         var hours = state.State.DisputeLog?.AdjustedHours ?? state.State.VerifiedTime?.TotalHours ?? 0;
+
+        await eventBus.PublishAsync(new AttendanceStatusChangedEvent(
+            this.GetPrimaryKey(), AttendanceStatus.Confirmed, state.State.VerifiedTime?.CheckOutTime, hours));
         var volunteerGrain = grainFactory.GetGrain<IVolunteerGrain>(state.State.VolunteerId);
         await volunteerGrain.AddCompletedHours(hours);
         await volunteerGrain.IncrementCompletedOpportunities();
