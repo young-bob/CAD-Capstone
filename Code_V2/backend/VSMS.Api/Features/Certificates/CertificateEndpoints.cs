@@ -227,7 +227,7 @@ public static class CertificateEndpoints
 
             // 5. Store in MinIO
             using var stream = new MemoryStream(pdfBytes);
-            var fileName = $"cert_{profile.FirstName}_{profile.LastName}_{DateTime.UtcNow:yyyyMMdd}.pdf";
+            var fileName = $"{templateEntity.TemplateType}_{DateTime.UtcNow:yyMMddHHmmss}_{profile.FirstName}_{profile.LastName}.pdf";
             var fileKey = await fileStorage.UploadAsync(stream, fileName, "certificates");
 
             var issuedCertificate = new IssuedCertificateEntity
