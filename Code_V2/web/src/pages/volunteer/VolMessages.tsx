@@ -101,7 +101,7 @@ export default function VolMessages() {
                         Notifications and messages from coordinators
                     </p>
                 </div>
-                <button onClick={load} className="p-2.5 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700 transition-colors" title="Refresh">
+                <button onClick={() => load()} className="p-2.5 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-500 dark:text-zinc-400 hover:bg-stone-200 dark:hover:bg-zinc-700 transition-colors" title="Refresh">
                     <RefreshCw className="w-4 h-4" />
                 </button>
             </div>

@@ -736,7 +736,7 @@ export function VolOpportunities({ onViewDetail }: VolOpportunitiesProps = {}) {
     }, [auth.userId, coords?.lat, coords?.lon, smartMatch, selectedCategory]);
 
     useEffect(() => { load(); }, [load]);
-    useAutoRefresh(load);
+    useAutoRefresh((silent) => load(undefined, silent));
 
     useEffect(() => {
         if (!smartMatch) return;
