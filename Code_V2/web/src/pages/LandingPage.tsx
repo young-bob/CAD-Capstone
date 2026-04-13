@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import CustomCursor from '../components/CustomCursor';
-import { Heart, Sun, ChevronRight, CheckCircle2, Award, ShieldCheck, MapPin, Clock, Users, Briefcase, FileCheck, Star, Mail, Github, Twitter } from 'lucide-react';
+import { Heart, Sun, ChevronRight, CheckCircle2, Award, ShieldCheck, MapPin, Clock, Users, Briefcase, FileCheck, Star, Mail, Github, Twitter, Download, Smartphone, ExternalLink, X } from 'lucide-react';
 
 interface Props {
     onGoLogin: () => void;
@@ -120,6 +120,7 @@ const TESTIMONIALS = [
 
 export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
     const typewriterText = useTypewriter(TYPEWRITER_PHRASES);
+    const [showDownload, setShowDownload] = useState(false);
 
     // Hero card cycling
     const [heroCard, setHeroCard] = useState(0);
@@ -165,6 +166,7 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                         <a href="#how-it-works" className="hover:text-orange-500 transition-colors">How It Works</a>
                         <a href="#features" className="hover:text-orange-500 transition-colors">Features</a>
                         <a href="#testimonials" className="hover:text-orange-500 transition-colors">Testimonials</a>
+                        <button onClick={() => setShowDownload(true)} className="hover:text-orange-500 transition-colors flex items-center gap-1"><Download className="w-3.5 h-3.5" />Download</button>
                     </nav>
                     <div className="flex items-center gap-4">
                         <button onClick={onGoLogin} className="text-stone-600 hover:text-orange-500 font-semibold transition-colors text-sm">
@@ -670,6 +672,7 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                                     { label: 'How It Works', href: '#how-it-works' },
                                     { label: 'Platform Features', href: '#features' },
                                     { label: 'Testimonials', href: '#testimonials' },
+                                    { label: 'Download Apps', onClick: () => setShowDownload(true) },
                                     { label: 'Register', onClick: onGoRegister },
                                     { label: 'Log In', onClick: onGoLogin },
                                 ].map((link, i) => (
@@ -710,6 +713,55 @@ export default function LandingPage({ onGoLogin, onGoRegister }: Props) {
                     </div>
                 </div>
             </footer>
+
+            {/* ─── Download Modal ─── */}
+            {showDownload && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowDownload(false)}>
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowDownload(false)} className="absolute top-4 right-4 p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-400/30">
+                                <Download className="w-8 h-8 text-white" />
+                            </div>
+                            <h3 className="text-2xl font-extrabold text-stone-900 mb-1">Download VSMS</h3>
+                            <p className="text-stone-500 text-sm">Get the mobile app for the best experience</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Android APK */}
+                            <a
+                                href="/download/vsms.apk"
+                                className="flex items-center gap-4 p-4 rounded-2xl border border-stone-100 hover:border-orange-200 hover:bg-orange-50/50 transition-all group"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <Smartphone className="w-6 h-6 text-emerald-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-stone-800 text-sm">Android APK</p>
+                                    <p className="text-xs text-stone-400">Download and install directly</p>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-stone-300 group-hover:text-orange-500 transition-colors flex-shrink-0" />
+                            </a>
+
+                            {/* iOS placeholder */}
+                            <div className="flex items-center gap-4 p-4 rounded-2xl border border-stone-100 opacity-50 cursor-not-allowed">
+                                <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
+                                    <Smartphone className="w-6 h-6 text-stone-400" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-stone-800 text-sm">iOS App</p>
+                                    <p className="text-xs text-stone-400">Coming soon</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p className="text-center text-[11px] text-stone-400 mt-6">Android 8.0+ required · v1.0.0</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

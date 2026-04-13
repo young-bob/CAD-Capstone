@@ -19,6 +19,8 @@ services:
     image: vsms-web
     network_mode: "host"
     restart: unless-stopped
+    volumes:
+      - ./downloads:/usr/share/nginx/html/download:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081"]
       interval: 10s
