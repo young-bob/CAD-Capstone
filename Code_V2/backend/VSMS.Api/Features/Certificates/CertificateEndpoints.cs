@@ -253,8 +253,8 @@ public static class CertificateEndpoints
             db.IssuedCertificates.Add(issuedCertificate);
             await db.SaveChangesAsync();
 
-            // 6. Get presigned URL
-            var downloadUrl = await fileStorage.GetUrlAsync(fileKey);
+            // 6. Build a download URL that proxies through the API (avoids exposing internal MinIO hostname)
+            var downloadUrl = BuildDownloadUrl(config, http, fileKey);
 
             return Results.Ok(new GenerateCertificateResponse(fileKey, downloadUrl, fileName, certificateId, verifyUrl));
         });
@@ -340,6 +340,22 @@ public static class CertificateEndpoints
             }
 
             return issued is null ? Results.NotFound() : Results.Ok(issued);
+        }).AllowAnonymous();
+
+        // Download a certificate PDF through the API (no auth — fileKey UUID acts as capability token)
+        publicGroup.MapGet("/download/{*fileKey}", async (string fileKey, IFileStorageService fileStorage) =>
+        {
+            try
+            {
+                var normalizedKey = Uri.UnescapeDataString(fileKey).TrimStart('/');
+                var (content, contentType) = await fileStorage.DownloadAsync(normalizedKey);
+                var fileName = Path.GetFileName(normalizedKey);
+                return Results.File(content, contentType, fileDownloadName: fileName, enableRangeProcessing: true);
+            }
+            catch
+            {
+                return Results.NotFound();
+            }
         }).AllowAnonymous();
 
         // Seed system preset templates (call once during initial setup)
@@ -445,6 +461,17 @@ public static class CertificateEndpoints
             : configuredBaseUrl.Trim().TrimEnd('/');
 
         return $"{baseUrl}/api/certificates/verify/{Uri.EscapeDataString(certificateId)}";
+    }
+
+    private static string BuildDownloadUrl(IConfiguration config, HttpContext http, string fileKey)
+    {
+        var configuredBaseUrl = config["App:PublicBaseUrl"];
+        var baseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
+            ? $"{http.Request.Scheme}://{http.Request.Host}"
+            : configuredBaseUrl.Trim().TrimEnd('/');
+
+        // fileKey contains slashes (e.g. "certificates/uuid_name.pdf") — include as path segments
+        return $"{baseUrl}/api/certificates/download/{fileKey}";
     }
 
     private static string ResolveSignatoryName(string? preferredName, string? organizationName)
