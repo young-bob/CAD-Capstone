@@ -1599,16 +1599,14 @@ export function VolCertificates() {
                 ? `${profile.firstName} ${profile.lastName}`.trim()
                 : (auth.email ?? 'Volunteer');
             const districtName = template.organizationName || 'Community Organization';
-            const confirmedRecords = attendance.filter(a =>
-                a.status === AttendanceStatus.Confirmed || a.status === AttendanceStatus.CheckedOut
-            );
+            const confirmedRecords = attendance.filter(a => a.status === AttendanceStatus.Confirmed);
             const activities: CertActivity[] = confirmedRecords.map(a => ({
                 title: a.opportunityTitle,
                 orgName: districtName,
                 date: a.checkOutTime ?? a.checkInTime ?? a.shiftStartTime,
                 hours: a.totalHours,
             }));
-            const totalHours = profile?.totalHours ?? activities.reduce((s, a) => s + a.hours, 0);
+            const totalHours = activities.reduce((s, a) => s + a.hours, 0);
             const style = getTemplateStyle(template);
             const issued = await certificateService.issue(
                 auth.linkedGrainId,

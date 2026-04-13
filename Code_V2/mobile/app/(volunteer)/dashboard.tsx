@@ -59,6 +59,7 @@ export default function DashboardScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [profile, setProfile] = useState<VolunteerProfile | null>(null);
     const [attendanceHistory, setAttendanceHistory] = useState<AttendanceSummary[]>([]);
+    const [confirmedHours, setConfirmedHours] = useState(0);
     const [unreadCount, setUnreadCount] = useState(0);
 
     const load = useCallback(async () => {
@@ -72,6 +73,11 @@ export default function DashboardScreen() {
                 SecureStore.getItemAsync('app_notif_read_ids').catch(() => null),
             ]);
             setProfile(p);
+            // Compute confirmed hours from attendance records — same source as the Attendance page
+            const hours = (attendance as AttendanceSummary[])
+                .filter(r => r.status === 'Confirmed')
+                .reduce((sum, r) => sum + (r.totalHours ?? 0), 0);
+            setConfirmedHours(hours);
             const readIds: Set<string> = readRaw ? new Set(JSON.parse(readRaw)) : new Set();
             const appNotifCount = apps.filter((a: any) =>
                 ['Approved', 'Rejected', 'Waitlisted', 'Promoted'].includes(a.status) &&
@@ -79,7 +85,8 @@ export default function DashboardScreen() {
             ).length;
             setUnreadCount(notifCount + appNotifCount);
             setAttendanceHistory(
-                attendance
+                (attendance as AttendanceSummary[])
+                    .filter(r => r.status !== 'Pending')
                     .sort((a, b) => {
                         const aTime = a.checkInTime ? new Date(a.checkInTime).getTime() : 0;
                         const bTime = b.checkInTime ? new Date(b.checkInTime).getTime() : 0;
@@ -132,7 +139,7 @@ export default function DashboardScreen() {
             {/* Impact Stats */}
             <Text style={styles.sectionTitle}>Your Impact</Text>
             <View style={styles.statsRow}>
-                <StatCard icon="clock-check-outline" value={(profile?.totalHours ?? 0).toFixed(1)} label="Hours" color={COLORS.primary} />
+                <StatCard icon="clock-check-outline" value={confirmedHours.toFixed(1)} label="Hours" color={COLORS.primary} />
                 <StatCard icon="check-decagram" value={profile?.completedOpportunities ?? 0} label="Completed" color={COLORS.success} />
                 <StatCard icon="star-four-points" value={(profile?.impactScore ?? 0).toFixed(2)} label="Score" color={COLORS.warning} />
             </View>

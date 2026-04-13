@@ -2330,7 +2330,7 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
     const [showNotifyHistory, setShowNotifyHistory] = useState(false);
 
     // Live check-in mode
-    const [liveMode, setLiveMode] = useState(false);
+    const [liveMode, setLiveMode] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [qrGeneratingFor, setQrGeneratingFor] = useState<string | null>(null);
 
@@ -3015,7 +3015,11 @@ export function CoordOpportunityDetail({ oppId, onBack }: CoordOppDetailProps) {
                             </div>
                         </div>
                         {confirmedApps.map(app => {
-                            const rec = attendanceRecords.find(r => r.volunteerId === app.volunteerId);
+                            const rec = attendanceRecords.find(r =>
+                                r.volunteerId === app.volunteerId &&
+                                (!r.shiftStartTime || !app.shiftStartTime ||
+                                    new Date(r.shiftStartTime).getTime() === new Date(app.shiftStartTime).getTime())
+                            );
                             const status = rec?.status;
                             return (
                                 <div key={app.applicationId} className="flex items-start justify-between py-3.5 border-b border-stone-50 last:border-0 gap-4">

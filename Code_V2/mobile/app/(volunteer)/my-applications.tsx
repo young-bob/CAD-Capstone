@@ -26,7 +26,7 @@ type TabKey = 'Upcoming' | 'Waitlisted' | 'Past';
 
 function formatTimeRange(start: string, end: string): string {
     const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-    return `${new Date(start).toLocaleTimeString([], opts)} 鈥?${new Date(end).toLocaleTimeString([], opts)}`;
+    return `${new Date(start).toLocaleTimeString([], opts)} – ${new Date(end).toLocaleTimeString([], opts)}`;
 }
 
 function findAttendanceForApplication(
@@ -79,7 +79,7 @@ export default function MyApplicationsScreen() {
     }, [fetchApplications]);
 
     const handleWithdraw = async (app: ApplicationSummary) => {
-        Alert.alert('Withdraw', `Withdraw from "${app.opportunityTitle} 鈥?${app.shiftName}"?`, [
+        Alert.alert('Withdraw', `Withdraw from "${app.opportunityTitle} – ${app.shiftName}"?`, [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Withdraw', style: 'destructive', onPress: async () => {
@@ -194,9 +194,9 @@ export default function MyApplicationsScreen() {
                             <View style={styles.metaRow}>
                                 <MaterialCommunityIcons name="clock-outline" size={13} color={COLORS.textSecondary} />
                                 <Text style={styles.meta}>
-                                    {item.shiftName ? `${item.shiftName} 路 ` : ''}
+                                    {item.shiftName ? `${item.shiftName} · ` : ''}
                                     {item.shiftStartTime ? new Date(item.shiftStartTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-                                    {item.shiftStartTime && item.shiftEndTime ? `  路  ${formatTimeRange(item.shiftStartTime, item.shiftEndTime)}` : ''}
+                                    {item.shiftStartTime && item.shiftEndTime ? `  ·  ${formatTimeRange(item.shiftStartTime, item.shiftEndTime)}` : ''}
                                 </Text>
                             </View>
                             <View style={styles.metaRow}>
@@ -208,7 +208,7 @@ export default function MyApplicationsScreen() {
                                     <MaterialCommunityIcons name="login" size={13} color={COLORS.success} />
                                     <Text style={styles.meta}>
                                         Check-in: {new Date(rec.checkInTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                        {rec.checkOutTime ? `  路  Check-out: ${new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                                        {rec.checkOutTime ? `  ·  Check-out: ${new Date(rec.checkOutTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
                                     </Text>
                                 </View>
                             )}

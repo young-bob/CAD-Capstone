@@ -196,30 +196,33 @@ public static class CertificateEndpoints
             var signatoryName = ResolveSignatoryName(templateEntity.SignatoryName, resolvedOrganizationName);
             var signatoryTitle = ResolveSignatoryTitle(templateEntity.SignatoryTitle);
 
+            var confirmedActivities = await db.AttendanceReadModels
+                .AsNoTracking()
+                .Where(a => a.VolunteerId == req.VolunteerId &&
+                    a.Status == Abstractions.Enums.AttendanceStatus.Confirmed &&
+                    a.TotalHours > 0)
+                .OrderByDescending(a => a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime)
+                .Select(a => new CertificateActivity
+                {
+                    Title = a.OpportunityTitle,
+                    OrganizationName = resolvedOrganizationName ?? string.Empty,
+                    CompletedAt = a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime,
+                    Hours = a.TotalHours
+                })
+                .ToListAsync();
+
+            var confirmedTotalHours = confirmedActivities.Sum(a => a.Hours);
+
             var certData = new CertificateData
             {
                 VolunteerName = volunteerName,
-                TotalHours = profile.TotalHours,
-                CompletedOpportunities = profile.CompletedOpportunities,
+                TotalHours = confirmedTotalHours,
+                CompletedOpportunities = confirmedActivities.Count,
                 OrganizationName = resolvedOrganizationName,
                 VolunteerSignatureName = req.VolunteerSignatureName,
                 CertificateId = certificateId,
                 VerificationUrl = verifyUrl,
-                Activities = await db.AttendanceReadModels
-                    .AsNoTracking()
-                    .Where(a => a.VolunteerId == req.VolunteerId &&
-                        (a.Status == Abstractions.Enums.AttendanceStatus.Confirmed ||
-                         a.Status == Abstractions.Enums.AttendanceStatus.CheckedOut) &&
-                        a.TotalHours > 0)
-                    .OrderByDescending(a => a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime)
-                    .Select(a => new CertificateActivity
-                    {
-                        Title = a.OpportunityTitle,
-                        OrganizationName = resolvedOrganizationName ?? string.Empty,
-                        CompletedAt = a.CheckOutTime ?? a.CheckInTime ?? a.ShiftStartTime,
-                        Hours = a.TotalHours
-                    })
-                    .ToListAsync(),
+                Activities = confirmedActivities,
             };
 
             // 4. Generate PDF
@@ -240,8 +243,8 @@ public static class CertificateEndpoints
                 OrganizationName = resolvedOrganizationName ?? string.Empty,
                 TemplateName = templateEntity.Name,
                 TemplateType = templateEntity.TemplateType,
-                TotalHours = profile.TotalHours,
-                CompletedOpportunities = profile.CompletedOpportunities,
+                TotalHours = confirmedTotalHours,
+                CompletedOpportunities = confirmedActivities.Count,
                 VolunteerSignatureName = req.VolunteerSignatureName,
                 SignatoryName = signatoryName,
                 SignatoryTitle = signatoryTitle,
@@ -283,6 +286,19 @@ public static class CertificateEndpoints
             var certificateId = CreatePublicCertificateId();
             var verifyUrl = BuildVerifyUrl(config, http, certificateId);
 
+            var issueConfirmedHours = await db.AttendanceReadModels
+                .AsNoTracking()
+                .Where(a => a.VolunteerId == req.VolunteerId &&
+                    a.Status == Abstractions.Enums.AttendanceStatus.Confirmed &&
+                    a.TotalHours > 0)
+                .SumAsync(a => a.TotalHours);
+
+            var issueConfirmedCount = await db.AttendanceReadModels
+                .AsNoTracking()
+                .CountAsync(a => a.VolunteerId == req.VolunteerId &&
+                    a.Status == Abstractions.Enums.AttendanceStatus.Confirmed &&
+                    a.TotalHours > 0);
+
             var issuedCertificate = new IssuedCertificateEntity
             {
                 CertificateId = certificateId,
@@ -293,8 +309,8 @@ public static class CertificateEndpoints
                 OrganizationName = resolvedOrganizationName ?? string.Empty,
                 TemplateName = templateEntity.Name,
                 TemplateType = templateEntity.TemplateType,
-                TotalHours = profile.TotalHours,
-                CompletedOpportunities = profile.CompletedOpportunities,
+                TotalHours = issueConfirmedHours,
+                CompletedOpportunities = issueConfirmedCount,
                 VolunteerSignatureName = req.VolunteerSignatureName,
                 SignatoryName = ResolveSignatoryName(templateEntity.SignatoryName, resolvedOrganizationName),
                 SignatoryTitle = ResolveSignatoryTitle(templateEntity.SignatoryTitle),
