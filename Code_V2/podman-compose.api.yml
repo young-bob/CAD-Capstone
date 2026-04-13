@@ -51,7 +51,7 @@ services:
       AI__DefaultMaxTokens: ${AI_DEFAULT_MAX_TOKENS}
       # ---- Email (Resend) ----
       RESEND_API: ${RESEND_API:-}
-      Email__From: ${EMAIL_FROM:-VSMS <noreply@vsms.foo>}
+      Email__From: "${EMAIL_FROM}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/swagger/v1/swagger.json"]
       interval: 10s
