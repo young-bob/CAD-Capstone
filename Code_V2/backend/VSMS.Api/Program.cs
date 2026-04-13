@@ -51,7 +51,7 @@ else
     Console.WriteLine("[Startup] No .env file found — using system environment variables only");
 }
 Console.WriteLine($"[Startup] RESEND_API set: {!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEND_API"))}");
-Console.WriteLine($"[Startup] Email:From = {Environment.GetEnvironmentVariable("Email__From") ?? "(not set, using default)}");
+Console.WriteLine($"[Startup] Email:From = {Environment.GetEnvironmentVariable("Email__From") ?? "(not set, using default)"}");
 
 
 var builder = WebApplication.CreateBuilder(args);
