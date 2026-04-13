@@ -1,0 +1,12 @@
+# ---- Phase 1: Basic Infrastructure ----
+region   = "ca-central-1"
+ami_id   = "ami-0431110c89be170a4"   # Debian 13 ARM64
+key_name = "Capstone"
+
+# ---- Phase 2: Peering (boyang initiates, fill IDs here) ----
+chunxi_account_id  = "188847977220"
+chunxi_vpc_id      = ""   # from: cd chunxi && terraform output vpc_id
+brad_account_id    = "491243661019"
+brad_vpc_id        = ""   # from: cd brad && terraform output vpc_id
+marieth_account_id = "568598294678"
+marieth_vpc_id     = ""   # from: cd marieth && terraform output vpc_id
