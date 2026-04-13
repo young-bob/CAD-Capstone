@@ -258,6 +258,27 @@
         </div>
 
         <!-- ==============================================
+             WINDOW 7: CAPSTONE PORTAL (Live Webview — separate session)
+             ============================================== -->
+        <div class="magic-window" id="win-capstone">
+            <div class="window-inner">
+                <div class="window-header">
+                    <div class="traffic-lights">
+                        <div class="tl-btn close-btn red"></div>
+                        <div class="tl-btn yellow"></div>
+                        <div class="tl-btn green"></div>
+                    </div>
+                    <div class="window-title">Capstone Portal</div>
+                </div>
+                <div class="window-body">
+                    <!-- ELECTRON WEBVIEW (Isolated Session) -->
+                    <webview src="https://www.vsms.foo/dashboard" partition="persist:capstone"
+                        style="width:100%; height:100%; border:none;"></webview>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==============================================
              WINDOW 7: ARCHITECTURE (HTML Slide)
              ============================================== -->
         <div class="magic-window" id="win-arch">
@@ -370,6 +391,11 @@
                     <div class="desktop-card" data-target="win-coordinator">
                         <div class="card-icon grad-accent">📊</div>
                         <div class="card-label">Coordinator Portal</div>
+                        <div class="card-sub">Coordinator role</div>
+                    </div>
+                    <div class="desktop-card" data-target="win-capstone">
+                        <div class="card-icon grad-accent">📊</div>
+                        <div class="card-label">Capstone Portal</div>
                         <div class="card-sub">Coordinator role</div>
                     </div>
                     <div class="desktop-card" data-target="win-admin">
