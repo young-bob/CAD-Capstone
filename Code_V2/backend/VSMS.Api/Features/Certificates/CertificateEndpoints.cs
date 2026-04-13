@@ -259,7 +259,7 @@ public static class CertificateEndpoints
             // 6. Build a download URL that proxies through the API (avoids exposing internal MinIO hostname)
             var downloadUrl = BuildDownloadUrl(config, http, fileKey);
 
-            return Results.Ok(new GenerateCertificateResponse(fileKey, downloadUrl, fileName, certificateId, verifyUrl));
+            return Results.Ok(new GenerateCertificateResponse(fileKey, downloadUrl, fileName, certificateId, verifyUrl, confirmedTotalHours, confirmedActivities.Count));
         });
 
         group.MapPost("/issue", async (
@@ -690,7 +690,9 @@ public record GenerateCertificateResponse(
     string DownloadUrl,
     string FileName,
     string CertificateId,
-    string VerifyUrl);
+    string VerifyUrl,
+    double TotalHours,
+    int CompletedOpportunities);
 
 public record IssueCertificateRequest(
     Guid VolunteerId,

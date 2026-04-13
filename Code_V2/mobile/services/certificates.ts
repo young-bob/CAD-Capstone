@@ -39,6 +39,8 @@ export interface GenerateCertificateResult {
     fileName: string;
     certificateId: string;
     verifyUrl: string;
+    totalHours: number;
+    completedOpportunities: number;
 }
 
 export interface IssueCertificateResult {

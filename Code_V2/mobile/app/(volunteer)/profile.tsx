@@ -47,6 +47,8 @@ export default function ProfileScreen() {
     const [certLoading, setCertLoading] = useState(false);
     const [certUrl, setCertUrl] = useState<string | null>(null);
     const [certDetail, setCertDetail] = useState<CertificateTemplateDetail | null>(null);
+    const [certTotalHours, setCertTotalHours] = useState(0);
+    const [certOpportunities, setCertOpportunities] = useState(0);
 
     const fetchProfile = useCallback(async () => {
         try {
@@ -148,6 +150,8 @@ export default function ProfileScreen() {
             ]);
             setCertUrl(result.downloadUrl);
             setCertDetail(detail);
+            setCertTotalHours(result.totalHours);
+            setCertOpportunities(result.completedOpportunities);
             setShowCertPreview(true);
         } catch (err: any) {
             Alert.alert('Error', err.response?.data?.toString() || 'Failed to generate certificate');
@@ -452,7 +456,7 @@ export default function ProfileScreen() {
             <Portal>
                 <Modal
                     visible={showCertPreview}
-                    onDismiss={() => { setShowCertPreview(false); setCertUrl(null); setCertDetail(null); }}
+                    onDismiss={() => { setShowCertPreview(false); setCertUrl(null); setCertDetail(null); setCertTotalHours(0); setCertOpportunities(0); }}
                     contentContainerStyle={styles.modal}
                 >
                     <Text variant="titleLarge" style={styles.modalTitle}>Certificate Preview</Text>
@@ -476,11 +480,11 @@ export default function ProfileScreen() {
                             </Text>
                             <View style={styles.certPreviewStats}>
                                 <View style={styles.certStat}>
-                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{(profile?.totalHours ?? 0).toFixed(1)}h</Text>
+                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{certTotalHours.toFixed(1)}h</Text>
                                     <Text style={styles.certStatLabel}>Total Hours</Text>
                                 </View>
                                 <View style={styles.certStat}>
-                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{profile?.completedOpportunities ?? 0}</Text>
+                                    <Text style={[styles.certStatValue, { color: selectedTemplate.primaryColor }]}>{certOpportunities}</Text>
                                     <Text style={styles.certStatLabel}>Opportunities</Text>
                                 </View>
                             </View>
@@ -522,7 +526,7 @@ export default function ProfileScreen() {
                     <View style={styles.modalBtns}>
                         <Button
                             mode="outlined"
-                            onPress={() => { setShowCertPreview(false); setCertUrl(null); setCertDetail(null); }}
+                            onPress={() => { setShowCertPreview(false); setCertUrl(null); setCertDetail(null); setCertTotalHours(0); setCertOpportunities(0); }}
                             textColor={COLORS.error}
                             style={[{ flex: 1 }, { borderColor: COLORS.error + '40' }]}
                             icon="trash-can-outline"
