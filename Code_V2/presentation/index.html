@@ -293,7 +293,110 @@
                 </div>
                 <div class="slide-content">
                     <h2>What Powers VSMS</h2>
-                    <p class="subtitle">The demo already proved it works — here's how.</p>
+                    <p class="subtitle">The demo shows how it works</p>
+
+                    <div
+                        style="display: flex; gap: 1.2rem; margin: 1.5rem auto; max-width: 960px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                        <div style="flex: 1; min-width: 280px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.15); cursor: zoom-in;"
+                            onclick="archOpen()">
+                            <img src="assets/images/vsms_architecture.png" alt="VSMS Architecture"
+                                style="width: 100%; display: block;">
+                        </div>
+                        <div class="vid-thumb"
+                            style="flex: 1; min-width: 280px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.15); cursor: zoom-in;"
+                            data-video="assets/videos/orleans.mp4">
+                            <video autoplay loop muted playsinline style="width: 100%; display: block;">
+                                <source src="assets/videos/orleans.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <div class="vid-thumb"
+                            style="flex: 1; min-width: 280px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.15); cursor: zoom-in;"
+                            data-video="assets/videos/volunter.mp4">
+                            <video autoplay loop muted playsinline style="width: 100%; display: block;">
+                                <source src="assets/videos/volunter.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                    </div>
+                    <!-- Generic video modal -->
+                    <div id="video-modal"
+                        style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92); justify-content:center; align-items:center;"
+                        onclick="closeVideoModal()">
+                        <video id="modal-video" autoplay loop muted playsinline onclick="event.stopPropagation()"
+                            style="max-width:calc(100vw - 64px); max-height:calc(100vh - 64px); border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);"></video>
+                        <div onclick="event.stopPropagation(); closeVideoModal()"
+                            style="position:fixed; top:16px; right:20px; width:36px; height:36px; background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:20px; color:#fff; z-index:10000;">✕</div>
+                        <div style="position:fixed; bottom:16px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.5); font-size:12px; pointer-events:none;">Click video to play/pause · Click ✕ to close</div>
+                    </div>
+                    <script>
+                        (function () {
+                            var mv = document.getElementById('modal-video');
+                            mv.addEventListener('click', function () { mv.paused ? mv.play() : mv.pause(); });
+                            window.closeVideoModal = function () {
+                                document.getElementById('video-modal').style.display = 'none';
+                                mv.pause();
+                            };
+                            document.querySelectorAll('.vid-thumb').forEach(function (el) {
+                                el.addEventListener('click', function () {
+                                    var src = el.getAttribute('data-video');
+                                    mv.src = src;
+                                    mv.currentTime = 0;
+                                    document.getElementById('video-modal').style.display = 'flex';
+                                    mv.play();
+                                });
+                            });
+                        })();
+                    </script>
+                    <!-- Architecture image modal (zoom + pan) -->
+                    <div id="arch-modal"
+                        style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.9); cursor:grab; overflow:hidden;">
+                        <img id="arch-img" src="assets/images/vsms_architecture.png" draggable="false"
+                            style="position:absolute; transform-origin:0 0; user-select:none; border-radius:8px;">
+                        <div onclick="document.getElementById('arch-modal').style.display='none'; archReset();"
+                            style="position:fixed; top:16px; right:20px; width:36px; height:36px; background:rgba(255,255,255,0.2); backdrop-filter:blur(8px); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:20px; color:#fff; z-index:10000;">
+                            ✕</div>
+                        <div
+                            style="position:fixed; bottom:16px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.5); font-size:12px; pointer-events:none;">
+                            Scroll to zoom · Drag to pan · Click ✕ to close</div>
+                    </div>
+                    <script>
+                        (function () {
+                            var modal = document.getElementById('arch-modal'), img = document.getElementById('arch-img');
+                            var scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
+                            function apply() { img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
+                            window.archReset = function () { scale = 1; tx = 0; ty = 0; apply(); };
+                            // Open: fit image to viewport
+                            window.archOpen = function () {
+                                modal.style.display = 'block'; scale = 1; tx = 0; ty = 0;
+                                var vw = window.innerWidth - 48, vh = window.innerHeight - 48;
+                                img.onload = function () {
+                                    var r = Math.min(vw / img.naturalWidth, vh / img.naturalHeight, 1);
+                                    scale = r; tx = (window.innerWidth - img.naturalWidth * r) / 2; ty = (window.innerHeight - img.naturalHeight * r) / 2;
+                                    apply();
+                                };
+                                if (img.naturalWidth) {
+                                    var r = Math.min(vw / img.naturalWidth, vh / img.naturalHeight, 1);
+                                    scale = r; tx = (window.innerWidth - img.naturalWidth * r) / 2; ty = (window.innerHeight - img.naturalHeight * r) / 2;
+                                    apply();
+                                }
+                            };
+                            // Wheel zoom (cursor-centered)
+                            modal.addEventListener('wheel', function (e) {
+                                e.preventDefault();
+                                var rect = modal.getBoundingClientRect(), mx = e.clientX - rect.left, my = e.clientY - rect.top;
+                                var prev = scale; scale *= e.deltaY < 0 ? 1.15 : 1 / 1.15; scale = Math.max(0.1, Math.min(scale, 10));
+                                tx = mx - (mx - tx) * (scale / prev); ty = my - (my - ty) * (scale / prev);
+                                apply();
+                            }, { passive: false });
+                            // Drag pan
+                            modal.addEventListener('mousedown', function (e) {
+                                if (e.target.tagName === 'DIV' && e.target.onclick) return;
+                                dragging = true; sx = e.clientX; sy = e.clientY; stx = tx; sty = ty; modal.style.cursor = 'grabbing';
+                            });
+                            window.addEventListener('mousemove', function (e) { if (!dragging) return; tx = stx + e.clientX - sx; ty = sty + e.clientY - sy; apply(); });
+                            window.addEventListener('mouseup', function () { dragging = false; modal.style.cursor = 'grab'; });
+                        })();
+                    </script>
+
 
                     <div class="tech-grid">
                         <div class="tech-card">
