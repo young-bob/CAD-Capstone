@@ -1300,6 +1300,46 @@ export function VolApplications({ onNavigate }: VolApplicationsProps = {}) {
                     </div>
                 </div>
             </div>
+            {/* Check-in / Check-out actions */}
+            {a.status === 'Approved' && rec?.attendanceId && !rec.checkInTime && !isShiftPast(a) && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                    <GpsCheckInButton
+                        attendanceId={rec.attendanceId}
+                        opportunityId={a.opportunityId}
+                        shiftStartTime={a.shiftStartTime}
+                        onDone={() => {
+                            setAppAttendance(prev => prev.map(r =>
+                                r.attendanceId === rec.attendanceId
+                                    ? { ...r, checkInTime: new Date().toISOString(), status: AttendanceStatus.CheckedIn }
+                                    : r
+                            ));
+                            showToast('Checked in ✅');
+                            refreshSoon();
+                        }}
+                    />
+                </div>
+            )}
+            {rec?.checkInTime && !rec.checkOutTime && (
+                <div className="mt-3 pt-3 border-t border-stone-100">
+                    <button
+                        onClick={async () => {
+                            try {
+                                await attendanceService.checkOut(rec.attendanceId);
+                                setAppAttendance(prev => prev.map(r =>
+                                    r.attendanceId === rec.attendanceId
+                                        ? { ...r, checkOutTime: new Date().toISOString(), status: AttendanceStatus.CheckedOut }
+                                        : r
+                                ));
+                                showToast('Checked out successfully 🔚');
+                                refreshSoon();
+                            } catch (err: any) { showToast(getErr(err, 'Failed to check out')); }
+                        }}
+                        className="text-xs font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-lg hover:bg-emerald-100 flex items-center gap-1"
+                    >
+                        🔚 Check Out
+                    </button>
+                </div>
+            )}
         </div>
         );
     };
@@ -1486,9 +1526,9 @@ export function VolAttendance() {
                 )}
             </div>
 
-            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.filter(r => r.status !== AttendanceStatus.Pending).length === 0 ? <Empty msg="No attendance records yet." /> : (
+            {loading ? <Spinner /> : error ? <ErrorBox msg={error} onRetry={load} /> : records.length === 0 ? <Empty msg="No attendance records yet." /> : (
                 <div className="space-y-4">
-                    {records.filter(r => r.status !== AttendanceStatus.Pending).map(r => (
+                    {records.map(r => (
                         <div key={r.attendanceId} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100">
                             <div className="flex justify-between items-start mb-3">
                                 <p className="font-bold text-stone-800">{r.opportunityTitle}</p>
