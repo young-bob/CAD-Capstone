@@ -1,7 +1,7 @@
 # VSMS Capstone - AWS Deployment Report
 
 **Course:** INFO8372 - Cloud Fundamentals for Developers 
-**Team Members:** Boyang Zhang, Chunxi Wang, Brad Mitchell, Marieth Soto 
+**Team Members:** Bo Yang, Chunxi Zhang, Bo Zhang, Marieth Soto 
 **Date:** April 17, 2026 
 **Region:** ca-central-1 (Canada)
 
@@ -16,30 +16,36 @@ The Volunteer Shift Management System (VSMS) is deployed across **4 AWS accounts
 ```mermaid
 graph LR
     Internet["🌐 Internet / Users"]
-    GitHub["📦 GitHub — main branch"]
+    GitHub["📦 GitHub"]
+    VpnClient["🔐 Team Members"]
 
-    subgraph chunxi["chunxi — Gateway (10.16.0.0/16)"]
-        chunxi1["chunxi_1 (EIP)<br/>HAProxy LB + TLS 1.3<br/>React Web SPA"]
-        chunxi2["chunxi_2<br/>MinIO File Storage<br/>Container Registry :5000<br/>Build Server"]
-    end
+    subgraph AWS["☁️ AWS ca-central-1"]
 
-    subgraph boyang["boyang — API Cluster (10.18.0.0/16)"]
-        boyang1["boyang_1 (EIP)<br/>Orleans API Silo 1<br/>SSH Bastion + WireGuard Hub"]
-        boyang2["boyang_2<br/>Orleans API Silo 2"]
-    end
+        subgraph chunxi["chunxi — Gateway VPC (10.16.0.0/16)"]
+            chunxi1["chunxi_1 (EIP)<br/>HAProxy LB + TLS 1.3<br/>React Web SPA"]
+            chunxi2["chunxi_2<br/>MinIO File Storage<br/>Container Registry :5000<br/>Build Server"]
+        end
 
-    subgraph brad["brad — API Cluster (10.17.0.0/16)"]
-        brad1["brad_1<br/>Orleans API Silo 3"]
-        brad2["brad_2<br/>Orleans API Silo 4"]
-    end
+        subgraph boyang["boyang — API VPC (10.18.0.0/16)"]
+            boyang1["boyang_1 (EIP)<br/>Orleans API Silo 1<br/>SSH Bastion + WireGuard Hub"]
+            boyang2["boyang_2<br/>Orleans API Silo 2"]
+        end
 
-    subgraph marieth["marieth — Data Layer (10.19.0.0/16)"]
-        marieth1["marieth_1<br/>PostgreSQL 17"]
-        marieth2["marieth_2<br/>Orleans API Silo 5"]
+        subgraph brad["brad — API VPC (10.17.0.0/16)"]
+            brad1["brad_1<br/>Orleans API Silo 3"]
+            brad2["brad_2<br/>Orleans API Silo 4"]
+        end
+
+        subgraph marieth["marieth — Data VPC (10.19.0.0/16)"]
+            marieth1["marieth_1<br/>PostgreSQL 17"]
+            marieth2["marieth_2<br/>Orleans API Silo 5"]
+        end
+
     end
 
     Internet -->|"HTTPS 443"| chunxi1
-    VpnClient["🔐 Team Members"] -->|"WireGuard 51822/UDP"| boyang1
+    VpnClient -->|"WireGuard 51822/UDP"| boyang1
+    GitHub -->|"git poll + build"| chunxi2
 
     chunxi1 -->|"Round-Robin LB"| boyang1
     chunxi1 -->|"Round-Robin LB"| boyang2
@@ -50,7 +56,6 @@ graph LR
     boyang1 & boyang2 & brad1 & brad2 & marieth2 -->|"SQL"| marieth1
     boyang1 & boyang2 & brad1 & brad2 & marieth2 -->|"S3 API"| chunxi2
 
-    GitHub -->|"git poll + build"| chunxi2
     chunxi2 -->|"image pull"| chunxi1
     chunxi2 -->|"image pull"| boyang1
     chunxi2 -->|"image pull"| boyang2
@@ -86,22 +91,27 @@ graph LR
 - 1 instance runs **HAProxy** as a TLS-terminating reverse proxy and serves the React Web SPA
 - 1 instance runs **PostgreSQL 17** as the central database
 - 1 instance runs **MinIO** for S3-compatible file storage
-- All instances use **gp3 EBS** volumes (30 GB for API nodes, 10 GB default for others)
+- All instances use 30 GB **gp3 EBS** volumes
 - **User Data scripts** automate post-launch setup: hostname configuration, Podman installation, and environment tagging
 
 ### 2.2 Networking - VPC + VPC Peering
 
-```
-         chunxi (Gateway)
-        /      |      \
-       /       |       \
-    brad ---- boyang    |
-       \       |       /
-        \      |      /
-         marieth (DB)
+```mermaid
+graph LR
+    chunxi["chunxi - VPC<br/>10.16.0.0/16"]
+    boyang["boyang - VPC<br/>10.18.0.0/16"]
+    brad["brad - VPC<br/>10.17.0.0/16"]
+    marieth["marieth - VPC<br/>10.19.0.0/16"]
+
+    boyang <-->|"#1 [boyang → chunxi]"| chunxi
+    boyang <-->|"#2 [boyang → brad]"| brad
+    boyang <-->|"#3 [boyang → marieth]"| marieth
+    chunxi <-->|"#4 [chunxi → brad]"| brad
+    chunxi <-->|"#5 [chunxi → marieth]"| marieth
+    brad <-->|"#6 [brad → marieth]"| marieth
 ```
 
-| # | Initiator → Acceptor | 
+| # | Initiator → Acceptor |
 |---|---------------------|
 | 1 | boyang → chunxi |
 | 2 | boyang → brad |
@@ -112,7 +122,19 @@ graph LR
 
 - **4 VPCs** with non-overlapping CIDR blocks (10.16–10.19.0.0/16)
 - **Full-mesh VPC Peering**: 6 cross-account peering connections ensure every VPC can communicate directly with every other VPC
-- A **supernet CIDR** (`10.16.0.0/14`) is used in Security Group rules to allow all inter-VPC traffic through a single rule
+  - $$\text{Links} = \binom{n}{2} = \frac{n(n-1)}{2} = \frac{4 \times 3}{2} = 6$$
+- A **supernet CIDR** (`10.16.0.0/14`) is used in Security Group rules to allow all inter-VPC traffic through a single rule:
+
+  | VPC | CIDR | Octet Binary |
+  |-----|------|-----------------|
+  | chunxi | 10.**16**.0.0/16 | 0000 1010 0001 00**00** |
+  | brad | 10.**17**.0.0/16 | 0000 1010 0001 00**01** |
+  | boyang | 10.**18**.0.0/16 | 0000 1010 0001 00**10** |
+  | marieth | 10.**19**.0.0/16 | 0000 1010 0001 00**11** |
+
+  The first **14 bits** are identical across all 4 VPCs. Only bits 15–16 vary (`00`–`11`), covering exactly 4 networks:
+
+  $$10.16.0.0/14 \Rightarrow 10.16.0.0 \sim 10.19.255.255$$
 - Each VPC has a public subnet, internet gateway, and route table with both IGW and peering routes
 
 ### 2.3 Security - IAM + Security Groups
@@ -124,7 +146,6 @@ graph LR
 
 | Type | Protocol | Port | Source | Purpose |
 |------|----------|------|--------|---------|
-| SSH | TCP | 22 | Admin IP/32 | Restricted SSH access (single IP only) |
 | Custom UDP | UDP | 51822 | 0.0.0.0/0 | WireGuard VPN tunnel |
 | All traffic | ALL | ALL | 10.16.0.0/14 | Inter-VPC communication (supernet) |
 
@@ -132,7 +153,8 @@ graph LR
 
 | Account | Type | Port | Source | Purpose |
 |---------|------|------|--------|---------|
-| **chunxi** | TCP | 80, 443 | 0.0.0.0/0 | HTTP/HTTPS — gateway only |
+| **boyang** | SSH | TCP | 22 | Admin IP/32 | Restricted SSH access (single IP only) |
+| **chunxi** | TCP | 80, 443 | 0.0.0.0/0 | HTTP/HTTPS - gateway only |
 
 > **Key design**: SSH is locked to a single admin IP (`/32`), not open to the internet. Only WireGuard (encrypted tunnel) and inter-VPC traffic are broadly allowed.
 
