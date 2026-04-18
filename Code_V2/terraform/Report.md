@@ -228,12 +228,12 @@ After initial deployment, all subsequent updates are fully automated via a **pol
 
 ```mermaid
 graph LR
-    GH["GitHub Repository<br/>main branch"] -->|"1\. Poll every 6 min"| Build["chunxi_2 - Build Server<br/>build-image.sh"]
-    Build -->|"2\.git pull + podman build"| Registry["chunxi_2 - Private Registry<br/>10.16.1.11:5000"]
-    Registry -->|"3\. Digest comparison"| Web["chunxi_1<br/>deploy.sh → Web SPA"]
-    Registry -->|"3\. Digest comparison"| API1["boyang_1/boyang_2<br/>deploy.sh → API Silos"]
-    Registry -->|"3\. Digest comparison"| API2["brad_1/brad_2<br/>deploy.sh → API Silos"]
-    Registry -->|"3\. Digest comparison"| API3["marieth_2<br/>deploy.sh → API Silo"]
+    GH["GitHub Repository<br/>main branch"] -->|"Poll every 6 min"| Build["chunxi_2 - Build Server<br/>build-image.sh"]
+    Build -->|"git pull + podman build"| Registry["chunxi_2 - Private Registry<br/>10.16.1.11:5000"]
+    Registry -->|"Digest comparison"| Web["chunxi_1<br/>deploy.sh → Web SPA"]
+    Registry -->|"Digest comparison"| API1["boyang_1/boyang_2<br/>deploy.sh → API Silos"]
+    Registry -->|"Digest comparison"| API2["brad_1/brad_2<br/>deploy.sh → API Silos"]
+    Registry -->|"Digest comparison"| API3["marieth_2<br/>deploy.sh → API Silo"]
 ```
 
 **Pipeline Components:**
