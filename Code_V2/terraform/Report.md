@@ -1,7 +1,7 @@
 # VSMS Capstone - AWS Deployment Report
 
 **Course:** INFO8372 - Cloud Fundamentals for Developers 
-**Team Members:** Bo Yang, Chunxi Zhang, Bo Zhang, Marieth Soto 
+**Team Members:** Bo Yang, Bo Zhang, Chunxi Zhang, Marieth Franciss Perez Zevallos
 **Date:** April 17, 2026 
 **Region:** ca-central-1 (Canada)
 
