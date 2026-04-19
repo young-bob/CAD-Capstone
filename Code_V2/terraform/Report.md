@@ -21,22 +21,22 @@ graph LR
 
     subgraph AWS["☁️ AWS ca-central-1"]
 
-        subgraph chunxi["chunxi — Gateway VPC (10.16.0.0/16)"]
+        subgraph chunxi["chunxi — VPC (10.16.0.0/16)"]
             chunxi1["chunxi_1 (EIP)<br/>HAProxy LB + TLS 1.3<br/>React Web SPA"]
             chunxi2["chunxi_2<br/>MinIO File Storage<br/>Container Registry :5000<br/>Build Server"]
         end
 
-        subgraph boyang["boyang — API VPC (10.18.0.0/16)"]
+        subgraph boyang["boyang — VPC (10.18.0.0/16)"]
             boyang1["boyang_1 (EIP)<br/>Orleans API Silo 1<br/>SSH Bastion + WireGuard Hub"]
             boyang2["boyang_2<br/>Orleans API Silo 2"]
         end
 
-        subgraph brad["brad — API VPC (10.17.0.0/16)"]
+        subgraph brad["brad — VPC (10.17.0.0/16)"]
             brad1["brad_1<br/>Orleans API Silo 3"]
             brad2["brad_2<br/>Orleans API Silo 4"]
         end
 
-        subgraph marieth["marieth — Data VPC (10.19.0.0/16)"]
+        subgraph marieth["marieth — VPC (10.19.0.0/16)"]
             marieth1["marieth_1<br/>PostgreSQL 17"]
             marieth2["marieth_2<br/>Orleans API Silo 5"]
         end
@@ -125,7 +125,7 @@ graph LR
   - $$\text{Links} = \binom{n}{2} = \frac{n(n-1)}{2} = \frac{4 \times 3}{2} = 6$$
 - A **supernet CIDR** (`10.16.0.0/14`) is used in Security Group rules to allow all inter-VPC traffic through a single rule:
 
-  | VPC | CIDR | Octet Binary |
+  | VPC | CIDR | 16-bit Binary |
   |-----|------|-----------------|
   | chunxi | 10.**16**.0.0/16 | 0000 1010 0001 00**00** |
   | brad | 10.**17**.0.0/16 | 0000 1010 0001 00**01** |
@@ -228,8 +228,9 @@ After initial deployment, all subsequent updates are fully automated via a **pol
 
 ```mermaid
 graph LR
-    GH["GitHub Repository<br/>main branch"] -->|"Poll every 6 min"| Build["chunxi_2 - Build Server<br/>build-image.sh"]
-    Build -->|"git pull + podman build"| Registry["chunxi_2 - Private Registry<br/>10.16.1.11:5000"]
+		TM["Team Members"] <--> GH["GitHub Repository"]
+    GH -->|"Poll every 6 min"| Build["chunxi_2 - Build Server<br/>build-image.sh"]
+    Build -->|"podman build & push image"| Registry["chunxi_2 - Private Registry<br/>10.16.1.11:5000"]
     Registry -->|"Digest comparison"| Web["chunxi_1<br/>deploy.sh → Web SPA"]
     Registry -->|"Digest comparison"| API1["boyang_1/boyang_2<br/>deploy.sh → API Silos"]
     Registry -->|"Digest comparison"| API2["brad_1/brad_2<br/>deploy.sh → API Silos"]
