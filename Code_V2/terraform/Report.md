@@ -94,6 +94,19 @@ graph LR
 - All instances use 30 GB **gp3 EBS** volumes
 - **User Data scripts** automate post-launch setup: hostname configuration, Podman installation, and environment tagging
 
+**Scalability through Orleans:**
+
+The VSMS backend uses **Microsoft Orleans**, a virtual actor framework that provides:
+- **Automatic grain distribution** across 5 API Silos spanning 3 AWS accounts
+- **Transparent failover** — if a silo goes down, Orleans redistributes grains to surviving silos
+- **Horizontal scaling** — new silos can join the cluster by pointing to the same PostgreSQL membership table
+
+**Multi-Account Resilience:**
+
+The distributed architecture across 4 AWS accounts provides:
+- **Blast radius reduction** — an account-level issue (e.g., billing suspension) only affects part of the system
+- **Independent scaling** — each account can upgrade instance types or add nodes without affecting others
+
 ### 2.2 Networking - VPC + VPC Peering
 
 ```mermaid
@@ -126,7 +139,7 @@ graph LR
 - A **supernet CIDR** (`10.16.0.0/14`) is used in Security Group rules to allow all inter-VPC traffic through a single rule:
 
   | VPC | CIDR | 16-bit Binary |
-  |-----|------|-----------------|
+  |-----|------|---------------|
   | chunxi | 10.**16**.0.0/16 | 0000 1010 0001 00**00** |
   | brad | 10.**17**.0.0/16 | 0000 1010 0001 00**01** |
   | boyang | 10.**18**.0.0/16 | 0000 1010 0001 00**10** |
@@ -137,26 +150,22 @@ graph LR
   $$10.16.0.0/14 \Rightarrow 10.16.0.0 \sim 10.19.255.255$$
 - Each VPC has a public subnet, internet gateway, and route table with both IGW and peering routes
 
-### 2.3 Security - IAM + Security Groups
+### 2.3 Load Balancing - HAProxy
 
-- **IAM Roles** with `AmazonBedrockFullAccess` policy are attached via instance profiles to API nodes, enabling the AI Assistant to call Amazon Bedrock for LLM inference without hardcoded credentials
-- **Security Groups** enforce least-privilege with only 3 inbound rules per account (+ account-specific additions):
+The gateway runs **HAProxy** as a cross-VPC load balancer (chosen over AWS ALB because ALB cannot route to backends in peered VPCs across different accounts):
 
-**Base Security Group Rules (all accounts):**
-
-| Type | Protocol | Port | Source | Purpose |
-|------|----------|------|--------|---------|
-| Custom UDP | UDP | 51822 | 0.0.0.0/0 | WireGuard VPN tunnel |
-| All traffic | ALL | ALL | 10.16.0.0/14 | Inter-VPC communication (supernet) |
-
-**Additional rules by account:**
-
-| Account | Type | Port | Source | Purpose |
-|---------|------|------|--------|---------|
-| **boyang** | SSH | TCP | 22 | Admin IP/32 | Restricted SSH access (single IP only) |
-| **chunxi** | TCP | 80, 443 | 0.0.0.0/0 | HTTP/HTTPS - gateway only |
-
-> **Key design**: SSH is locked to a single admin IP (`/32`), not open to the internet. Only WireGuard (encrypted tunnel) and inter-VPC traffic are broadly allowed.
+- **TLS 1.3 only** — cipher suites restricted to `TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, and `TLS_CHACHA20_POLY1305_SHA256`
+- **HSTS** enabled with `max-age=31536000; includeSubDomains; preload`
+- **Round-robin load balancing** across 5 API silos spanning 3 VPCs:
+  - `api01` 10.18.1.226:8080 (boyang) 
+  - `api02` 10.18.1.207:8080 (boyang)
+  - `api03` 10.17.1.32:8080 (brad)
+  - `api04` 10.17.1.224:8080 (brad)
+  - `api05` 10.19.1.25:8080 (marieth)
+- **Health checks** every 10 seconds with 3-strike failover (`check inter 10000 fall 3`)
+- **Let's Encrypt TLS** with automated ACME challenge solver backend
+- **Security hardening** — `/swagger` endpoints blocked in production via ACL deny rules
+- **HTTP → HTTPS redirect** (301) for all non-ACME traffic
 
 ### 2.4 Storage - EBS + MinIO
 
@@ -170,9 +179,52 @@ graph LR
 
 ---
 
-## 3. Deployment Steps
+## 3. Deployment Steps & Terraform
 
-### Phase 1: Provision Infrastructure (Parallel)
+### 3.1 Terraform Module: `vsms-node`
+
+A single reusable Terraform module creates all per-account infrastructure:
+
+```hcl
+module "node" {
+  source       = "../../modules/vsms-node"
+  region       = "ca-central-1"
+  vpc_cidr     = "10.18.0.0/16"
+  subnet_cidr  = "10.18.1.0/24"
+  role         = "api-2"
+  owner_name   = "boyang"
+  ami_id       = var.ami_id
+  key_name     = var.key_name
+  disk_size_gb = 30
+  enable_eip   = true
+}
+```
+
+The module supports **feature flags** for account-specific customization:
+
+| Flag | Purpose | Used By |
+|------|---------|---------|
+| `enable_eip` | Attach Elastic IP to node[0] | chunxi (gateway), boyang (bastion) |
+| `enable_http` | Open ports 80/443 from internet | chunxi (gateway) only |
+| `enable_iam` | Create IAM role with Bedrock access | brad, boyang, marieth |
+| `enable_public_ip` | Assign public IPs via subnet | All accounts |
+
+Directory structure:
+
+```
+terraform/
+├── modules/vsms-node/          ← Reusable VPC + 2×EC2 module
+│   ├── main.tf                 ← VPC, SG, IAM, EC2, EIP
+│   ├── variables.tf            ← Parameterized feature flags
+│   └── outputs.tf              ← vpc_id, private_ips, eip
+└── accounts/
+    ├── boyang/                  ← API Cluster 2 + SSH Bastion
+    ├── chunxi/                  ← Gateway (HAProxy + Web)
+    ├── brad/                    ← API Cluster 1
+    └── marieth/                 ← Data Layer (PostgreSQL)
+```
+
+### 3.2 Phase 1: Provision Infrastructure (Parallel)
 
 All 4 accounts can be provisioned independently and simultaneously:
 
@@ -184,7 +236,7 @@ terraform init && terraform apply -auto-approve
 
 Each account's Terraform config has a **hard-coded AWS profile** in the provider block, preventing accidental cross-account operations.
 
-### Phase 2: Establish VPC Peering (Sequential)
+### 3.3 Phase 2: Establish VPC Peering (Sequential)
 
 VPC Peering must follow a specific order due to cross-account dependencies:
 
@@ -195,7 +247,25 @@ VPC Peering must follow a specific order due to cross-account dependencies:
 
 Each step adds the required peering IDs to `terraform.tfvars` and runs `terraform apply`. This creates **6 peering connections + 12 routes** total.
 
-### Phase 3: Verify Connectivity
+Each account has a dedicated `peering.tf` that uses **conditional creation** (`count` based on variable presence) to support this phased deployment:
+
+```hcl
+locals {
+  peering_enabled = var.chunxi_vpc_id != "" && var.brad_vpc_id != ""
+}
+
+resource "aws_vpc_peering_connection" "to_chunxi" {
+  count         = local.peering_enabled ? 1 : 0
+  vpc_id        = module.node.vpc_id
+  peer_vpc_id   = var.chunxi_vpc_id
+  peer_owner_id = var.chunxi_account_id
+  ...
+}
+```
+
+This design allows Phase 1 (`terraform apply` without peering variables) and Phase 2 (with peering variables) to use the **same Terraform configuration**, avoiding separate state files.
+
+### 3.4 Phase 3: Verify Connectivity
 
 SSH into the bastion (boyang_1) and validate cross-VPC reachability:
 
@@ -205,7 +275,7 @@ ping 10.17.1.x   # API Cluster 1
 ping 10.19.1.x   # Data Layer
 ```
 
-### Phase 4: Deploy Application Services
+### 3.5 Phase 4: Deploy Application Services
 
 SSH through the bastion and deploy services in order:
 
@@ -222,7 +292,7 @@ SSH through the bastion and deploy services in order:
    - `podman pull --tls-verify=false 10.16.1.11:5000/vsms-web:latest`
    - `podman-compose -f podman-compose.web.yml up -d` (Web SPA) + HAProxy load balancer with TLS
 
-### Phase 5: Automated CI/CD Pipeline
+### 3.6 Phase 5: Automated CI/CD Pipeline
 
 After initial deployment, all subsequent updates are fully automated via a **poll-based CI/CD pipeline** using a private container registry:
 
@@ -258,14 +328,35 @@ graph LR
 | Category | Implementation |
 |----------|---------------|
 | **Network Isolation** | 4 separate VPCs with controlled peering; no public access except gateway |
-| **Least Privilege SG** | HTTP/HTTPS only on gateway; SSH only on bastion via non-standard port (51522) |
+| **Least Privilege SG** | HTTP/HTTPS only on gateway; SSH restricted to single admin IP (`/32`) on bastion |
 | **No Hardcoded Secrets** | Database passwords, JWT secrets, API keys injected via environment variables from `.env` files |
 | **IAM Roles over Keys** | EC2 instances access Amazon Bedrock via IAM instance profiles - no AWS credentials stored on disk |
-| **WireGuard VPN** | Hub-and-spoke encrypted tunnel (see §4.1 below) for secure admin access to all 8 nodes |
+| **WireGuard VPN** | Hub-and-spoke encrypted tunnel (see §4.2 below) for secure admin access to all 8 nodes |
 | **Supernet Rule** | Inter-VPC traffic restricted to `10.16.0.0/14` - blocks traffic from any unrelated private networks |
 | **Container Isolation** | Podman runs rootless containers, reducing attack surface compared to traditional Docker |
 
-### 4.1 WireGuard VPN - Hub-and-Spoke Topology
+### 4.1 Security Group Rules
+
+- **IAM Roles** with `AmazonBedrockFullAccess` policy are attached via instance profiles to API nodes, enabling the AI Assistant to call Amazon Bedrock for LLM inference without hardcoded credentials
+- **Security Groups** enforce least-privilege with only 3 inbound rules per account (+ account-specific additions):
+
+**Base Security Group Rules (all accounts):**
+
+| Type | Protocol | Port | Source | Purpose |
+|------|----------|------|--------|---------|
+| Custom UDP | UDP | 51822 | 0.0.0.0/0 | WireGuard VPN tunnel |
+| All traffic | ALL | ALL | 10.16.0.0/14 | Inter-VPC communication (supernet) |
+
+**Additional rules by account:**
+
+| Account | Type | Port | Source | Purpose |
+|---------|------|------|--------|---------|
+| **boyang** | SSH | TCP | 22 | Admin IP/32 | Restricted SSH access (single IP only) |
+| **chunxi** | TCP | 80, 443 | 0.0.0.0/0 | HTTP/HTTPS - gateway only |
+
+> **Key design**: SSH is locked to a single admin IP (`/32`), not open to the internet. Only WireGuard (encrypted tunnel) and inter-VPC traffic are broadly allowed.
+
+### 4.2 WireGuard VPN - Hub-and-Spoke Topology
 
 The bastion node (boyang_1) acts as the **WireGuard VPN server**, providing each team member with encrypted access to the entire infrastructure across all 4 VPCs:
 
@@ -295,112 +386,11 @@ graph TD
 
 ---
 
-## 5. Scalability & Availability
-
-### 5.1 Orleans Distributed Actor Model
-
-The VSMS backend uses **Microsoft Orleans**, a virtual actor framework that provides:
-- **Automatic grain distribution** across 5 API Silos spanning 3 AWS accounts
-- **Transparent failover** - if a silo goes down, Orleans redistributes grains to surviving silos
-- **Horizontal scaling** - new silos can join the cluster by pointing to the same PostgreSQL membership table
-
-### 5.2 Multi-Account Resilience
-
-The distributed architecture across 4 AWS accounts provides:
-- **Blast radius reduction** - an account-level issue (e.g., billing suspension) only affects part of the system
-- **Geographic redundancy** within the same region - instances are spread across account-level isolation boundaries
-- **Independent scaling** - each account can upgrade instance types or add nodes without affecting others
-
-### 5.3 HAProxy Load Balancing
-
-The gateway runs **HAProxy** with a production-hardened configuration:
-
-- **TLS 1.3 only** - cipher suites restricted to `TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, and `TLS_CHACHA20_POLY1305_SHA256`
-- **HSTS** enabled with `max-age=31536000; includeSubDomains; preload`
-- **Round-robin load balancing** across 5 API silos spanning 3 VPCs:
-  - `api01` 10.18.1.226:8080 (boyang) 
-  - `api02` 10.18.1.207:8080 (boyang)
-  - `api03` 10.17.1.32:8080 (brad)
-  - `api04` 10.17.1.224:8080 (brad)
-  - `api05` 10.19.1.25:8080 (marieth)
-- **Health checks** every 10 seconds with 3-strike failover (`check inter 10000 fall 3`)
-- **Let's Encrypt TLS** with automated ACME challenge solver backend
-- **Security hardening** - `/swagger` endpoints blocked in production via ACL deny rules
-- **HTTP → HTTPS redirect** (301) for all non-ACME traffic
-
----
-
-## 6. Terraform Implementation
-
-### 6.1 Reusable Module: `vsms-node`
-
-A single reusable Terraform module creates all per-account infrastructure:
-
-```hcl
-module "node" {
-  source       = "../../modules/vsms-node"
-  region       = "ca-central-1"
-  vpc_cidr     = "10.18.0.0/16"
-  subnet_cidr  = "10.18.1.0/24"
-  role         = "api-2"
-  owner_name   = "boyang"
-  ami_id       = var.ami_id
-  key_name     = var.key_name
-  disk_size_gb = 30
-  enable_eip   = true
-}
-```
-
-The module supports **feature flags** for account-specific customization:
-
-| Flag | Purpose | Used By |
-|------|---------|---------|
-| `enable_eip` | Attach Elastic IP to node[0] | chunxi (gateway), boyang (bastion) |
-| `enable_http` | Open ports 80/443 from internet | chunxi (gateway) only |
-| `enable_iam` | Create IAM role with Bedrock access | brad, boyang, marieth |
-| `enable_public_ip` | Assign public IPs via subnet | All accounts |
-
-### 6.2 VPC Peering as Code
-
-Each account has a dedicated `peering.tf` that uses **conditional creation** (`count` based on variable presence) to support the phased deployment:
-
-```hcl
-locals {
-  peering_enabled = var.chunxi_vpc_id != "" && var.brad_vpc_id != ""
-}
-
-resource "aws_vpc_peering_connection" "to_chunxi" {
-  count         = local.peering_enabled ? 1 : 0
-  vpc_id        = module.node.vpc_id
-  peer_vpc_id   = var.chunxi_vpc_id
-  peer_owner_id = var.chunxi_account_id
-  ...
-}
-```
-
-This design allows Phase 1 (`terraform apply` without peering variables) and Phase 2 (with peering variables) to use the **same Terraform configuration**, avoiding separate state files.
-
-### 6.3 Directory Structure
-
-```
-terraform/
-├── modules/vsms-node/          ← Reusable VPC + 2×EC2 module
-│   ├── main.tf                 ← VPC, SG, IAM, EC2, EIP
-│   ├── variables.tf            ← Parameterized feature flags
-│   └── outputs.tf              ← vpc_id, private_ips, eip
-└── accounts/
-    ├── boyang/                  ← API Cluster 2 + SSH Bastion
-    ├── chunxi/                  ← Gateway (HAProxy + Web)
-    ├── brad/                    ← API Cluster 1
-    └── marieth/                 ← Data Layer (PostgreSQL)
-```
-
----
-
-## 7. Challenges Faced
+## 5. Challenges Faced
 
 | Challenge | Solution |
 |-----------|----------|
+| **Why not AWS ALB?** | ALB cannot route to backends in peered VPCs across different AWS accounts; HAProxy on EC2 provides cross-VPC round-robin with full TLS control |
 | **Cross-account VPC Peering** requires a specific accept/request sequence | Designed a 4-phase deployment order with clear output→input dependency chain |
 | **Route table conflicts** between inline routes and separate `aws_route` resources | Removed all inline route blocks from `aws_route_table`; used only standalone `aws_route` resources |
 | **IAM permission differences** across accounts | Added `enable_iam` feature flag so accounts without IAM permissions can skip role creation |
@@ -409,33 +399,33 @@ terraform/
 
 ---
 
-## 8. Screenshots
+## 6. Screenshots
 
-### 8.1 Running Application
+### 6.1 Running Application
 
-#### 8.1.1 DNS
+#### 6.1.1 DNS
 
 ![VSMS DNS](screenshots/dig.png)
 
-#### 8.1.2 HAProxy Load Balancer
+#### 6.1.2 HAProxy Load Balancer
 
 ![VSMS Web LB](screenshots/haproxy.png)
 
 ![VSMS Web LB](screenshots/HAProxy_Load_Balancer.png)
 
-#### 8.1.3 System Info
+#### 6.1.3 System Info
 
 ![VSMS Web Dashboard](screenshots/vsms-web-dashboard.png)
 
-#### 8.1.4 CI/CD
+#### 6.1.4 CI/CD
 
 ![VSMS Web Dashboard](screenshots/build.png)
 
 ![VSMS Web Dashboard](screenshots/deploy.png)
 
-### 8.2 AWS Resources
+### 6.2 AWS Resources
 
-#### 8.2.1 AWS EC2 Console
+#### 6.2.1 AWS EC2 Console
 
 8 running instances across 4 accounts (2 per account)
 
@@ -447,7 +437,7 @@ terraform/
 
 ![EC2 Instances](screenshots/EC2_Marieth.png)
 
-#### 8.2.2 VPC Peering Connections
+#### 6.2.2 VPC Peering Connections
 
 **6 active full-mesh peering connections**
 
@@ -460,7 +450,7 @@ terraform/
 ![VPC Peering](screenshots/VPC_Peering_Marieth.png)
 
 
-#### 8.2.3 Security Group Rules
+#### 6.2.3 Security Group Rules
 
 ![Security Groups](screenshots/SecurityGroup_boyang.png)
 
@@ -472,21 +462,20 @@ terraform/
 
 
 
-### 8.3 Terraform Execution Results
+### 6.3 Terraform Execution Results
 
-#### 8.3.1 Terraform output : boyang
+#### 6.3.1 Terraform output : boyang
 
 ![Terraform Output](screenshots/terraform_output_boyang.png)
 
-#### 8.3.1 Terraform output : chunxi
+#### 6.3.2 Terraform output : chunxi
 
 ![Terraform Output](screenshots/terraform_output_chunxi.png)
 
-#### 8.3.1 Terraform output : brad
+#### 6.3.3 Terraform output : brad
 
 ![Terraform Output](screenshots/terraform_output_brad.png)
 
-#### 8.3.1 Terraform output : marieth
+#### 6.3.4 Terraform output : marieth
 
 ![Terraform Output](screenshots/terraform_output_marieth.png)
-
