@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VSMS Capstone - AWS Deployment</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body)"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1e293b;
+      --accent: #3b82f6;
+      --accent2: #8b5cf6;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --radius: 16px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Slide container */
+    .deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      transform: translateX(40px);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+
+    .slide.exit {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(-40px);
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 3.2rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
+    }
+
+    h2 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--accent2);
+      margin-bottom: 12px;
+    }
+
+    p,
+    li {
+      font-size: 1.15rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    ul li::before {
+      content: "▸ ";
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .subtitle {
+      font-size: 1.3rem;
+      color: var(--text-dim);
+      margin-top: 12px;
+      font-weight: 300;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      margin: 4px;
+    }
+
+    strong {
+      color: #fff;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--surface2);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      color: var(--green);
+    }
+
+    /* Layout helpers */
+    .cols {
+      display: flex;
+      gap: 40px;
+      width: 100%;
+      align-items: flex-start;
+    }
+
+    .col {
+      flex: 1;
+    }
+
+    .full {
+      width: 100%;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .mt {
+      margin-top: 24px;
+    }
+
+    .mb {
+      margin-bottom: 24px;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 1rem;
+    }
+
+    th {
+      background: var(--surface2);
+      color: var(--accent);
+      padding: 10px 16px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    tr:hover td {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Mermaid */
+    .mermaid-wrap {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin: 16px 0;
+    }
+
+    .mermaid-wrap svg {
+      max-width: 100%;
+      min-width: 700px;
+      height: auto;
+      overflow: visible;
+    }
+
+    /* Data flow particle glow */
+    @keyframes flowPulse {
+
+      0%,
+      100% {
+        opacity: 0.3;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    /* Filter buttons */
+    .flow-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+
+    .flow-btn {
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--surface2);
+      background: var(--surface);
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .flow-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .flow-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .flow-btn[data-view='http'].active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    .flow-btn[data-view='git'].active {
+      background: #10b981;
+      border-color: #10b981;
+    }
+
+    .flow-btn[data-view='vpn'].active {
+      background: #ec4899;
+      border-color: #ec4899;
+    }
+
+
+    /* Progress bar */
+    .progress {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease;
+      z-index: 100;
+    }
+
+    /* Slide counter */
+    .counter {
+      position: fixed;
+      bottom: 16px;
+      right: 24px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      z-index: 100;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Keyboard hint */
+    .hint {
+      position: fixed;
+      bottom: 16px;
+      left: 24px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      z-index: 100;
+      opacity: 0.5;
+    }
+
+    /* Step-by-step reveal within a slide */
+    .step {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .step.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--surface2);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+  </style>
+</head>
+
+<body>
+  <svg id="shared-defs" width="0" height="0" style="position:absolute;">
+    <defs>
+      <!-- Glow filter -->
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="4" result="blur"></feGaussianBlur>
+        <feMerge>
+          <feMergeNode in="blur"></feMergeNode>
+          <feMergeNode in="SourceGraphic"></feMergeNode>
+        </feMerge>
+      </filter>
+      <!-- Arrow markers for Orleans -->
+      <marker id="aG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#22C55E"></path>
+      </marker>
+      <marker id="aB" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#3B82F6"></path>
+      </marker>
+      <marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#EF4444"></path>
+      </marker>
+    </defs>
+  </svg>
+
+  <div class="deck" id="deck">
+
+    <!-- Slide 1: Title -->
+    <div class="slide active" data-anim="0">
+      <div class="center">
+        <h1>VSMS Capstone</h1>
+        <h1 style="font-size:2.4rem; margin-top:8px;">AWS Multi-Account Deployment</h1>
+        <p class="subtitle mt">INFO8372 - Cloud Fundamentals for Developers</p>
+        <div class="mt">
+          <span class="tag">4 AWS Accounts</span>
+          <span class="tag">8 EC2 Instances</span>
+          <span class="tag">Full-Mesh VPC Peering</span>
+          <span class="tag">HAProxy + TLS 1.3</span>
+        </div>
+        <p class="subtitle mt">Bo Yang · Bo Zhang · Chunxi Zhang · Marieth F. Perez Zevallos</p>
+        <p style="color:var(--text-dim); margin-top:8px; font-size:0.95rem;">April 2026 · ca-central-1 (Canada)</p>
+      </div>
+    </div>
+
+    <!-- Slide 2: Orleans: Virtual Actor Model -->
+    <div class="slide" data-anim-id="orleans">
+      <h2>1. Orleans - Virtual Actor Model</h2>
+      <div style="display:flex;justify-content:center;gap:30px;margin-bottom:10px;font-size:1.05rem;">
+        <span><strong style="color:var(--blue);">✓ Distributed Scaling</strong> across 5 Silos</span>
+        <span><strong style="color:var(--orange);">✓ Transparent Failover</strong></span>
+        <span><strong style="color:var(--green);">✓ Auto Grain Distribution</strong></span>
+      </div>
+      <div style="width:100%;display:flex;justify-content:center;">
+        <svg id="orleansSvg" width="1000" height="460" viewBox="0 0 1000 600" style="max-width:100%;height:auto;"></svg>
+      </div>
+      <div style="display:flex;gap:24px;justify-content:center;margin-top:8px;">
+        <span class="tag" style="border-color:#22c55e;color:#22c55e;">● Phase 1: Load State</span>
+        <span class="tag" style="border-color:#3b82f6;color:#3b82f6;">● Phase 2: In-memory Read</span>
+        <span class="tag" style="border-color:#ef4444;color:#ef4444;">● Phase 3: Persist</span>
+      </div>
+    </div>
+
+    <!-- Slide 3: Architecture Overview (SVG animated) -->
+    <div class="slide" data-anim-id="arch">
+      <h2>2. Architecture Overview</h2>
+      <div class="flow-filters" id="archFilters">
+        <button class="flow-btn active" data-view="all" onclick="switchView('all')">🌐 All</button>
+        <button class="flow-btn" data-view="http" onclick="switchView('http')">🔵 HTTP 443</button>
+        <button class="flow-btn" data-view="git" onclick="switchView('git')">🟢 CI/CD</button>
+        <button class="flow-btn" data-view="vpn" onclick="switchView('vpn')">🔐 VPN</button>
+      </div>
+      <div style="width:100%;display:flex;justify-content:center;">
+        <svg id="archSvg" width="1100" height="520" viewBox="0 0 1100 520" style="max-width:100%;height:auto;"></svg>
+      </div>
+    </div>
+
+    <!-- Slide 4: Node Assignment -->
+    <div class="slide">
+      <h2>3. Node Assignment</h2>
+      <table>
+        <tr>
+          <th>Account</th>
+          <th>VPC CIDR</th>
+          <th>EC2 #1</th>
+          <th>EC2 #2</th>
+          <th>Features</th>
+        </tr>
+        <tr>
+          <td><strong>chunxi</strong></td>
+          <td>10.16.0.0/16</td>
+          <td>HAProxy LB + Web</td>
+          <td>MinIO + Registry + Build</td>
+          <td>EIP, HTTP/HTTPS</td>
+        </tr>
+        <tr>
+          <td><strong>brad</strong></td>
+          <td>10.17.0.0/16</td>
+          <td>Orleans Silo 3</td>
+          <td>Orleans Silo 4</td>
+          <td>IAM + Bedrock</td>
+        </tr>
+        <tr>
+          <td><strong>boyang</strong></td>
+          <td>10.18.0.0/16</td>
+          <td>Silo 1 + WireGuard Hub</td>
+          <td>Orleans Silo 2</td>
+          <td>EIP, Bastion</td>
+        </tr>
+        <tr>
+          <td><strong>marieth</strong></td>
+          <td>10.19.0.0/16</td>
+          <td>PostgreSQL 17</td>
+          <td>Orleans Silo 5</td>
+          <td>IAM + Bedrock</td>
+        </tr>
+      </table>
+      <div class="mt center">
+        <span class="tag">8 Instances</span>
+        <span class="tag">Debian 13 ARM64</span>
+        <span class="tag">t4g.small</span>
+        <span class="tag">30 GB gp3 EBS</span>
+        <span class="tag">Daemonless Podman</span>
+      </div>
+    </div>
+
+    <!-- Slide 5: VPC Peering (SVG animated) -->
+    <div class="slide" data-anim-id="peer">
+      <h2>4. Full-Mesh VPC Peering</h2>
+      <div class="cols">
+        <div class="col" style="flex:1.2;">
+          <svg id="peerSvg" width="480" height="320" viewBox="-60 50 480 300" style="max-width:100%;height:auto;"></svg>
+        </div>
+        <div class="col">
+          <h3>6 Peering Connections</h3>
+          <p class="mb" style="font-size:1.2rem; font-family:monospace; color:var(--text-bright);">Links = n(n-1) / 2 = 6</p>
+          <h3 class="mt">Supernet CIDR</h3>
+          <p><code>10.16.0.0/14</code> covers all 4 VPCs</p>
+          <p class="mt" style="font-size:0.95rem; color:var(--text-dim);">First 14 bits identical → bits 15-16 vary (00–11)</p>
+          <p><code>10.16.0.0 ~ 10.19.255.255</code></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 6: HAProxy LB -->
+    <div class="slide">
+      <h2>5. HAProxy Load Balancing</h2>
+      <p class="mb" style="color:var(--orange); font-weight:bold;">Why not AWS ALB? → ALB cannot route to backends in peered VPCs across different accounts</p>
+      <div class="cols">
+        <div class="col card">
+          <h3>TLS 1.3 Only</h3>
+          <ul>
+            <li><code>TLS_AES_128_GCM_SHA256</code></li>
+            <li><code>TLS_AES_256_GCM_SHA384</code></li>
+            <li><code>TLS_CHACHA20_POLY1305_SHA256</code></li>
+          </ul>
+          <h3 class="mt">Security</h3>
+          <ul>
+            <li>HSTS with preload</li>
+            <li>Swagger blocked in production</li>
+            <li>HTTP → HTTPS 301 redirect</li>
+          </ul>
+        </div>
+        <div class="col card">
+          <h3>5 API Silos (Round-Robin)</h3>
+          <table>
+            <tr><td>api01</td><td>10.18.1.226</td><td>boyang</td></tr>
+            <tr><td>api02</td><td>10.18.1.207</td><td>boyang</td></tr>
+            <tr><td>api03</td><td>10.17.1.32</td><td>brad</td></tr>
+            <tr><td>api04</td><td>10.17.1.224</td><td>brad</td></tr>
+            <tr><td>api05</td><td>10.19.1.25</td><td>marieth</td></tr>
+          </table>
+          <p class="mt" style="font-size:0.9rem; color:var(--text-dim);">Health check: every 10s, 3-strike failover</p>
+        </div>
+      </div>
+    </div>
+
+    
+
+    <!-- Slide 7: Deployment & Terraform -->
+    <div class="slide">
+      <h2>6. Deployment & Terraform</h2>
+      <div class="cols">
+        <div class="col">
+          <h3>Reusable Module: vsms-node</h3>
+          <table>
+            <tr><th>Flag</th><th>Purpose</th></tr>
+            <tr><td><code>enable_eip</code></td><td>Elastic IP</td></tr>
+            <tr><td><code>enable_http</code></td><td>Open 80/443</td></tr>
+            <tr><td><code>enable_iam</code></td><td>Bedrock IAM role</td></tr>
+            <tr><td><code>enable_public_ip</code></td><td>Public subnet IP</td></tr>
+          </table>
+        </div>
+        <div class="col">
+          <h3>Deployment Phases</h3>
+          <ul>
+            <li><strong>Phase 1:</strong> Provision 4 accounts (parallel)</li>
+            <li><strong>Phase 2:</strong> VPC Peering (sequential, 4-step)</li>
+            <li><strong>Phase 3:</strong> Verify cross-VPC connectivity</li>
+            <li><strong>Phase 4:</strong> Deploy containers via registry</li>
+            <li><strong>Phase 5:</strong> Automated CI/CD pipeline</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 8: CI/CD Pipeline (SVG animated) -->
+    <div class="slide" data-anim-id="cicd">
+      <h2>7. CI/CD Pipeline</h2>
+      <div style="width:100%;display:flex;justify-content:center;">
+        <svg id="cicdSvg" width="1000" height="320" viewBox="0 10 1000 320" style="max-width:100%;height:auto;"></svg>
+      </div>
+      <div class="cols mt">
+        <div class="col card">
+          <h3>Build Server (chunxi_2)</h3>
+          <p class="mb" style="font-size:0.85rem; color:var(--text-dim);">Cron polls GitHub every 6 min</p>
+          <div style="font-size:0.85rem; line-height:1.8;">
+            <span class="tag" style="border-color:#3b82f6;color:#3b82f6;padding:2px 6px;">Git Hash Check</span> ➔ 
+            <span class="tag" style="border-color:#10b981;color:#10b981;padding:2px 6px;">Podman Build</span> ➔ 
+            <span class="tag" style="border-color:#8b5cf6;color:#8b5cf6;padding:2px 6px;">Push to :5000</span>
+          </div>
+        </div>
+        <div class="col card">
+          <h3>Deploy Agent (All Nodes)</h3>
+          <p class="mb" style="font-size:0.85rem; color:var(--text-dim);">Internal Registry: 10.16.1.11:5000</p>
+          <div style="font-size:0.85rem; line-height:1.8;">
+            <span class="tag" style="border-color:#3b82f6;color:#3b82f6;padding:2px 6px;">Skopeo Check</span> ➔ 
+            <span class="tag" style="border-color:#10b981;color:#10b981;padding:2px 6px;">Podman Pull</span> ➔ 
+            <span class="tag" style="border-color:#ef4444;color:#ef4444;padding:2px 6px;">Rolling Restart</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 9: Security -->
+    <div class="slide" data-anim-id="vpn">
+      <h2>8. Security</h2>
+      <div class="cols">
+        <div class="col">
+          <table style="font-size:0.95rem;">
+            <tr><th>Category</th><th>Implementation</th></tr>
+            <tr>
+              <td>Network Isolation</td>
+              <td>4 VPCs, gateway-only public access<br/><span style="color:var(--orange);font-size:0.9em;font-weight:bold;">+ Hub-and-Spoke WireGuard (10.20.0.0/24)</span></td>
+            </tr>
+            <tr><td>Least Privilege SG</td><td>SSH locked to admin IP /32</td></tr>
+            <tr><td>No Hardcoded Secrets</td><td>.env injection</td></tr>
+            <tr><td>IAM Roles</td><td>Instance profiles for Bedrock</td></tr>
+            <tr><td>Supernet Rule</td><td>10.16.0.0/14 single rule</td></tr>
+            <tr><td>Container Engine</td><td>Daemonless Podman</td></tr>
+          </table>
+        </div>
+        <div class="col" style="flex:1;">
+          <svg id="vpnSvg" width="460" height="360" viewBox="-10 10 460 340" style="max-width:100%;height:auto;"></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 10: Challenges -->
+    <div class="slide">
+      <h2>9. Challenges & Solutions</h2>
+      <table style="font-size:0.95rem;">
+        <tr><th>Challenge</th><th>Solution</th></tr>
+        <tr><td>Why not AWS ALB?</td><td>ALB can't route to peered VPC backends → HAProxy on EC2</td></tr>
+        <tr><td>Cross-account VPC Peering</td><td>4-phase deployment with output→input chain</td></tr>
+        <tr><td>Route table conflicts</td><td>Standalone <code>aws_route</code> resources only</td></tr>
+        <tr><td>IAM permission differences</td><td><code>enable_iam</code> feature flag</td></tr>
+        <tr><td>Podman cross-VPC</td><td>Host networking + private IP references</td></tr>
+        <tr><td>Security group complexity</td><td>/14 supernet CIDR - single rule for 4 VPCs</td></tr>
+      </table>
+    </div>
+
+    <!-- Slide 11: Demo -->
+    <div class="slide">
+      <div class="center">
+        <h1>Live Demo</h1>
+        <p class="subtitle mt">https://www.vsms.foo</p>
+        <div class="mt" style="margin-top:40px;">
+          <span class="tag">HAProxy LB</span>
+          <span class="tag">5 Orleans Silos</span>
+          <span class="tag">WireGuard VPN</span>
+          <span class="tag">CI/CD Pipeline</span>
+        </div>
+        <p class="mt" style="color:var(--text-dim); font-size:1.1rem;">Thank You - Questions?</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="progress" id="progress"></div>
+  <div class="counter" id="counter"></div>
+  <div class="hint">← → Arrow Keys to Navigate</div>
+
+  <script>
+    // Mermaid for remaining slides
+    mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: { primaryColor: '#3b82f6', primaryTextColor: '#e2e8f0', primaryBorderColor: '#6366f1', lineColor: '#6366f1', secondaryColor: '#1e293b', tertiaryColor: '#111827', background: '#111827', mainBkg: '#1e293b', nodeBorder: '#6366f1', clusterBkg: '#0f172a', clusterBorder: '#334155', fontSize: '14px' }, flowchart: { curve: 'basis', padding: 16 } });
+
+    // Particle injection for Mermaid diagrams (slides 4+)
+    setTimeout(() => {
+      const ns = 'http://www.w3.org/2000/svg';
+      const CC = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+      document.querySelectorAll('.mermaid-wrap svg').forEach(svg => {
+        svg.querySelectorAll('.edgePaths path').forEach((p, i) => {
+          p.id = p.id || `ep-${Math.random().toString(36).slice(2, 8)}`;
+          for (let j = 0; j < 2; j++) {
+            const d = document.createElementNS(ns, 'circle');
+            d.setAttribute('r', '5'); d.setAttribute('fill', CC[i % CC.length]);
+            d.style.filter = `drop-shadow(0 0 8px ${CC[i % CC.length]})`;
+            d.style.animation = 'flowPulse 2s ease-in-out infinite';
+            const a = document.createElementNS(ns, 'animateMotion');
+            a.setAttribute('dur', `${2 + Math.random()}s`); a.setAttribute('repeatCount', 'indefinite');
+            a.setAttribute('begin', `${i * 0.3 + j}s`);
+            const m = document.createElementNS(ns, 'mpath');
+            m.setAttributeNS('http://www.w3.org/1999/xlink', 'href', `#${p.id}`);
+            a.appendChild(m); d.appendChild(a); p.closest('g').appendChild(d);
+          }
+        });
+      });
+    }, 1500);
+
+    // ===== SVG Architecture Engine (App.ts style) =====
+    const svg = document.getElementById('archSvg');
+    const NS = 'http://www.w3.org/2000/svg';
+    let currentView = 'all';
+    let animFrame;
+
+    // Node coordinates
+    const N = {
+      inet: { x: 50, y: 200 }, vpn: { x: 50, y: 80 }, gh: { x: 50, y: 400 },
+      c1: { x: 280, y: 160 }, c2: { x: 280, y: 370 },
+      b1: { x: 520, y: 100 }, b2: { x: 520, y: 230 },
+      d1: { x: 720, y: 150 }, d2: { x: 720, y: 280 },
+      m1: { x: 930, y: 300 }, m2: { x: 930, y: 160 },
+    };
+    // VPC cluster rects [x,y,w,h,label,color]
+    const VPCS = [
+      [220, 120, 120, 300, 'chunxi\n10.16', '#3b82f6'],
+      [460, 60, 120, 220, 'boyang\n10.18', '#8b5cf6'],
+      [660, 110, 120, 220, 'brad\n10.17', '#f59e0b'],
+      [860, 120, 140, 230, 'marieth\n10.19', '#ec4899'],
+    ];
+    // Node labels
+    const LABELS = {
+      inet: '🌐 Internet', vpn: '🔐 VPN', gh: '📦 GitHub',
+      c1: 'chunxi_1\nHAProxy', c2: 'chunxi_2\nMinIO+Build',
+      b1: 'boyang_1\nSilo1+WG', b2: 'boyang_2\nSilo 2',
+      d1: 'brad_1\nSilo 3', d2: 'brad_2\nSilo 4',
+      m1: 'marieth_1\nPostgreSQL', m2: 'marieth_2\nSilo 5',
+    };
+
+    // Edge definitions per view: {from,to,label,color,dash}
+    const EDGES = {
+      all: [
+        { f: 'inet', t: 'c1', l: 'HTTPS 443', c: '#3b82f6' },
+        { f: 'vpn', t: 'b1', l: 'WG 51822', c: '#ec4899' },
+        { f: 'gh', t: 'c2', l: 'git poll', c: '#10b981' },
+        { f: 'c1', t: 'b1', l: 'RR', c: '#6366f1' }, { f: 'c1', t: 'b2', l: '', c: '#6366f1' }, { f: 'c1', t: 'd1', l: '', c: '#6366f1' }, { f: 'c1', t: 'd2', l: '', c: '#6366f1' }, { f: 'c1', t: 'm2', l: '', c: '#6366f1' },
+        { f: 'b1', t: 'm1', l: 'SQL', c: '#ef4444' }, { f: 'b2', t: 'm1', l: '', c: '#ef4444' }, { f: 'd1', t: 'm1', l: '', c: '#ef4444' }, { f: 'd2', t: 'm1', l: '', c: '#ef4444' }, { f: 'm2', t: 'm1', l: '', c: '#ef4444' },
+        { f: 'b1', t: 'c2', l: 'S3', c: '#8b5cf6' }, { f: 'b2', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'd1', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'd2', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'm2', t: 'c2', l: '', c: '#8b5cf6' },
+        { f: 'b1', t: 'b2', l: '', c: '#f59e0b', dash: true }, { f: 'b1', t: 'd1', l: 'Orleans', c: '#f59e0b', dash: true }, { f: 'b1', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'b1', t: 'm2', l: '', c: '#f59e0b', dash: true },
+        { f: 'b2', t: 'd1', l: '', c: '#f59e0b', dash: true }, { f: 'b2', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'b2', t: 'm2', l: '', c: '#f59e0b', dash: true },
+        { f: 'd1', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'd1', t: 'm2', l: '', c: '#f59e0b', dash: true }, { f: 'd2', t: 'm2', l: '', c: '#f59e0b', dash: true },
+      ],
+      http: [
+        { f: 'inet', t: 'c1', l: '① HTTPS 443', c: '#3b82f6' },
+        { f: 'c1', t: 'b1', l: '② Round-Robin', c: '#6366f1' }, { f: 'c1', t: 'b2', l: '②', c: '#6366f1' }, { f: 'c1', t: 'd1', l: '②', c: '#6366f1' }, { f: 'c1', t: 'd2', l: '②', c: '#6366f1' }, { f: 'c1', t: 'm2', l: '②', c: '#6366f1' },
+        { f: 'b1', t: 'b2', l: '', c: '#f59e0b', dash: true }, { f: 'b1', t: 'd1', l: '③ Orleans', c: '#f59e0b', dash: true }, { f: 'b1', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'b1', t: 'm2', l: '', c: '#f59e0b', dash: true },
+        { f: 'b2', t: 'd1', l: '', c: '#f59e0b', dash: true }, { f: 'b2', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'b2', t: 'm2', l: '', c: '#f59e0b', dash: true },
+        { f: 'd1', t: 'd2', l: '', c: '#f59e0b', dash: true }, { f: 'd1', t: 'm2', l: '', c: '#f59e0b', dash: true }, { f: 'd2', t: 'm2', l: 'Mesh', c: '#f59e0b', dash: true },
+        { f: 'b1', t: 'm1', l: '④ SQL', c: '#ef4444' }, { f: 'b2', t: 'm1', l: '', c: '#ef4444' }, { f: 'd1', t: 'm1', l: '', c: '#ef4444' }, { f: 'd2', t: 'm1', l: '', c: '#ef4444' }, { f: 'm2', t: 'm1', l: '', c: '#ef4444' },
+        { f: 'b1', t: 'c2', l: '⑤ S3', c: '#8b5cf6' }, { f: 'b2', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'd1', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'd2', t: 'c2', l: '', c: '#8b5cf6' }, { f: 'm2', t: 'c2', l: '', c: '#8b5cf6' },
+        { f: 'm1', t: 'b1', l: '⑥ Result', c: '#ef4444', dash: true },
+        { f: 'c1', t: 'inet', l: '⑦ Response', c: '#3b82f6', dash: true },
+      ],
+      git: [
+        { f: 'gh', t: 'c2', l: '① poll + build', c: '#10b981' },
+        { f: 'c2', t: 'c1', l: '② pull', c: '#22c55e' }, { f: 'c2', t: 'b1', l: '② pull', c: '#22c55e' }, { f: 'c2', t: 'b2', l: '②', c: '#22c55e' }, { f: 'c2', t: 'd1', l: '②', c: '#22c55e' }, { f: 'c2', t: 'd2', l: '②', c: '#22c55e' }, { f: 'c2', t: 'm2', l: '②', c: '#22c55e' },
+      ],
+      vpn: [
+        { f: 'vpn', t: 'b1', l: '① WireGuard', c: '#ec4899' },
+        { f: 'b1', t: 'c1', l: '② NAT', c: '#f472b6' }, { f: 'b1', t: 'c2', l: '② NAT', c: '#f472b6' }, { f: 'b1', t: 'b2', l: '② NAT', c: '#f472b6' },
+        { f: 'b1', t: 'd1', l: '② NAT', c: '#f472b6' }, { f: 'b1', t: 'd2', l: '② NAT', c: '#f472b6' }, { f: 'b1', t: 'm1', l: '② NAT', c: '#f472b6' }, { f: 'b1', t: 'm2', l: '② NAT', c: '#f472b6' },
+        { f: 'b1', t: 'vpn', l: '③ SSH Bastion', c: '#ec4899', dash: true, cv: -60 },
+      ],
+    };
+
+    function el(tag, attrs, parent) {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+      if (parent) parent.appendChild(e);
+      return e;
+    }
+
+    // Helper: compute curve control point for an edge
+    function getCurve(a, b, e, idx) {
+      if (e.cv) return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 + e.cv };
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const sign = (idx % 2 === 0) ? 1 : -1;
+      const offset = sign * (12 + (idx % 5) * 8); // 12~44px spread
+      const nx = -dy / len, ny = dx / len; // perpendicular unit
+      return { mx: (a.x + b.x) / 2 + nx * offset, my: (a.y + b.y) / 2 + ny * offset };
+    }
+
+    let archNodes = null;
+    let archLastView = null;
+
+    function initScene(view) {
+      if (!svg) return;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      archLastView = view;
+      archNodes = [];
+      // AWS cloud bg
+      el('rect', { x: 200, y: 30, width: 830, height: 470, rx: 16, fill: '#0f172a', stroke: '#334155', 'stroke-width': 1 }, svg);
+      el('text', { x: 635, y: 55, 'text-anchor': 'middle', fill: '#475569', 'font-size': '13', 'font-family': 'Inter' }, svg).textContent = '☁️ AWS ca-central-1';
+      // VPC clusters
+      VPCS.forEach(([x, y, w, h, lbl, c]) => {
+        el('rect', { x, y, width: w, height: h, rx: 10, fill: 'none', stroke: c, 'stroke-width': 1, 'stroke-dasharray': '6 3', opacity: 0.5 }, svg);
+        const lines = lbl.split('\n');
+        lines.forEach((ln, i) => { const tx = el('text', { x: x + w / 2, y: y + h + 16 + i * 14, 'text-anchor': 'middle', fill: c, 'font-size': '11', 'font-family': 'Inter' }, svg); tx.textContent = ln; });
+      });
+      // Edges - static
+      const edges = EDGES[view] || EDGES.all;
+      edges.forEach((e, idx) => {
+        const a = N[e.f], b = N[e.t]; if (!a || !b) return;
+        const { mx, my } = getCurve(a, b, e, idx);
+        const d = `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`;
+        const pa = { d, stroke: e.c, 'stroke-width': 2, opacity: 0.6, fill: 'none' };
+        if (e.dash) pa['stroke-dasharray'] = '8 4';
+        el('path', pa, svg);
+        if (e.l) el('text', { x: mx, y: my - 6, 'text-anchor': 'middle', fill: e.c, 'font-size': '10', 'font-family': 'Inter', opacity: 0.9 }, svg).textContent = e.l;
+        // Animated packet setup
+        const pck = el('circle', { r: 4, fill: e.c, filter: 'url(#glow)' }, svg);
+        archNodes.push({ pck, a, b, mx, my, idx, e });
+      });
+
+      for (const [id, pos] of Object.entries(N)) {
+        const isExternal = ['inet', 'vpn', 'gh'].includes(id);
+        const w = isExternal ? 90 : 100, h = isExternal ? 36 : 44, rx = isExternal ? 18 : 8;
+        const fill = isExternal ? '#1e293b' : '#111827';
+        const stroke = isExternal ? '#6366f1' : '#3b82f6';
+        el('rect', { x: pos.x - w / 2, y: pos.y - h / 2, width: w, height: h, rx, fill, stroke, 'stroke-width': 1.5 }, svg);
+        const lines = (LABELS[id] || id).split('\n');
+        lines.forEach((ln, i) => {
+          const ty = pos.y - (lines.length - 1) * 7 + i * 14;
+          el('text', { x: pos.x, y: ty + 4, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '11', 'font-weight': '600', 'font-family': 'Inter' }, svg).textContent = ln;
+        });
+      }
+    }
+
+    function updateScene(view, t) {
+      if (!archNodes || archLastView !== view) initScene(view);
+      archNodes.forEach(n => {
+        const period = 3000;
+        const offset = n.idx * 400;
+        const p = ((t + offset) % period) / period;
+        const px = (1 - p) * (1 - p) * n.a.x + 2 * (1 - p) * p * n.mx + p * p * n.b.x;
+        const py = (1 - p) * (1 - p) * n.a.y + 2 * (1 - p) * p * n.my + p * p * n.b.y;
+        const pulse = 0.5 + 0.5 * Math.sin(p * Math.PI);
+        n.pck.setAttribute('cx', px); n.pck.setAttribute('cy', py);
+        n.pck.setAttribute('r', 4 + pulse * 2); n.pck.setAttribute('opacity', 0.7 + pulse * 0.3);
+      });
+    }
+
+    // Animation loop
+    let startTime;
+    function animLoop(now) {
+      if (!startTime) startTime = now;
+      const t = now - startTime;
+      
+      const animId = slides[current].getAttribute('data-anim-id');
+      if (animId === 'arch') updateScene(currentView, t);
+      if (animId === 'peer') updatePeering(t);
+      if (animId === 'cicd') updateCICD(t);
+      if (animId === 'vpn') updateVPN(t);
+      if (animId === 'orleans') updateOrleans(t);
+
+      animFrame = requestAnimationFrame(animLoop);
+    }
+    animFrame = requestAnimationFrame(animLoop);
+
+    // ===== VPC Peering SVG Engine =====
+    const peerSvg = document.getElementById('peerSvg');
+    const PN = {
+      chunxi: { x: 100, y: 100, cidr: '10.16.0.0/16', color: '#3b82f6' },
+      boyang: { x: 360, y: 100, cidr: '10.18.0.0/16', color: '#8b5cf6' },
+      brad: { x: 100, y: 280, cidr: '10.17.0.0/16', color: '#f59e0b' },
+      marieth: { x: 360, y: 280, cidr: '10.19.0.0/16', color: '#ec4899' },
+    };
+    const PEERS = [
+      { f: 'chunxi', t: 'boyang', l: '#1', c: '#6366f1' },
+      { f: 'boyang', t: 'brad', l: '#2', c: '#6366f1' },
+      { f: 'boyang', t: 'marieth', l: '#3', c: '#6366f1' },
+      { f: 'chunxi', t: 'brad', l: '#4', c: '#6366f1' },
+      { f: 'chunxi', t: 'marieth', l: '#5', c: '#6366f1' },
+      { f: 'brad', t: 'marieth', l: '#6', c: '#6366f1' },
+    ];
+    let peerNodes = null;
+    function initPeering() {
+      if (!peerSvg) return;
+      while (peerSvg.firstChild) peerSvg.removeChild(peerSvg.firstChild);
+      peerNodes = [];
+      // Edges (Static)
+      PEERS.forEach((pe, idx) => {
+        const a = PN[pe.f], b = PN[pe.t];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const sign = (idx % 2 === 0) ? 1 : -1;
+        const off = sign * (15 + (idx % 3) * 10);
+        const nx = -dy / len, ny = dx / len;
+        const mx = (a.x + b.x) / 2 + nx * off, my = (a.y + b.y) / 2 + ny * off;
+        el('path', { d: `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`, stroke: pe.c, 'stroke-width': 2, opacity: 0.5, fill: 'none' }, peerSvg);
+        el('text', { x: mx, y: my - 6, 'text-anchor': 'middle', fill: '#a5b4fc', 'font-size': '11', 'font-family': 'Inter', 'font-weight': '600' }, peerSvg).textContent = pe.l;
+        // Animated Packets
+        const fwd = el('circle', { r: 4, fill: a.color, filter: 'url(#glow)' }, peerSvg);
+        const rev = el('circle', { r: 4, fill: b.color, filter: 'url(#glow)' }, peerSvg);
+        peerNodes.push({ fwd, rev, a, b, mx, my, idx, pe });
+      });
+      // Nodes (Static)
+      for (const [name, nd] of Object.entries(PN)) {
+        el('rect', { x: nd.x - 60, y: nd.y - 28, width: 120, height: 56, rx: 10, fill: '#111827', stroke: nd.color, 'stroke-width': 2 }, peerSvg);
+        el('text', { x: nd.x, y: nd.y - 6, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '13', 'font-weight': '700', 'font-family': 'Inter' }, peerSvg).textContent = name;
+        el('text', { x: nd.x, y: nd.y + 14, 'text-anchor': 'middle', fill: nd.color, 'font-size': '10', 'font-family': 'JetBrains Mono' }, peerSvg).textContent = nd.cidr;
+      }
+    }
+    function updatePeering(t) {
+      if (!peerNodes) initPeering();
+      peerNodes.forEach(n => {
+        // Forward
+        const p1 = ((t + n.idx * 500) % 3000) / 3000;
+        const px1 = (1 - p1) * (1 - p1) * n.a.x + 2 * (1 - p1) * p1 * n.mx + p1 * p1 * n.b.x;
+        const py1 = (1 - p1) * (1 - p1) * n.a.y + 2 * (1 - p1) * p1 * n.my + p1 * p1 * n.b.y;
+        const pulse1 = 0.5 + 0.5 * Math.sin(p1 * Math.PI);
+        n.fwd.setAttribute('cx', px1); n.fwd.setAttribute('cy', py1);
+        n.fwd.setAttribute('r', 4 + pulse1 * 2); n.fwd.setAttribute('opacity', 0.8);
+        // Reverse
+        const p2 = ((t + n.idx * 500 + 1500) % 3000) / 3000;
+        const px2 = (1 - p2) * (1 - p2) * n.b.x + 2 * (1 - p2) * p2 * n.mx + p2 * p2 * n.a.x;
+        const py2 = (1 - p2) * (1 - p2) * n.b.y + 2 * (1 - p2) * p2 * n.my + p2 * p2 * n.a.y;
+        const pulse2 = 0.5 + 0.5 * Math.sin(p2 * Math.PI);
+        n.rev.setAttribute('cx', px2); n.rev.setAttribute('cy', py2);
+        n.rev.setAttribute('r', 4 + pulse2 * 2); n.rev.setAttribute('opacity', 0.8);
+      });
+    }
+
+    // ===== CI/CD Pipeline SVG Engine =====
+    const cicdSvg = document.getElementById('cicdSvg');
+    const CN = {
+      team: { x: 60, y: 160, label: '👥 Team', color: '#6366f1' },
+      gh: { x: 220, y: 160, label: '📦 GitHub', color: '#8b5cf6' },
+      build: { x: 420, y: 160, label: 'chunxi_2\nBuild Server', color: '#10b981' },
+      reg: { x: 620, y: 160, label: '📦 Registry\n:5000', color: '#22c55e' },
+      web: { x: 850, y: 60, label: 'chunxi_1\nWeb SPA', color: '#3b82f6' },
+      api1: { x: 850, y: 140, label: 'boyang_1/2\nSilos', color: '#8b5cf6' },
+      api2: { x: 850, y: 220, label: 'brad_1/2\nSilos', color: '#f59e0b' },
+      api3: { x: 850, y: 300, label: 'marieth_2\nSilo', color: '#ec4899' },
+    };
+    const CICD_EDGES = [
+      { f: 'team', t: 'gh', l: 'git push', c: '#6366f1' },
+      { f: 'gh', t: 'build', l: 'poll 6min', c: '#8b5cf6' },
+      { f: 'build', t: 'reg', l: 'podman push', c: '#10b981' },
+      { f: 'reg', t: 'web', l: 'digest check', c: '#3b82f6' },
+      { f: 'reg', t: 'api1', l: 'digest check', c: '#8b5cf6' },
+      { f: 'reg', t: 'api2', l: 'digest check', c: '#f59e0b' },
+      { f: 'reg', t: 'api3', l: 'digest check', c: '#ec4899' },
+    ];
+    let cicdNodes = null;
+    function initCICD() {
+      if (!cicdSvg) return;
+      while (cicdSvg.firstChild) cicdSvg.removeChild(cicdSvg.firstChild);
+      cicdNodes = [];
+      // Edges (Static)
+      CICD_EDGES.forEach((e, idx) => {
+        const a = CN[e.f], b = CN[e.t];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const sign = (idx % 2 === 0) ? 1 : -1;
+        const off = sign * (10 + (idx % 4) * 8);
+        const nx = -dy / len, ny = dx / len;
+        const mx = (a.x + b.x) / 2 + nx * off, my = (a.y + b.y) / 2 + ny * off;
+        el('path', { d: `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`, stroke: e.c, 'stroke-width': 2, opacity: 0.5, fill: 'none' }, cicdSvg);
+        if (e.l) el('text', { x: mx, y: my - 6, 'text-anchor': 'middle', fill: e.c, 'font-size': '9', 'font-family': 'Inter', opacity: 0.9 }, cicdSvg).textContent = e.l;
+        // Animated Packet
+        const pck = el('circle', { r: 4, fill: e.c, filter: 'url(#glow)' }, cicdSvg);
+        cicdNodes.push({ pck, a, b, mx, my, idx, e });
+      });
+      // Nodes (Static)
+      for (const [id, nd] of Object.entries(CN)) {
+        const isExt = ['team', 'gh'].includes(id);
+        const w = isExt ? 90 : 110, h = 44, rx = isExt ? 18 : 8;
+        el('rect', { x: nd.x - w / 2, y: nd.y - h / 2, width: w, height: h, rx, fill: '#111827', stroke: nd.color, 'stroke-width': 1.5 }, cicdSvg);
+        const lines = nd.label.split('\n');
+        lines.forEach((ln, i) => {
+          const ty = nd.y - (lines.length - 1) * 7 + i * 14;
+          el('text', { x: nd.x, y: ty + 4, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '11', 'font-weight': '600', 'font-family': 'Inter' }, cicdSvg).textContent = ln;
+        });
+      }
+    }
+    function updateCICD(t) {
+      if (!cicdNodes) initCICD();
+      cicdNodes.forEach(n => {
+        const p = ((t + n.idx * 500) % 3000) / 3000;
+        const px = (1 - p) * (1 - p) * n.a.x + 2 * (1 - p) * p * n.mx + p * p * n.b.x;
+        const py = (1 - p) * (1 - p) * n.a.y + 2 * (1 - p) * p * n.my + p * p * n.b.y;
+        const pulse = 0.5 + 0.5 * Math.sin(p * Math.PI);
+        n.pck.setAttribute('cx', px); n.pck.setAttribute('cy', py);
+        n.pck.setAttribute('r', 4 + pulse * 2); n.pck.setAttribute('opacity', 0.8);
+      });
+    }
+
+    // ===== Orleans Virtual Actor Engine (App.ts port) =====
+    const orleansSvg = document.getElementById('orleansSvg');
+    let orleansNodes = null;
+    const P = { U_A:{x:120,y:150},U_B:{x:120,y:300},U_C:{x:120,y:450}, N1_L:{x:450,y:145},N1_R:{x:550,y:145}, N2_L:{x:450,y:305},N2_R:{x:550,y:305}, N3_L:{x:450,y:465},N3_R:{x:550,y:465}, DB1_L:{x:810,y:200},DB2_L:{x:810,y:400}, G2_G:{x:465,y:260},G3_R:{x:465,y:420},G3_B:{x:488,y:420} };
+    const C = {g:'#22C55E',b:'#3B82F6',r:'#EF4444'};
+
+    function initOrleans() {
+      if (!orleansSvg) return;
+      while (orleansSvg.firstChild) orleansSvg.removeChild(orleansSvg.firstChild);
+      orleansNodes = { p1L:[], p2L:[], p3L:[], gr:[], pkts:{} };
+
+      // Users, Silo boxes, DB cylinders (Static Background)
+      [['A',P.U_A],['B',P.U_B],['C',P.U_C]].forEach(([l,p])=>{ const g=el('g',{transform:`translate(${p.x-20},${p.y-30})`},orleansSvg); el('circle',{cx:20,cy:15,r:12,fill:'#FBBF24',stroke:'#B45309','stroke-width':2},g); el('path',{d:'M 0 45 C 0 25, 40 25, 40 45 Z',fill:'#FBBF24',stroke:'#B45309','stroke-width':2},g); el('text',{x:20,y:65,'font-size':16,'text-anchor':'middle',fill:'#e2e8f0','font-weight':'bold','font-family':'Inter'},g).textContent=l; });
+      [[450,80],[450,240],[450,400]].forEach(([sx,sy])=>{ const g=el('g',{transform:`translate(${sx},${sy})`},orleansSvg); el('rect',{width:100,height:130,rx:6,fill:'#1e293b',stroke:'#0284C7','stroke-width':2},g); for(let i=0;i<16;i++) el('circle',{cx:15+(i%4)*23,cy:20+Math.floor(i/4)*23,r:8,fill:'none',stroke:'#0284C7','stroke-width':1.5,opacity:0.5},g); el('rect',{x:15,y:105,width:70,height:20,rx:4,fill:'#0c4a6e'},g); el('text',{x:50,y:119,'font-size':12,'text-anchor':'middle',fill:'#0284C7','font-weight':'bold','font-family':'Inter'},g).textContent='Stateful'; });
+      [[810,150],[810,350]].forEach(([dx,dy])=>{ const g=el('g',{transform:`translate(${dx},${dy})`},orleansSvg); el('ellipse',{cx:40,cy:20,rx:40,ry:15,fill:'#1e293b',stroke:'#B91C1C','stroke-width':2},g); el('path',{d:'M 0 20 L 0 80 A 40 15 0 0 0 80 80 L 80 20 Z',fill:'#1e293b',stroke:'#B91C1C','stroke-width':2},g); el('ellipse',{cx:40,cy:80,rx:40,ry:15,fill:'#1e293b',stroke:'#B91C1C','stroke-width':2},g); el('text',{x:40,y:60,'font-size':28,'text-anchor':'middle',fill:'#EF4444','font-weight':'bold','font-family':'Inter'},g).textContent='DB'; });
+
+
+      // Lines
+      function dL(x1,y1,x2,y2,c,me,grp){ const l=el('line',{x1,y1,x2,y2,stroke:c,'stroke-width':3,fill:'none',opacity:0},orleansSvg); if(me) l.setAttribute('marker-end',me); grp.push(l); }
+      function dLs(x1,y1,x2,y2,c,ms,grp){ const l=el('line',{x1,y1,x2,y2,stroke:c,'stroke-width':3,fill:'none',opacity:0,'marker-start':ms},orleansSvg); grp.push(l); }
+      function dPth(d,c,ms,grp){ const p=el('path',{d,stroke:c,'stroke-width':3,fill:'none',opacity:0,'marker-start':ms},orleansSvg); grp.push(p); }
+
+      dL(P.N2_L.x,P.N2_L.y,P.U_A.x,P.U_A.y,C.g,'url(#aG)',orleansNodes.p1L); dL(P.DB1_L.x,P.DB1_L.y,P.N2_R.x,P.N2_R.y,C.g,'url(#aG)',orleansNodes.p1L);
+      dL(P.N3_L.x,P.N3_L.y,P.U_B.x,P.U_B.y,C.b,'url(#aB)',orleansNodes.p1L); dL(P.DB2_L.x,P.DB2_L.y,P.N3_R.x,P.N3_R.y,C.b,'url(#aB)',orleansNodes.p1L);
+      dL(P.N3_L.x,P.N3_L.y,P.U_C.x,P.U_C.y,C.r,'url(#aR)',orleansNodes.p1L); dL(P.DB2_L.x,P.DB2_L.y,P.N3_R.x,P.N3_R.y,C.r,'url(#aR)',orleansNodes.p1L);
+      
+      dLs(P.U_A.x,P.U_A.y,P.N1_L.x,P.N1_L.y,C.g,'url(#aG)',orleansNodes.p2L);
+      dPth(`M${P.N1_R.x} ${P.N1_R.y} Q 650 225 ${P.N2_R.x} ${P.N2_R.y}`,C.g,'url(#aG)',orleansNodes.p2L);
+      dLs(P.U_B.x,P.U_B.y,P.N1_L.x,P.N1_L.y,C.b,'url(#aB)',orleansNodes.p2L);
+      dPth(`M${P.N1_R.x} ${P.N1_R.y} Q 700 305 ${P.N3_R.x} ${P.N3_R.y}`,C.b,'url(#aB)',orleansNodes.p2L);
+      dLs(P.U_C.x,P.U_C.y,P.N3_L.x,P.N3_L.y,C.r,'url(#aR)',orleansNodes.p2L);
+
+      dL(P.U_A.x,P.U_A.y,P.N2_L.x,P.N2_L.y,C.g,'url(#aG)',orleansNodes.p3L); dL(P.N2_R.x,P.N2_R.y,P.DB1_L.x,P.DB1_L.y,C.g,'url(#aG)',orleansNodes.p3L);
+      dL(P.U_B.x,P.U_B.y,P.N3_L.x,P.N3_L.y,C.r,'url(#aR)',orleansNodes.p3L); dL(P.N3_R.x,P.N3_R.y,P.DB2_L.x,P.DB2_L.y,C.r,'url(#aR)',orleansNodes.p3L);
+      dL(P.U_C.x,P.U_C.y,P.N3_L.x,P.N3_L.y,C.r,'url(#aR)',orleansNodes.p3L); dL(P.N3_R.x,P.N3_R.y,P.DB2_L.x,P.DB2_L.y,C.r,'url(#aR)',orleansNodes.p3L);
+
+      // Active Grains
+      orleansNodes.gr.push(el('circle',{cx:P.G2_G.x,cy:P.G2_G.y,r:8,fill:C.g,stroke:'#166534','stroke-width':1.5,opacity:0},orleansSvg));
+      orleansNodes.gr.push(el('circle',{cx:P.G3_B.x,cy:P.G3_B.y,r:8,fill:C.b,stroke:'#1E40AF','stroke-width':1.5,opacity:0},orleansSvg));
+      orleansNodes.gr.push(el('circle',{cx:P.G3_R.x,cy:P.G3_R.y,r:8,fill:C.r,stroke:'#991B1B','stroke-width':1.5,opacity:0},orleansSvg));
+
+      // Packets
+      const keys = ['p1G','p1B','p1R','p2G','p2B','p2R','p3G','p3B','p3R'];
+      const pkC = [C.g,C.b,C.r, C.g,C.b,C.r, C.g,C.r,C.r]; // Note p3B is red
+      keys.forEach((k,i)=>{
+        orleansNodes.pkts[k] = el('circle',{r:8,fill:pkC[i],stroke:'#FFF','stroke-width':2,opacity:0},orleansSvg);
+      });
+
+      // Text and Progress Bar
+      orleansNodes.t2 = el('text',{x:640,y:120,fill:'#16A34A','font-size':24,'font-weight':'bold','font-family':'Inter',opacity:0},orleansSvg);
+      orleansNodes.t2.textContent='Fast, in-memory reads!';
+      orleansNodes.t3a = el('text',{x:620,y:540,fill:'#94a3b8','font-size':20,'font-weight':'bold','font-family':'Inter',opacity:0},orleansSvg);
+      orleansNodes.t3a.textContent='Write-through or write-behind';
+      orleansNodes.t3b = el('text',{x:620,y:568,fill:'#94a3b8','font-size':20,'font-weight':'bold','font-family':'Inter',opacity:0},orleansSvg);
+      orleansNodes.t3b.textContent='No write contention';
+      orleansNodes.pb = el('rect',{x:0,y:596,width:0,height:4,fill:'#3b82f6',rx:2},orleansSvg);
+    }
+
+    function updateOrleans(t) {
+      if (!orleansNodes) initOrleans();
+      const cycle = t % 16000;
+      function interp(t, kf) {
+        if (t <= kf[0][0]) return kf[0][1]; if (t >= kf[kf.length-1][0]) return kf[kf.length-1][1];
+        for (let i = 0; i < kf.length-1; i++) { if (t >= kf[i][0] && t <= kf[i+1][0]) { const p = (t-kf[i][0])/(kf[i+1][0]-kf[i][0]); return kf[i][1]+p*(kf[i+1][1]-kf[i][1]); } } return 0;
+      }
+      function iXY(t, kf) {
+        if (!kf || kf.length === 0) return {x:0, y:0};
+        if (t <= kf[0].t) return {x: kf[0].x, y: kf[0].y}; 
+        if (t >= kf[kf.length-1].t) return {x: kf[kf.length-1].x, y: kf[kf.length-1].y};
+        for (let i = 0; i < kf.length-1; i++) { 
+          if (t >= kf[i].t && t <= kf[i+1].t) { 
+            const p = (t-kf[i].t)/(kf[i+1].t-kf[i].t); 
+            return {x:kf[i].x+p*(kf[i+1].x-kf[i].x), y:kf[i].y+p*(kf[i+1].y-kf[i].y)}; 
+          } 
+        } 
+        return {x:0, y:0};
+      }
+      
+      const op = { p1L:interp(cycle,[[0,0],[500,1],[3500,1],[4000,0]]), p1P:interp(cycle,[[0,0],[1400,0],[1500,1],[3500,1],[3600,0]]), gr:interp(cycle,[[0,0],[2400,0],[2500,1],[14000,1],[14500,0]]), p2L:interp(cycle,[[0,0],[4500,0],[5000,1],[8500,1],[9000,0]]), p2P:interp(cycle,[[0,0],[5400,0],[5500,1],[6400,1],[6500,0]]), p2T:interp(cycle,[[0,0],[6000,0],[6500,1],[8500,1],[9000,0]]), p3L:interp(cycle,[[0,0],[9500,0],[10000,1],[13500,1],[14000,0]]), p3P:interp(cycle,[[0,0],[10400,0],[10500,1],[12700,1],[12800,0]]), p3P_B:interp(cycle,[[0,0],[10400,0],[10500,1],[11300,1],[11400,0]]), p3T:interp(cycle,[[0,0],[11500,0],[12000,1],[13500,1],[14000,0]]) };
+      
+      // Update Lines & Text Opacity
+      orleansNodes.p1L.forEach(l=>l.setAttribute('opacity',op.p1L));
+      orleansNodes.p2L.forEach(l=>l.setAttribute('opacity',op.p2L));
+      orleansNodes.p3L.forEach(l=>l.setAttribute('opacity',op.p3L));
+      orleansNodes.gr.forEach(l=>l.setAttribute('opacity',op.gr));
+      orleansNodes.t2.setAttribute('opacity',op.p2T);
+      orleansNodes.t3a.setAttribute('opacity',op.p3T);
+      orleansNodes.t3b.setAttribute('opacity',op.p3T);
+      orleansNodes.pb.setAttribute('width',1000*(cycle/16000));
+
+      // Update Packets Pos & Opacity
+      const pa = { 
+        p1G:iXY(cycle,[{t:1500,...P.DB1_L},{t:2200,...P.N2_R},{t:2500,...P.G2_G},{t:2800,...P.N2_L},{t:3300,...P.U_A}]), 
+        p1B:iXY(cycle,[{t:1500,...P.DB2_L},{t:2200,...P.N3_R},{t:2500,...P.G3_B},{t:2800,...P.N3_L},{t:3300,...P.U_B}]), 
+        p1R:iXY(cycle,[{t:1700,...P.DB2_L},{t:2400,...P.N3_R},{t:2700,...P.G3_R},{t:3000,...P.N3_L},{t:3500,...P.U_C}]),
+        p2G:iXY(cycle,[{t:5500,...P.G2_G},{t:5600,...P.N2_R},{t:5800,x:600,y:225},{t:6000,...P.N1_R},{t:6100,...P.N1_L},{t:6500,...P.U_A}]),
+        p2B:iXY(cycle,[{t:5500,...P.G3_B},{t:5600,...P.N3_R},{t:5800,x:625,y:305},{t:6000,...P.N1_R},{t:6100,...P.N1_L},{t:6500,...P.U_B}]),
+        p2R:iXY(cycle,[{t:5500,...P.G3_R},{t:5900,...P.N3_L},{t:6500,...P.U_C}]),
+        p3G:iXY(cycle,[{t:10500,...P.U_A},{t:11000,...P.N2_L},{t:11300,...P.G2_G},{t:11600,...P.N2_R},{t:12500,...P.DB1_L}]),
+        p3B:iXY(cycle,[{t:10500,...P.U_B},{t:11000,...P.N3_L},{t:11300,...P.G3_R}]),
+        p3R:iXY(cycle,[{t:10700,...P.U_C},{t:11200,...P.N3_L},{t:11500,...P.G3_R},{t:11600,...P.G3_R},{t:11900,...P.N3_R},{t:12800,...P.DB2_L}]) };
+      
+      const opks = { p1G:op.p1P, p1B:op.p1P, p1R:op.p1P, p2G:op.p2P, p2B:op.p2P, p2R:op.p2P, p3G:op.p3P, p3B:op.p3P_B, p3R:op.p3P };
+      
+      for(const k in pa) {
+         if (opks[k] > 0.01) {
+            orleansNodes.pkts[k].setAttribute('cx', pa[k].x);
+            orleansNodes.pkts[k].setAttribute('cy', pa[k].y);
+            orleansNodes.pkts[k].setAttribute('opacity', opks[k]);
+         } else {
+            orleansNodes.pkts[k].setAttribute('opacity', 0);
+         }
+      }
+    }
+
+    // ===== VPN Security SVG Engine =====
+    const vpnSvg = document.getElementById('vpnSvg');
+    const VN = {
+      hub: { x: 200, y: 120, label: '🔐 boyang_1\nVPN Hub\n10.20.0.1', color: '#ec4899' },
+      p1: { x: 50, y: 40, label: '💻 boyang\n10.20.0.2', color: '#8b5cf6' },
+      p2: { x: 350, y: 40, label: '💻 chunxi\n10.20.0.3', color: '#3b82f6' },
+      p3: { x: 50, y: 200, label: '💻 brad\n10.20.0.4', color: '#f59e0b' },
+      p4: { x: 350, y: 200, label: '💻 marieth\n10.20.0.5', color: '#ec4899' },
+      vpc: { x: 200, y: 310, label: '☁️ All VPCs\n10.16.0.0/14', color: '#6366f1' },
+    };
+    const VPN_EDGES = [
+      { f: 'p1', t: 'hub', l: 'WG', c: '#8b5cf6' },
+      { f: 'p2', t: 'hub', l: 'WG', c: '#3b82f6' },
+      { f: 'p3', t: 'hub', l: 'WG', c: '#f59e0b' },
+      { f: 'p4', t: 'hub', l: 'WG', c: '#ec4899' },
+      { f: 'hub', t: 'vpc', l: 'NAT Masquerade', c: '#6366f1' },
+    ];
+    let vpnNodes = null;
+    function initVPN() {
+      if (!vpnSvg) return;
+      while (vpnSvg.firstChild) vpnSvg.removeChild(vpnSvg.firstChild);
+      vpnNodes = [];
+      // Edges (Static)
+      VPN_EDGES.forEach((e, idx) => {
+        const a = VN[e.f], b = VN[e.t];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const sign = (idx % 2 === 0) ? 1 : -1;
+        const off = sign * (12 + (idx % 3) * 8);
+        const nx = -dy / len, ny = dx / len;
+        const mx = (a.x + b.x) / 2 + nx * off, my = (a.y + b.y) / 2 + ny * off;
+        el('path', { d: `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`, stroke: e.c, 'stroke-width': 2, opacity: 0.5, fill: 'none' }, vpnSvg);
+        if (e.l) el('text', { x: mx, y: my - 6, 'text-anchor': 'middle', fill: e.c, 'font-size': '9', 'font-family': 'Inter', opacity: 0.9 }, vpnSvg).textContent = e.l;
+        // Animated Packets
+        const fwd = el('circle', { r: 4, fill: a.color, filter: 'url(#glow)' }, vpnSvg);
+        const rev = el('circle', { r: 4, fill: b.color, filter: 'url(#glow)' }, vpnSvg);
+        vpnNodes.push({ fwd, rev, a, b, mx, my, idx, e });
+      });
+      // Nodes (Static)
+      for (const [id, nd] of Object.entries(VN)) {
+        const isHub = id === 'hub';
+        const w = isHub ? 120 : 100, h = isHub ? 52 : 44, rx = id === 'vpc' ? 16 : 8;
+        el('rect', { x: nd.x - w / 2, y: nd.y - h / 2, width: w, height: h, rx, fill: '#111827', stroke: nd.color, 'stroke-width': isHub ? 2.5 : 1.5 }, vpnSvg);
+        const lines = nd.label.split('\n');
+        lines.forEach((ln, i) => {
+          const ty = nd.y - (lines.length - 1) * 7 + i * 14;
+          el('text', { x: nd.x, y: ty + 4, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '10', 'font-weight': '600', 'font-family': 'Inter' }, vpnSvg).textContent = ln;
+        });
+      }
+    }
+    function updateVPN(t) {
+      if (!vpnNodes) initVPN();
+      vpnNodes.forEach(n => {
+        // Forward
+        const p1 = ((t + n.idx * 500) % 3000) / 3000;
+        const px1 = (1 - p1) * (1 - p1) * n.a.x + 2 * (1 - p1) * p1 * n.mx + p1 * p1 * n.b.x;
+        const py1 = (1 - p1) * (1 - p1) * n.a.y + 2 * (1 - p1) * p1 * n.my + p1 * p1 * n.b.y;
+        const pulse1 = 0.5 + 0.5 * Math.sin(p1 * Math.PI);
+        n.fwd.setAttribute('cx', px1); n.fwd.setAttribute('cy', py1);
+        n.fwd.setAttribute('r', 4 + pulse1 * 2); n.fwd.setAttribute('opacity', 0.8);
+        // Reverse
+        const p2 = ((t + n.idx * 500 + 1500) % 3000) / 3000;
+        const px2 = (1 - p2) * (1 - p2) * n.b.x + 2 * (1 - p2) * p2 * n.mx + p2 * p2 * n.a.x;
+        const py2 = (1 - p2) * (1 - p2) * n.b.y + 2 * (1 - p2) * p2 * n.my + p2 * p2 * n.a.y;
+        const pulse2 = 0.5 + 0.5 * Math.sin(p2 * Math.PI);
+        n.rev.setAttribute('cx', px2); n.rev.setAttribute('cy', py2);
+        n.rev.setAttribute('r', 4 + pulse2 * 2); n.rev.setAttribute('opacity', 0.8);
+      });
+    }
+
+    function switchView(view) {
+      currentView = view;
+      document.querySelectorAll('#archFilters .flow-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === view);
+      });
+    }
+
+    // Slide navigation
+    const slides = document.querySelectorAll('.slide');
+    let current = 0;
+    function goTo(n) {
+      if (n < 0 || n >= slides.length) return;
+      slides[current].classList.remove('active');
+      slides[current].classList.add('exit');
+      current = n;
+      slides[current].classList.remove('exit');
+      slides[current].classList.add('active');
+      updateUI();
+    }
+    function updateUI() {
+      document.getElementById('counter').textContent = `${current + 1} / ${slides.length}`;
+      document.getElementById('progress').style.width = `${((current + 1) / slides.length) * 100}%`;
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(current + 1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(current - 1); }
+      if (e.key === 'Home') { e.preventDefault(); goTo(0); }
+      if (e.key === 'End') { e.preventDefault(); goTo(slides.length - 1); }
+    });
+    let touchStartX = 0;
+    document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', e => {
+      const diff = touchStartX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 50) { diff > 0 ? goTo(current + 1) : goTo(current - 1); }
+    });
+    initScene(currentView);
+    initPeering();
+    initCICD();
+    initVPN();
+    initOrleans();
+
+    updateUI();
+  </script>
+</body>
+
+</html>

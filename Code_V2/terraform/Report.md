@@ -174,7 +174,7 @@ The gateway runs **HAProxy** as a cross-VPC load balancer (chosen over AWS ALB b
 
 ### 2.5 Container Runtime - Podman
 
-- All services are containerized and deployed using **Podman + podman-compose** (rootless, daemonless alternative to Docker)
+- All services are containerized and deployed using **Podman + podman-compose** (daemonless alternative to Docker)
 - Separate compose files allow independent scaling of API, database, web, and file storage services
 
 ---
@@ -333,7 +333,7 @@ graph LR
 | **IAM Roles over Keys** | EC2 instances access Amazon Bedrock via IAM instance profiles - no AWS credentials stored on disk |
 | **WireGuard VPN** | Hub-and-spoke encrypted tunnel (see §4.2 below) for secure admin access to all 8 nodes |
 | **Supernet Rule** | Inter-VPC traffic restricted to `10.16.0.0/14` - blocks traffic from any unrelated private networks |
-| **Container Isolation** | Podman runs rootless containers, reducing attack surface compared to traditional Docker |
+| **Container Engine** | Daemonless Podman architecture, reducing attack surface compared to traditional Docker daemon |
 
 ### 4.1 Security Group Rules
 
