@@ -1,8 +1,6 @@
 # CAD-Capstone
 # VSMS: Volunteer Service Management System
 
-<div align="center">
-
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 **A platform for revolutionizing volunteer management through automated verification and compliance.**
