@@ -11,7 +11,7 @@ VSMS is a modern, high-performance platform designed to connect volunteers with 
   - *Clustering & Persistence*: ADO.NET (PostgreSQL)
   - *Event Bus / Message Streaming*: Orleans Streams (Memory / ADO.NET)
 - **Database / ORM**: PostgreSQL 17 + Entity Framework Core 9 (EF Core)
-- **Architecture Pattern**: CQRS (Command Query Responsibility Segregation) + Domain-Driven Design (DDD) principles
+- **Architecture Pattern**: Vertical Slice Architecture + CQRS + Domain-Driven Design (DDD) principles using Minimal APIs
 - **File Storage**: MinIO (S3-compatible object storage)
 - **Authentication / Authorization**: JWT (JSON Web Tokens)
 - **Document Generation**: QuestPDF (for volunteer hour certificates)
@@ -35,6 +35,30 @@ VSMS is a modern, high-performance platform designed to connect volunteers with 
 - **Icons**: Lucide React
 - **Network / API Integration**: Axios
 - **Deployment**: Nginx (static file serving via Podman)
+
+---
+
+## 📁 Repository Structure
+
+- **`backend/`**: Core backend services built with .NET 10, ASP.NET Core Web API, and Microsoft Orleans.
+- **`web/`**: Web application dashboard built with React 19, Vite, and TailwindCSS.
+- **`mobile/`**: Cross-platform mobile application built with React Native and Expo.
+- **`presentation/`**: Interactive Capstone project presentation (Reveal.js).
+- **`terraform/`**: Infrastructure as Code (IaC) configurations for AWS deployment.
+- **`deploy/`**: Configurations for reverse proxies and load balancers (Nginx, HAProxy).
+- **`tools/`**: Development utilities, including the Node.js data seeder (`seed-debug-data.mjs`).
+- **`tests/`**: Unit and integration test suites (`VSMS.Tests`).
+- **`data/`**: Local data storage and output directory for generated debug seed data.
+- **`*.sh` scripts**: Automation scripts for local (`local_*.sh`) and remote (`remote_*.sh`) deployments.
+
+---
+
+## 👥 System Roles & Personas
+
+The platform supports three distinct user roles, each with dedicated dashboard routing across the Web and Mobile applications:
+- **Volunteer**: Discovers opportunities, manages applications, performs geospatial attendance check-ins, and tracks their impact score.
+- **Coordinator**: Manages organization profiles, creates opportunities, reviews applications, handles manual attendance adjustments, and registers push notifications.
+- **Admin**: Oversees the entire platform, approves/rejects new organizations, resolves attendance disputes, and manages system moderation.
 
 ---
 
@@ -219,6 +243,17 @@ node tools/seed-debug-data.mjs --help
 
 ## 🏗 Deployment Guide Overview
 
+VSMS supports both local containerized development and automated cloud deployments.
+
+### Infrastructure as Code (Terraform)
+The `terraform/` directory contains complete IaC definitions for provisioning the AWS infrastructure required for the production environment, including compute instances, networking, and security groups.
+
+### Automation Scripts
+The root directory includes shell scripts to streamline the deployment lifecycle:
+- **Local Deployment**: `local_deploy_api.sh`, `local_deploy_db.sh`, `local_deploy_web.sh` for starting respective services. `local_seed.sh` for quick data initialization.
+- **Remote Deployment**: `remote_*_deploy.sh` and `remote_*_cleanup.sh` for CI/CD pipelines and remote server management.
+
+### Container Orchestration (Podman / Docker)
 For production deployments, VSMS provides tailored `podman-compose` configurations:
 
 ### Single-Node (All-in-One)

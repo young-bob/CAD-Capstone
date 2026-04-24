@@ -1,38 +1,45 @@
-``` mermaid
+```mermaid
 classDiagram
     %% ================= Infrastructure / Base Interfaces =================
-    class IGrainWithGuidKey { <<interface>> }
-    class IRemindable { 
-        <<Interface>> 
-        +ReceiveReminder(reminderName, status) Task 
-        %% Handles scheduled tasks (e.g., 24h reminders, timeouts)
+    class IGrainWithGuidKey {
+        <<interface>>
     }
-    
-    %% ================= 1. Core Business Grains (Actors) =================
+
+    class IRemindable {
+        <<interface>>
+        +ReceiveReminder(reminderName, status) Task
+    }
+
+    %% ================= 1. Core Business Grains =================
     IGrainWithGuidKey <|-- IOpportunityGrain
     IGrainWithGuidKey <|-- IApplicationGrain
     IGrainWithGuidKey <|-- IAttendanceRecordGrain
     IGrainWithGuidKey <|-- IVolunteerGrain
     IGrainWithGuidKey <|-- IOrganizationGrain
+    IGrainWithGuidKey <|-- ICoordinatorGrain
     IGrainWithGuidKey <|-- IAdminGrain
     IGrainWithGuidKey <|-- INotificationGrain
-    
-    IRemindable <|-- IOpportunityGrain : "Event Reminders / Recurrence"
-    IRemindable <|-- IAttendanceRecordGrain : "Auto-Checkout / Timeout"
-    IRemindable <|-- IApplicationGrain : "Waitlist Acceptance Timeout"
+
+    IRemindable <|-- OpportunityGrain : "impl only"
+    IRemindable <|-- AttendanceRecordGrain : "impl only"
+    IRemindable <|-- ApplicationGrain : "impl only"
 
     class IOpportunityGrain {
         <<Aggregate Root>>
+        +Initialize(organizationId, title, desc, category) Task
         +Publish() Task
         +Cancel(reason) Task
-        +SubmitApplication(volunteerId, shiftId, idempotencyKey) Task
+        +SubmitApplication(volunteerId, shiftId, idempotencyKey) Task~Guid~
         +WithdrawApplication(appId) Task
         +ValidateGeoLocation(lat, lon) Task~bool~
         +TryPromoteFromWaitlist(shiftId) Task
+        +AddShift(name, startTime, endTime, maxCapacity) Task
+        +GetState() Task~OpportunityState~ "[AlwaysInterleave]"
     }
 
     class IApplicationGrain {
         <<Process Manager>>
+        +Initialize(volunteerId, opportunityId, shiftId, idempotencyKey) Task
         +Approve() Task
         +Reject(reason) Task
         +Waitlist() Task
@@ -40,47 +47,70 @@ classDiagram
         +Withdraw() Task
         +MarkAsNoShow() Task
         +AcceptInvitation() Task
+        +GetState() Task~ApplicationState~
     }
 
     class IAttendanceRecordGrain {
         <<Proof Entity>>
-        +CheckIn(applicationId, lat, lon, proofPhotoUrl) Task
-        +CheckOut(timeOut) Task
-        +ManualAdjustment(coordinatorId, newTimes, reason) Task
+        +Initialize(volunteerId, applicationId, opportunityId) Task
+        +CheckIn(lat, lon, proofPhotoUrl) Task
+        +CheckOut(timeOut?) Task
+        +ManualAdjustment(coordinatorId, newCheckIn, newCheckOut, reason) Task
         +RaiseDispute(reason, evidenceUrl) Task
         +ResolveDispute(resolverId, resolution, adjustedHours) Task
         +Confirm(supervisorId, rating) Task
+        +GetState() Task~AttendanceRecordState~
     }
 
     class IVolunteerGrain {
         <<User Actor>>
-        +GetProfile() Task~VolunteerState~
-        +UpdateProfile(data) Task
-        +UpdatePrivacySettings(settings) Task
-        +UploadCredential(credData) Task
-        +GetStats() Task~VolunteerStats~
-        +GetApplications() Task~List~Guid~~
+        +GetProfile() Task~VolunteerState~ "[AlwaysInterleave]"
+        +UpdateProfile(firstName, lastName, email, phone, bio) Task
+        +UpdatePrivacySettings(isPublic, allowEmail, allowPush) Task
+        +UploadCredential(credentialUrl) Task
+        +AddApplicationId(applicationId) Task
+        +RemoveApplicationId(applicationId) Task
+        +GetApplications() Task~List[Guid]~
+        +AddCompletedHours(hours) Task
+        +IncrementCompletedOpportunities() Task
+        +IsBlockedByOrg(orgId) Task~bool~
         +SubmitFeedback(opportunityId, rating, comment) Task
     }
 
     class IOrganizationGrain {
         <<Tenant Actor>>
-        +CreateOpportunity(data, shifts) Task
+        +Initialize(name, desc, creatorUserId, creatorEmail) Task
+        +CreateOpportunity(title, desc, category) Task~Guid~
         +InviteMember(email, role) Task
         +BlockVolunteer(volunteerId) Task
         +UnblockVolunteer(volunteerId) Task
-        +GetDashboardStats() Task
-        +GetOpportunities() Task~List~Guid~~
+        +IsVolunteerBlocked(volunteerId) Task~bool~
+        +SetStatus(status) Task
+        +GetOpportunities() Task~List[Guid]~
+        +GetState() Task~OrganizationState~
+    }
+
+    class ICoordinatorGrain {
+        <<User Actor>>
+        +Initialize(firstName, lastName, email, phone, organizationId) Task
+        +GetProfile() Task~CoordinatorState~ "[AlwaysInterleave]"
+        +UpdateProfile(firstName, lastName, phone) Task
+        +SetOrganization(organizationId) Task
+        +GetOrganizationId() Task~Guid?~ "[AlwaysInterleave]"
+        +RegisterPushToken(expoPushToken) Task
+        +GetPushToken() Task~string?~ "[AlwaysInterleave]"
+        +IncrementManagedOpportunities() Task
     }
 
     class IAdminGrain {
         <<System Actor>>
+        +Initialize(userId) Task
         +ApproveOrganization(orgId) Task
         +RejectOrganization(orgId, reason) Task
         +BanUser(userId) Task
         +UnbanUser(userId) Task
         +ResolveDispute(attendanceId, resolution, adjustedHours) Task
-        +GetSystemStats() Task
+        +GetState() Task~AdminState~
     }
 
     class INotificationGrain {
@@ -91,23 +121,24 @@ classDiagram
     }
 
     %% ================= 2. Persistent States =================
-    
+
     class OpportunityState {
-        <<[GenerateSerializer]>>
+        <<GenerateSerializer>>
         +BasicInfo Info
         +List~Shift~ Shifts
-        +RecurrenceRule Recurrence
-        +GeoFenceSettings GeoFence
+        +RecurrenceRule? Recurrence
+        +GeoFenceSettings? GeoFence
         +ApprovalPolicy Policy
         +List~Guid~ WaitlistQueue
         +HashSet~Guid~ ConfirmedVolunteerIds
         +List~string~ RequiredSkills
         +OpportunityStatus Status
         +Guid OrganizationId
+        +DateTime CreatedAt
     }
 
     class ApplicationState {
-        <<[GenerateSerializer]>>
+        <<GenerateSerializer>>
         +Guid VolunteerId
         +Guid OpportunityId
         +Guid ShiftId
@@ -115,34 +146,45 @@ classDiagram
         +string IdempotencyKey
         +DateTime? ExpirationTime
         +Dictionary~string, string~ QuestionAnswers
+        +DateTime CreatedAt
     }
 
     class AttendanceRecordState {
-        <<[GenerateSerializer]>>
+        <<GenerateSerializer>>
         +Guid VolunteerId
         +Guid ApplicationId
         +Guid OpportunityId
-        +TimeRecord VerifiedTime
-        +Location CheckInSnapshot
+        +TimeRecord? VerifiedTime
+        +GeoFenceSettings? CheckInSnapshot
         +AttendanceStatus Status
         +List~AuditLog~ Modifications
-        +DisputeInfo DisputeLog
+        +DisputeInfo? DisputeLog
         +string ProofPhotoUrl
+        +int SupervisorRating
     }
 
     class VolunteerState {
-        <<[GenerateSerializer]>>
-        +UserProfile Profile
-        +PrivacySettings Privacy
-        +NotificationConfig NotifPrefs
-        +ImpactScore Score
+        <<GenerateSerializer>>
+        +string FirstName
+        +string LastName
+        +string Email
+        +string Phone
+        +string Bio
+        +bool IsProfilePublic
+        +bool AllowEmailNotifications
+        +bool AllowPushNotifications
+        +double ImpactScore
+        +double TotalHours
+        +int CompletedOpportunities
         +HashSet~Guid~ BlockedByOrgIds
         +List~Guid~ SkillIds
         +List~Guid~ ApplicationIds
+        +List~string~ Credentials
+        +bool IsInitialized
     }
 
     class OrganizationState {
-        <<[GenerateSerializer]>>
+        <<GenerateSerializer>>
         +string Name
         +string Description
         +OrgStatus Status
@@ -150,16 +192,30 @@ classDiagram
         +HashSet~Guid~ BlockedVolunteerIds
         +List~Guid~ OpportunityIds
         +DateTime CreatedAt
+        +bool IsInitialized
+    }
+
+    class CoordinatorState {
+        <<GenerateSerializer>>
+        +string FirstName
+        +string LastName
+        +string Email
+        +string Phone
+        +Guid? OrganizationId
+        +string? ExpoPushToken
+        +int ManagedOpportunities
+        +bool IsInitialized
     }
 
     class AdminState {
-        <<[GenerateSerializer]>>
+        <<GenerateSerializer>>
         +Guid UserId
         +AdminRole Role
         +List~AuditLog~ ActionLog
+        +bool IsInitialized
     }
 
-    %% ================= 3. Enums (State Machines) =================
+    %% ================= 3. Enums =================
 
     class ApplicationStatus {
         <<Enumeration>>
@@ -207,8 +263,35 @@ classDiagram
         InviteOnly
     }
 
-    %% ================= 4. Value Objects (Key Logic Holders) =================
-    
+    class AdminRole {
+        <<Enumeration>>
+        Moderator
+        SuperAdmin
+    }
+
+    class OrgRole {
+        <<Enumeration>>
+        Admin
+        Coordinator
+        Member
+    }
+
+    class DisputeStatus {
+        <<Enumeration>>
+        Open
+        Resolved
+    }
+
+    class Frequency {
+        <<Enumeration>>
+        None
+        Daily
+        Weekly
+        Monthly
+    }
+
+    %% ================= 4. Value Objects =================
+
     class Shift {
         <<Value Object>>
         +Guid ShiftId
@@ -221,8 +304,7 @@ classDiagram
 
     class RecurrenceRule {
         <<Value Object>>
-        +Frequency Type 
-        %% e.g., Daily, Weekly
+        +Frequency Type
         +int Interval
         +DateTime? EndDate
     }
@@ -278,59 +360,175 @@ classDiagram
     }
 
     %% ================= 5. CQRS Read Models =================
-    class OpportunitySearchIndex {
-        <<Elasticsearch Doc>>
+
+    class OpportunitySummary {
+        <<EF Core ReadModel>>
         +Guid OpportunityId
+        +Guid OrganizationId
+        +string OrganizationName
         +string Title
-        +GeoPoint Location
-        +List~string~ Skills
-        +DateRange TimeRange
+        +string Category
+        +OpportunityStatus Status
+        +DateTime PublishDate
+        +int TotalSpots
         +int AvailableSpots
+        +double? Latitude
+        +double? Longitude
     }
 
-    %% ================= 6. Relationships =================
-    
-    %% -- State ownership --
+    class ApplicationSummary {
+        <<EF Core ReadModel>>
+        +Guid ApplicationId
+        +Guid OpportunityId
+        +Guid ShiftId
+        +string OpportunityTitle
+        +string ShiftName
+        +DateTime ShiftStartTime
+        +DateTime ShiftEndTime
+        +Guid VolunteerId
+        +string VolunteerName
+        +ApplicationStatus Status
+        +DateTime AppliedAt
+    }
+
+    class AttendanceSummary {
+        <<EF Core ReadModel>>
+        +Guid AttendanceId
+        +Guid OpportunityId
+        +Guid VolunteerId
+        +string VolunteerName
+        +string OpportunityTitle
+        +AttendanceStatus Status
+        +DateTime? CheckInTime
+        +DateTime? CheckOutTime
+        +double TotalHours
+    }
+
+    class DisputeSummary {
+        <<EF Core ReadModel>>
+        +Guid AttendanceId
+        +Guid VolunteerId
+        +string VolunteerName
+        +string OpportunityTitle
+        +string Reason
+        +string EvidenceUrl
+        +DateTime RaisedAt
+    }
+
+    class OrganizationSummary {
+        <<EF Core ReadModel>>
+        +Guid OrganizationId
+        +string Name
+        +string Description
+        +OrgStatus Status
+        +DateTime CreatedAt
+    }
+
+    %% ================= 6. CQRS Query Services =================
+
+    class IOpportunityQueryService {
+        <<interface>>
+        +SearchPublishedAsync(query?, category?) Task~List[OpportunitySummary]~
+        +GetByOrganizationAsync(orgId) Task~List[OpportunitySummary]~
+        +GetByIdsAsync(ids) Task~List[OpportunitySummary]~
+    }
+
+    class IApplicationQueryService {
+        <<interface>>
+        +GetByOpportunityAsync(oppId) Task~List[ApplicationSummary]~
+        +GetByVolunteerAsync(volId) Task~List[ApplicationSummary]~
+        +GetByOrganizationAsync(orgId) Task~List[ApplicationSummary]~
+    }
+
+    class IAttendanceQueryService {
+        <<interface>>
+        +GetByOpportunityAsync(oppId) Task~List[AttendanceSummary]~
+        +GetPendingDisputesAsync() Task~List[DisputeSummary]~
+    }
+
+    class IOrganizationQueryService {
+        <<interface>>
+        +GetPendingOrganizationsAsync() Task~List[OrganizationSummary]~
+        +GetApprovedOrganizationsAsync() Task~List[OrganizationSummary]~
+        +GetOrganizationAsync(orgId) Task~OrganizationSummary?~
+    }
+
+    %% ================= 7. Event Bus =================
+
+    class IEventBus {
+        <<interface>>
+        +PublishAsync~T~(domainEvent) Task
+    }
+
+    class IEventHandler~TEvent~ {
+        <<interface>>
+        +HandleAsync(domainEvent) Task
+    }
+
+    %% ================= 8. Relationships =================
+
+    %% State ownership
     IOpportunityGrain *-- OpportunityState : Holds
     IOpportunityGrain *-- Shift : Manages
     IApplicationGrain *-- ApplicationState : Holds
     IAttendanceRecordGrain *-- AttendanceRecordState : Holds
     IVolunteerGrain *-- VolunteerState : Holds
     IOrganizationGrain *-- OrganizationState : Holds
+    ICoordinatorGrain *-- CoordinatorState : Holds
     IAdminGrain *-- AdminState : Holds
 
-    %% -- Grain interactions --
-    IOrganizationGrain ..> IOpportunityGrain : "Owns / Creates"
+    %% Grain interactions
+    IOrganizationGrain ..> IOpportunityGrain : "Creates"
     IOpportunityGrain ..> IApplicationGrain : "Manages Lifecycle"
-    IVolunteerGrain ..> IApplicationGrain : "Tracks Applications"
-    IAttendanceRecordGrain ..> IOpportunityGrain : "Validates Location"
-    IOrganizationGrain ..> IVolunteerGrain : "Manages Blocklist"
-    IAdminGrain ..> IOrganizationGrain : "Approves / Suspends"
-    IAttendanceRecordGrain ..> IVolunteerGrain : "Updates ImpactScore"
+    IOpportunityGrain ..> IVolunteerGrain : "Checks Block Status"
+    IApplicationGrain ..> IOpportunityGrain : "Notifies Capacity"
+    IAttendanceRecordGrain ..> IVolunteerGrain : "Updates Hours"
+    IAdminGrain ..> IOrganizationGrain : "Approves / Rejects"
+    IAdminGrain ..> IVolunteerGrain : "Bans / Unbans"
+    IOrganizationGrain ..> ICoordinatorGrain : "Invites/Assigns"
+    ICoordinatorGrain ..> IOpportunityGrain : "Manages"
 
-    %% -- Notification triggers --
+    %% Notification triggers
     IOpportunityGrain ..> INotificationGrain : "Cancel / Reminder"
     IApplicationGrain ..> INotificationGrain : "Status Change"
     IAttendanceRecordGrain ..> INotificationGrain : "Dispute Updates"
 
-    %% -- CQRS sync --
-    IOpportunityGrain ..> OpportunitySearchIndex : "Syncs (Eventual Consistency)"
+    %% CQRS event flow
+    IOpportunityGrain ..> IEventBus : "Publishes Events"
+    IApplicationGrain ..> IEventBus : "Publishes Events"
+    IAttendanceRecordGrain ..> IEventBus : "Publishes Events"
+    IOrganizationGrain ..> IEventBus : "Publishes Events"
 
-    %% -- Enum usage --
+    IEventBus ..> IEventHandler~TEvent~ : "Routes to"
+    IEventHandler~TEvent~ ..> OpportunitySummary : "Upserts"
+    IEventHandler~TEvent~ ..> ApplicationSummary : "Upserts"
+    IEventHandler~TEvent~ ..> AttendanceSummary : "Upserts"
+    IEventHandler~TEvent~ ..> DisputeSummary : "Upserts"
+    IEventHandler~TEvent~ ..> OrganizationSummary : "Upserts"
+
+    IOpportunityQueryService ..> OpportunitySummary : "Reads"
+    IApplicationQueryService ..> ApplicationSummary : "Reads"
+    IAttendanceQueryService ..> AttendanceSummary : "Reads"
+    IAttendanceQueryService ..> DisputeSummary : "Reads"
+    IOrganizationQueryService ..> OrganizationSummary : "Reads"
+
+    %% Enum usage
     ApplicationState --> ApplicationStatus : uses
     AttendanceRecordState --> AttendanceStatus : uses
     OpportunityState --> OpportunityStatus : uses
     OpportunityState --> ApprovalPolicy : uses
     OrganizationState --> OrgStatus : uses
     DisputeInfo --> DisputeStatus : uses
+    OrgMember --> OrgRole : uses
+    AdminState --> AdminRole : uses
+    RecurrenceRule --> Frequency : uses
 ```
 
-``` mermaid
+```mermaid
 stateDiagram-v2
-    %% ================= Application Status State Machine =================
     [*] --> Pending : SubmitApplication
 
-    Pending --> Approved : Approve (Auto/Manual)
+    Pending --> Approved : Approve
     Pending --> Rejected : Reject
     Pending --> Waitlisted : Capacity Full
     Pending --> Withdrawn : Withdraw
@@ -339,7 +537,7 @@ stateDiagram-v2
     Waitlisted --> Withdrawn : Withdraw
 
     Promoted --> Approved : AcceptInvitation
-    Promoted --> Waitlisted : Acceptance Timeout (IRemindable)
+    Promoted --> Waitlisted : Timeout via IRemindable
 
     Approved --> NoShow : MarkAsNoShow
     Approved --> Withdrawn : Withdraw
@@ -351,50 +549,82 @@ stateDiagram-v2
     NoShow --> [*]
 ```
 
-``` mermaid
+```mermaid
 stateDiagram-v2
-    %% ================= Attendance Status State Machine =================
-    [*] --> Pending : Application Approved
+    [*] --> Pending : Initialize
 
-    Pending --> CheckedIn : CheckIn (GeoFence Validated)
+    Pending --> CheckedIn : CheckIn with GPS + Photo
 
-    CheckedIn --> CheckedOut : CheckOut / Auto-Checkout (IRemindable)
+    CheckedIn --> CheckedOut : CheckOut or Auto-Timeout
 
     CheckedOut --> Disputed : RaiseDispute
-    CheckedOut --> Confirmed : Confirm (Supervisor)
+    CheckedOut --> Confirmed : Confirm by Supervisor
 
-    Disputed --> Resolved : ResolveDispute (Admin)
-    Resolved --> Confirmed : Confirm (Supervisor)
+    Disputed --> Resolved : ResolveDispute by Admin
+    Resolved --> Confirmed : Confirm by Supervisor
 
     Confirmed --> [*]
 ```
 
-``` mermaid
+```mermaid
 sequenceDiagram
-    %% ================= Core Flow: Volunteer Applies to Opportunity =================
     participant V as Volunteer
-    participant VG as IVolunteerGrain
-    participant OG as IOpportunityGrain
-    participant AG as IApplicationGrain
-    participant NG as INotificationGrain
+    participant API as API Endpoint
+    participant OG as OpportunityGrain
+    participant VG as VolunteerGrain
+    participant AG as ApplicationGrain
+    participant EB as IEventBus
+    participant EH as EventHandler
+    participant DB as PostgreSQL ReadModel
 
-    V->>OG: SubmitApplication(volunteerId, shiftId, key)
-    OG->>VG: Check BlockedByOrgIds
-    VG-->>OG: Not Blocked ✓
-    OG->>OG: Check Shift Capacity & Idempotency
-    
-    alt Capacity Available & AutoApprove
-        OG->>AG: Create (Status = Pending)
-        OG->>AG: Approve()
-        AG->>NG: SendNotification("Application Approved")
-        AG->>VG: Add ApplicationId
-    else Capacity Available & ManualApprove
-        OG->>AG: Create (Status = Pending)
-        AG->>NG: SendNotification("Application Under Review")
-        AG->>VG: Add ApplicationId
+    V->>API: POST /apply (volunteerId, shiftId, key)
+    API->>OG: SubmitApplication(volunteerId, shiftId, key)
+    OG->>VG: IsBlockedByOrg(orgId)
+    VG-->>OG: false
+    OG->>OG: Check Idempotency + Shift Capacity
+
+    alt Capacity Available
+        OG->>AG: Initialize(volunteerId, oppId, shiftId, key)
+        OG->>VG: AddApplicationId(appId)
+        OG->>EB: PublishAsync(ApplicationSubmittedEvent)
+        EB->>EH: HandleAsync(event)
+        EH->>DB: INSERT ApplicationReadModel
     else Capacity Full
-        OG->>AG: Create (Status = Waitlisted)
-        AG->>NG: SendNotification("Added to Waitlist")
-        AG->>VG: Add ApplicationId
+        OG->>AG: Initialize then Waitlist()
+        OG->>VG: AddApplicationId(appId)
     end
+
+    OG-->>API: applicationId
+    API-->>V: 200 OK
+```
+
+```mermaid
+sequenceDiagram
+    participant V as Volunteer
+    participant API as API Endpoint
+    participant ATT as AttendanceRecordGrain
+    participant VG as VolunteerGrain
+    participant EB as IEventBus
+    participant EH as EventHandler
+    participant DB as PostgreSQL ReadModel
+
+    V->>API: POST /attendance/init (volunteerId, appId, oppId)
+    API->>ATT: Initialize(volunteerId, appId, oppId)
+    ATT-->>API: OK
+
+    V->>API: POST /attendance/checkin (lat, lon, photo)
+    API->>ATT: CheckIn(lat, lon, photo)
+    ATT->>EB: PublishAsync(AttendanceRecordedEvent)
+    EB->>EH: HandleAsync(event)
+    EH->>DB: INSERT AttendanceReadModel
+    ATT-->>API: OK
+
+    V->>API: POST /attendance/checkout
+    API->>ATT: CheckOut()
+    ATT->>VG: AddCompletedHours(hours)
+    ATT->>VG: IncrementCompletedOpportunities()
+    ATT->>EB: PublishAsync(AttendanceStatusChangedEvent)
+    EB->>EH: HandleAsync(event)
+    EH->>DB: UPDATE AttendanceReadModel
+    ATT-->>API: OK
 ```
