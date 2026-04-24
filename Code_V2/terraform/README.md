@@ -1,4 +1,4 @@
-# VSMS Infrastructure — Terraform + VPC Peering
+# VSMS Infrastructure - Terraform + VPC Peering
 
 Multi-account AWS deployment with full-mesh VPC Peering for the VSMS Capstone project.
 

@@ -135,7 +135,8 @@ graph LR
 
 - **4 VPCs** with non-overlapping CIDR blocks (10.16–10.19.0.0/16)
 - **Full-mesh VPC Peering**: 6 cross-account peering connections ensure every VPC can communicate directly with every other VPC
-  - $$\text{Links} = \binom{n}{2} = \frac{n(n-1)}{2} = \frac{4 \times 3}{2} = 6$$
+  
+  - Links = n(n-1)/2 = 4x3/2 = 6
 - A **supernet CIDR** (`10.16.0.0/14`) is used in Security Group rules to allow all inter-VPC traffic through a single rule:
 
   | VPC | CIDR | 16-bit Binary |
@@ -405,23 +406,27 @@ graph TD
 
 #### 6.1.1 DNS
 
-![VSMS DNS](screenshots/dig.png)
+<img src="screenshots/dig.png" alt="VSMS DNS" style="zoom:50%;" />
 
 #### 6.1.2 HAProxy Load Balancer
 
-![VSMS Web LB](screenshots/haproxy.png)
-
 ![VSMS Web LB](screenshots/HAProxy_Load_Balancer.png)
+
+<img src="screenshots/haproxy1.png" alt="VSMS Web LB" style="zoom:40%;" />
+
+<img src="screenshots/haproxy2.png" alt="VSMS Web LB" style="zoom:40%;" />
+
+<img src="screenshots/haproxy3.png" alt="VSMS Web LB" style="zoom:50%;" />
 
 #### 6.1.3 System Info
 
-![VSMS Web Dashboard](screenshots/vsms-web-dashboard.png)
+<img src="screenshots/vsms-web-dashboard.png" alt="VSMS Web Dashboard" style="zoom:50%;" />
 
 #### 6.1.4 CI/CD
 
-![VSMS Web Dashboard](screenshots/build.png)
+<img src="screenshots/build.png" alt="VSMS Web Dashboard" style="zoom:32%;" />
 
-![VSMS Web Dashboard](screenshots/deploy.png)
+<img src="screenshots/deploy.png" alt="VSMS Web Dashboard" style="zoom:40%;" />
 
 ### 6.2 AWS Resources
 
@@ -429,34 +434,57 @@ graph TD
 
 8 running instances across 4 accounts (2 per account)
 
-![EC2 Instances](screenshots/EC2_yangbo.png)
+##### Bo Yang EC2
 
-![EC2 Instances](screenshots/EC2.png)
+<img src="screenshots/EC2_yangbo.png" alt="EC2 Instances" style="zoom:30%;" />
 
-![EC2 Instances](screenshots/EC2_Brad.png)
+##### Chunxi EC2
 
-![EC2 Instances](screenshots/EC2_Marieth.png)
+<img src="screenshots/EC2.png" alt="EC2 Instances" style="zoom:50%;" />
+
+##### Bo Zhang EC2
+
+<img src="screenshots/EC2_Brad.png" alt="EC2 Instances" style="zoom:30%;" />
+
+##### Marieth EC2
+
+<img src="screenshots/EC2_Marieth.png" alt="EC2 Instances" style="zoom:40%;" />
 
 #### 6.2.2 VPC Peering Connections
 
 **6 active full-mesh peering connections**
 
+##### Bo Yang VPC Peering
+
 ![VPC Peering](screenshots/VPC_Peering_boyang.png)
 
-![VPC Peering](screenshots/VPC_Peering.png)
+##### Chunxi VPC Peering
 
-![VPC Peering](screenshots/VPC_Peering_Brad.png)
+<img src="screenshots/VPC_Peering.png" alt="VPC Peering" style="zoom:60%;" />
 
-![VPC Peering](screenshots/VPC_Peering_Marieth.png)
+##### Bo Zhang VPC Peering
 
+<img src="screenshots/VPC_Peering_Brad.png" alt="VPC Peering" style="zoom:40%;" />
+
+##### Marieth VPC Peering
+
+<img src="screenshots/VPC_Peering_Marieth.png" alt="VPC Peering" style="zoom:40%;" />
 
 #### 6.2.3 Security Group Rules
 
-![Security Groups](screenshots/SecurityGroup_boyang.png)
+##### Bo Yang Security Group
+
+<img src="screenshots/SecurityGroup_boyang.png" alt="Security Groups" style="zoom:40%;" />
+
+##### Chunxi Security Group
 
 ![Security Groups](screenshots/SecurityGroup.png)
 
+##### Bo Zhang Security Group
+
 ![Security Groups](screenshots/SecurityGroup_Brad.png)
+
+##### Marieth Security Group
 
 ![Security Groups](screenshots/SecurityGroup_Marieth.png)
 
