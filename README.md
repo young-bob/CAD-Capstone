@@ -7,9 +7,7 @@
 
 **A platform for revolutionizing volunteer management through automated verification and compliance.**
 
-[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [Documentation](#-documentation) • 
-
-</div>
+[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [Architecture](#-architecture)
 
 ---
 
@@ -17,11 +15,12 @@
 
 - [The Problem](#-the-problem)
 - [Our Solution](#-our-solution)
+- [System Roles & Personas](#-system-roles--personas)
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
+- [Repository Structure](#-repository-structure)
 - [Architecture](#-architecture)
 - [Getting Started](#-getting-started)
-- [Project Structure](#-project-structure)
 - [Development Workflow](#-development-workflow)
 - [Testing](#-testing)
 - [Deployment](#-deployment)
@@ -50,7 +49,7 @@ Students can't see in real-time how many approved clinical hours they still need
 
 ## 💡 Our Solution
 
-A **mobile-first , web platform** that automates volunteer coordination with GPS-verified attendance, instant certificates, and real-time progress tracking.
+A **mobile-first, web platform** that automates volunteer coordination with GPS-verified attendance, instant certificates, and real-time progress tracking.
 
 ### For Volunteers 🙋
 - 📍 **Smart Discovery**: Location-based matching finds opportunities within 5 km
@@ -60,10 +59,19 @@ A **mobile-first , web platform** that automates volunteer coordination with GPS
 
 ### For Organizations - Coordinator 🏢
 - 📧 **Zero Email**: Automated scheduling with real-time availability
--  **Predictive Demand Forecasting** :AI-Driven Predictive Demand Forecasting 
+- 📈 **Predictive Demand Forecasting**: AI-Driven Predictive Demand Forecasting 
 - 📱 **Digital Attendance**: GPS-verified check-ins eliminate manual tracking
-- 📈 **Instant Reports**: Export verified hours for grant compliance
+- 📊 **Instant Reports**: Export verified hours for grant compliance
 - 🛡️ **Fraud Prevention**: Geofencing ensures volunteers are actually present
+
+---
+
+## 👥 System Roles & Personas
+
+The platform supports three distinct user roles, each with dedicated dashboard routing across the Web and Mobile applications:
+- **Volunteer**: Discovers opportunities, manages applications, performs geospatial attendance check-ins, and tracks their impact score.
+- **Coordinator**: Manages organization profiles, creates opportunities, reviews applications, handles manual attendance adjustments, and registers push notifications.
+- **Admin**: Oversees the entire platform, approves/rejects new organizations, resolves attendance disputes, and manages system moderation.
 
 ---
 
@@ -74,151 +82,184 @@ A **mobile-first , web platform** that automates volunteer coordination with GPS
 #### Volunteers 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Multi-org Discovery** | Browse opportunities across organizations with map view | 📋 Planned  |
-| **Application Tracking** | Real-time status updates (pending/approved/rejected) | 📋 Planned |
-| **Document Upload** | Secure upload for background checks, certifications | 📋 Planned |
-| **Smart Task Discovery** | Location-based matching within 5 km radius | 📋 Planned |
-| **One-Click Application** | Auto-approval based on task capacity | 📋 Planned |
-| **Geofenced Check-in** | Automatic GPS-verified attendance tracking | 📋 Planned |
-| **Progress Dashboard** | Visual tracking toward graduation/certification goals | 📋 Planned |
-| **Certificate Generator** | Instant verified PDFs for schools/employers | 📋 Planned |
+| **Multi-org Discovery** | Browse opportunities across organizations with map view | ✅ Finished  |
+| **Application Tracking** | Real-time status updates (pending/approved/rejected) | ✅ Finished |
+| **Document Upload** | Secure upload for background checks, certifications | ✅ Finished |
+| **Smart Task Discovery** | Location-based matching within 5 km radius | ✅ Finished |
+| **One-Click Application** | Auto-approval based on task capacity | ✅ Finished |
+| **Geofenced Check-in** | Automatic GPS-verified attendance tracking | ✅ Finished |
+| **Progress Dashboard** | Visual tracking toward graduation/certification goals | ✅ Finished |
+| **Certificate Generator** | Instant verified PDFs for schools/employers | ✅ Finished |
 
 #### Coordinators 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Organization Verification** | Upload proof of legitimate organization | 📋 Planned |
-| **Attendance Console** | Live dashboard with geofence validation | 📋 Planned |
-| **Shift Management** | Create/manage shifts with real-time applicants | 📋 Planned |
-| **Approval Workflow** | Review applications and verify credentials | 📋 Planned |
-| **Geofencing Config** | Set radius boundaries for each location | 📋 Planned |
-| **Bulk Notifications** | Send automated shift reminders/updates | 📋 Planned |
-| **Organization Profile** | Manage details, locations, requirements | 📋 Planned |
+| **Organization Verification** | Upload proof of legitimate organization | ✅ Finished |
+| **Attendance Console** | Live dashboard with geofence validation | ✅ Finished |
+| **Shift Management** | Create/manage shifts with real-time applicants | ✅ Finished |
+| **Approval Workflow** | Review applications and verify credentials | ✅ Finished |
+| **Geofencing Config** | Set radius boundaries for each location | ✅ Finished |
+| **Bulk Notifications** | Send automated shift reminders/updates | ✅ Finished |
+| **Organization Profile** | Manage details, locations, requirements | ✅ Finished |
 | **Predictive Demand Forecasting**| A heatmap or trend line showing "Predicted Need" vs. "Current Registered Volunteers."| 📋 Planned |
 
-📌 **Note**: See [ROADMAP.md](https://github.com/users/czhang1818/projects/4/views/1) for Tier 2 & 3 features (notifications, analytics, AI forecasting)
+#### Administrators
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Organization Approval** | Review and approve/reject new organization registrations | ✅ Finished |
+| **System Moderation** | Ban/unban users and handle critical platform violations | ✅ Finished |
+| **Dispute Resolution** | Intervene in and resolve attendance or hour disputes | ✅ Finished |
+
+#### Platform-Wide Features
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **AI Assistant** | Context-aware generative AI for answering platform and data questions | ✅ Finished |
+| **Push Notifications** | Cross-platform real-time alerts for shift and application updates | ✅ Finished |
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend (Mobile)
-- TBD
+### Backend Architecture
+- **Core Framework**: .NET 10 (ASP.NET Core Web API)
+- **Language**: C# 13
+- **Distributed Systems / Actor Model**: Microsoft Orleans 10
+  - *Clustering & Persistence*: ADO.NET (PostgreSQL)
+  - *Event Bus / Message Streaming*: Orleans Streams (Memory / ADO.NET)
+- **Database / ORM**: PostgreSQL 17 + Entity Framework Core 9 (EF Core)
+- **Architecture Pattern**: Vertical Slice Architecture + CQRS + Domain-Driven Design (DDD) principles using Minimal APIs
+- **File Storage**: MinIO (S3-compatible object storage)
+- **Authentication / Authorization**: JWT (JSON Web Tokens)
+- **Document Generation**: QuestPDF (for volunteer hour certificates)
+- **Deployment & Containerization**: Podman Compose (supports both single-node and multi-silo cluster deployments)
 
-### Backend
-- TBD
+### Mobile Application
+- **Framework**: React Native with Expo (SDK 55)
+- **Language**: TypeScript
+- **UI Component Library**: React Native Paper (Material Design)
+- **State Management**: Zustand
+- **Routing/Navigation**: Expo Router (File-based routing)
+- **Network / API Integration**: Axios
+- **Maps & Location**: Expo Location (for geospatial check-ins)
+- **Hardware Integration**: Expo Image Picker (for proof of attendance & credential uploads)
+- **Push Notifications**: Expo Push Notifications Service
 
-### Infrastructure
-- TBD
+### Web Application
+- **Framework**: React 19 + Vite 6
+- **Language**: TypeScript
+- **Styling**: TailwindCSS v4
+- **Icons**: Lucide React
+- **Network / API Integration**: Axios
+- **Deployment**: Nginx (static file serving via Podman)
 
-### Development Tools
-- TBD
+---
+
+## 📁 Repository Structure
+
+The active development is located in the `Code_V2/` directory:
+
+- **`Code_V2/backend/`**: Core backend services built with .NET 10, ASP.NET Core Web API, and Microsoft Orleans.
+- **`Code_V2/web/`**: Web application dashboard built with React 19, Vite, and TailwindCSS.
+- **`Code_V2/mobile/`**: Cross-platform mobile application built with React Native and Expo.
+- **`Code_V2/presentation/`**: Interactive Capstone project presentation (Reveal.js).
+- **`Code_V2/terraform/`**: Infrastructure as Code (IaC) configurations for AWS deployment.
+- **`Code_V2/deploy/`**: Configurations for reverse proxies and load balancers (Nginx, HAProxy).
+- **`Code_V2/tools/`**: Development utilities, including the Node.js data seeder (`seed-debug-data.mjs`).
+- **`Code_V2/tests/`**: Unit and integration test suites (`VSMS.Tests`).
+- **`Code_V2/data/`**: Local data storage and output directory for generated debug seed data.
+- **`Code_V2/*.sh` scripts**: Automation scripts for local (`local_*.sh`) and remote (`remote_*.sh`) deployments.
 
 ---
 
 ## 🏗️ Architecture
 
-- TBD
+VSMS utilizes an event-driven, distributed actor model built on Microsoft Orleans. This ensures high availability, horizontal scalability, and low-latency processing for real-time attendance tracking and matching. 
 
-
-### Database Schema
-
-See detailed schema with relationships in ![docs/architecture/database-schema.png](./docs/architecture/database-schema.png)
-
-
+For detailed diagrams and the CQRS data flow, see the [Architecture UML Diagrams](./Code_V2/UML.md).
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- TBD
-- **Node.js** >= 18.0.0 ([Download](https://nodejs.org/))
-- **npm** >= 9.0.0 or **yarn** >= 1.22.0
-- **PostgreSQL** >= 15.0 ([Download](https://www.postgresql.org/download/))
-- **Expo CLI** (install globally: `npm install -g expo-cli`)
-- **Git** ([Download](https://git-scm.com/))
+- **Docker / Podman** installed and running
+- **Node.js** (v18 or newer recommended)
+- **.NET 10 SDK** (for local backend development)
+- **Android Studio** (for mobile emulator)
 
-**For mobile development:**
-- TBD
-- **Expo Go** app on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
-- OR **iOS Simulator** (macOS only) / **Android Emulator**
+### 1. Start the Backend Services (Docker/Podman)
+The backend has cross-service dependencies (PostgreSQL, MinIO, etc.). It is highly recommended to run the entire stack using containerization.
 
-
----
-
-## 📁 Project Structure
-
-- TBD
+```bash
+cd Code_V2
+podman compose -f podman-compose.yml up -d
+# or
+docker compose -f podman-compose.yml up -d
 ```
-volunteer-management-system/
-├── .github/                    # GitHub Actions, issue templates, PR templates
-├── docs/                       # All project documentation
-│   ├── architecture/           # System design, diagrams, ADRs
+*The API will be available at `http://localhost:8080`.*
 
+### 2. Seed Debug Data
+To quickly generate realistic data for testing:
+```bash
+cd Code_V2
+node tools/seed-debug-data.mjs --base-url http://localhost:8080 --incremental true
 ```
 
-> 📚 See [ARCHITECTURE.md](./docs/architecture/system-overview.md) for detailed component descriptions
+### 3. Run the Web App
+```bash
+cd Code_V2/web
+npm install
+npm run dev
+```
+*Available at `http://localhost:5173`.*
+
+### 4. Run the Mobile App
+```bash
+cd Code_V2/mobile
+npm install
+npx expo start
+```
+*Press `a` in the terminal to launch on the Android Emulator.*
 
 ---
 
 ## 💻 Development Workflow
 
 ### Branch Strategy
-
 We follow **Git Flow**:
-
 - `main` - Production-ready code
 - `develop` - Integration branch for features
 - `feature/*` - New features (e.g., `feature/V-9-geofenced-checkin`)
 - `bugfix/*` - Bug fixes
 - `hotfix/*` - Critical production fixes
 
-### Commit Convention
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
-```bash
-feat(mobile): add geofenced check-in screen
-feat(frontend): add dashboard check-in screen
-fix(backend): resolve authentication token expiry bug
-docs(readme): update setup instructions
-test(backend): add unit tests for shift service
-chore(deps): update dependencies
-```
-
 ### Pull Request Process
-
 1. Create a feature branch from `develop`
-2. Make your changes and commit
+2. Make your changes and commit using Conventional Commits
 3. Push and create a Pull Request
 4. Ensure CI checks pass (linting, tests)
 5. Get at least 1 approval from a team member
 6. Squash and merge into `develop`
 
-
 ---
 
 ## 🧪 Testing
 
-### Running Tests
-
-- TBD
 ```bash
-# Backend tests
-cd backend
-npm test                    # Run all tests
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests
-npm run test:e2e           # End-to-end tests
-npm run test:coverage      # Generate coverage report
+# Backend tests (.NET)
+cd Code_V2/tests/VSMS.Tests
+dotnet test
 
-# Mobile tests
-cd mobile
-npm test                    # Jest tests
-npm run test:e2e           # Detox E2E tests (requires simulator)
+# Web tests (React)
+cd Code_V2/web
+npm test
+
+# Mobile tests (React Native)
+cd Code_V2/mobile
+npm test
 ```
 
 ### Test Coverage Goals
-
 - **Unit Tests**: > 80% coverage
 - **Integration Tests**: All API endpoints
 - **E2E Tests**: Critical user flows (check-in, application, certificate generation)
@@ -227,32 +268,20 @@ npm run test:e2e           # Detox E2E tests (requires simulator)
 
 ## 🚢 Deployment
 
-### Environments
+VSMS supports both local containerized development and automated cloud deployments.
 
-- **Development**: Local development environment
-- **Staging**: Testing environment (mimics production)
-- **Production**: Live application (TBD)
+### Infrastructure as Code (Terraform)
+The `Code_V2/terraform/` directory contains complete IaC definitions for provisioning the AWS infrastructure required for the production environment, including compute instances, networking, and security groups.
 
-### Backend Deployment
-- TBD
-
-### Mobile Deployment
-- TBD
-
-
-
-
-
+---
 
 ## 👥 Team
 
 ### Development Team
-
 - Bo Yang
 - Bo Zhang
 - Chunxi Zhang
 - Marieth Franciss Perez Zevallos
-
 
 ---
 
