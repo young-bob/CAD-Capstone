@@ -81,8 +81,8 @@ The platform supports three distinct user roles, each with dedicated dashboard r
 
 #### Volunteers 
 | Feature | Description | Status |
-|---------|-------------|--------|
-| **Multi-org Discovery** | Browse opportunities across organizations with map view | ✅ Finished  |
+|---|---|---|
+| **Multi-org Discovery** | Browse opportunities across organizations with map view | ✅ Finished |
 | **Application Tracking** | Real-time status updates (pending/approved/rejected) | ✅ Finished |
 | **Document Upload** | Secure upload for background checks, certifications | ✅ Finished |
 | **Smart Task Discovery** | Location-based matching within 5 km radius | ✅ Finished |
@@ -93,7 +93,7 @@ The platform supports three distinct user roles, each with dedicated dashboard r
 
 #### Coordinators 
 | Feature | Description | Status |
-|---------|-------------|--------|
+|---|---|---|
 | **Organization Verification** | Upload proof of legitimate organization | ✅ Finished |
 | **Attendance Console** | Live dashboard with geofence validation | ✅ Finished |
 | **Shift Management** | Create/manage shifts with real-time applicants | ✅ Finished |
@@ -101,18 +101,18 @@ The platform supports three distinct user roles, each with dedicated dashboard r
 | **Geofencing Config** | Set radius boundaries for each location | ✅ Finished |
 | **Bulk Notifications** | Send automated shift reminders/updates | ✅ Finished |
 | **Organization Profile** | Manage details, locations, requirements | ✅ Finished |
-| **Predictive Demand Forecasting**| A heatmap or trend line showing "Predicted Need" vs. "Current Registered Volunteers."| 📋 Planned |
+| **Predictive Demand Forecasting** | A heatmap or trend line showing "Predicted Need" vs. "Current Registered Volunteers." | 📋 Planned |
 
 #### Administrators
 | Feature | Description | Status |
-|---------|-------------|--------|
+|---|---|---|
 | **Organization Approval** | Review and approve/reject new organization registrations | ✅ Finished |
 | **System Moderation** | Ban/unban users and handle critical platform violations | ✅ Finished |
 | **Dispute Resolution** | Intervene in and resolve attendance or hour disputes | ✅ Finished |
 
 #### Platform-Wide Features
 | Feature | Description | Status |
-|---------|-------------|--------|
+|---|---|---|
 | **AI Assistant** | Context-aware generative AI for answering platform and data questions | ✅ Finished |
 | **Push Notifications** | Cross-platform real-time alerts for shift and application updates | ✅ Finished |
 
