@@ -26,10 +26,11 @@ The following AI tools were used to assist team members during the design, devel
 | Tool | Provider | Primary Use |
 |------|----------|-------------|
 | Claude / Claude Code | Anthropic | Code generation, code review, architecture analysis, debugging, technical documentation |
-| ChatGPT / GPT-4 | OpenAI | Code generation, problem-solving, research, explaining concepts |
+| ChatGPT / GPT-4 | OpenAI | Problem-solving, research, explaining concepts |
 | Codex | OpenAI | Code autocompletion and generation |
 | Lovable | Lovable Technologies | UI/UX design mockup generation |
-| Antigravity | Antigravity AI | Code generation assistance |
+| Antigravity | Antigravity AI | AI coding assistant — autonomous code generation and task execution |
+| Gemini | Google | Code generation, problem-solving, research |
 
 ### How AI Tools Were Used
 
